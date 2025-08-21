@@ -1,3 +1,4 @@
+import 'package:confetti/confetti.dart';
 import 'package:flutter/material.dart';
 import 'dart:async';
 
@@ -31,7 +32,81 @@ class ChronofyHomePage extends StatefulWidget {
   State<ChronofyHomePage> createState() => _ChronofyHomePageState();
 }
 
-class _ChronofyHomePageState extends State<ChronofyHomePage> {
+class _ChronofyHomePageState extends State<ChronofyHomePage>
+    with TickerProviderStateMixin {
+  Widget _buildBottomNavigation() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 12),
+      decoration: const BoxDecoration(
+        color: Color(0xFF23263A),
+        borderRadius: BorderRadius.only(
+          topLeft: Radius.circular(24),
+          topRight: Radius.circular(24),
+        ),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          _buildNavIcon(Icons.home, 'Home'),
+          _buildNavIcon(Icons.calendar_today, 'Calendar'),
+          _buildNavIcon(Icons.trending_up, 'Report'),
+          _buildNavIcon(Icons.settings, 'Settings'),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildNavIcon(IconData icon, String label) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(
+          icon,
+          color: Colors.white,
+          size: 24,
+        ),
+        const SizedBox(height: 4),
+        Text(
+          label,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 10,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      ],
+    );
+  }
+  late ConfettiController _confettiController;
+  late AnimationController _progressAnimationController;
+  late Animation<double> _progressAnimation;
+  
+  @override
+  void initState() {
+    super.initState();
+    _confettiController = ConfettiController(duration: const Duration(seconds: 2));
+    _progressAnimationController = AnimationController(
+      duration: const Duration(milliseconds: 800),
+      vsync: this,
+    );
+    _progressAnimation = Tween<double>(
+      begin: 0.0,
+      end: 0.0,
+    ).animate(CurvedAnimation(
+      parent: _progressAnimationController,
+      curve: Curves.linear,
+    ));
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    _confettiController.dispose();
+    _progressAnimationController.dispose();
+    super.dispose();
+  }
+
+  // Test data
   Timer? _timer;
   int _focusSeconds = 25 * 60; // 25 minutes
   int _breakSeconds = 5 * 60; // 5 minutes
@@ -274,7 +349,7 @@ class _ChronofyHomePageState extends State<ChronofyHomePage> {
     );
   }
 
-  int _selectedIndex = 0;
+  // ...existing code...
   bool _isStrictMode = false;
   bool _isTimerMode = true;
   bool _isWhiteNoise = false;
@@ -305,11 +380,13 @@ class _ChronofyHomePageState extends State<ChronofyHomePage> {
       _currentSession = _currentSession == 0 ? 1 : _currentSession;
       _currentSeconds = _focusSeconds;
     });
+    _updateProgressAnimation();
 
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
       setState(() {
         if (_currentSeconds > 0) {
           _currentSeconds--;
+          _updateProgressAnimation();
         } else {
           _completeFocusSession();
         }
@@ -323,11 +400,13 @@ class _ChronofyHomePageState extends State<ChronofyHomePage> {
       _isBreakTime = true;
       _currentSeconds = _breakSeconds;
     });
+    _updateProgressAnimation();
 
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
       setState(() {
         if (_currentSeconds > 0) {
           _currentSeconds--;
+          _updateProgressAnimation();
         } else {
           _completeBreakSession();
         }
@@ -354,6 +433,7 @@ class _ChronofyHomePageState extends State<ChronofyHomePage> {
         setState(() {
           if (_currentSeconds > 0) {
             _currentSeconds--;
+            _updateProgressAnimation();
           } else {
             _completeFocusSession();
           }
@@ -363,6 +443,7 @@ class _ChronofyHomePageState extends State<ChronofyHomePage> {
   }
 
   void _completeFocusSession() {
+  _confettiController.play();
     _timer?.cancel();
     
     if (_currentSession >= _totalSessions) {
@@ -417,6 +498,7 @@ class _ChronofyHomePageState extends State<ChronofyHomePage> {
       _isBreakTime = false;
       _selectedTask = 'Select Task';
     });
+    _progressAnimationController.reset();
   }
 
   String _formatTime(int seconds) {
@@ -435,16 +517,25 @@ class _ChronofyHomePageState extends State<ChronofyHomePage> {
     }
   }
 
+  void _updateProgressAnimation() {
+    double targetProgress = _getProgress();
+    _progressAnimation = Tween<double>(
+      begin: _progressAnimation.value,
+      end: targetProgress,
+    ).animate(CurvedAnimation(
+      parent: _progressAnimationController,
+      curve: Curves.linear,
+    ));
+    _progressAnimationController.reset();
+    _progressAnimationController.forward();
+  }
+
   Color _getProgressColor() {
     if (_isBreakTime) return const Color(0xFFFF6B47);
     return const Color(0xFFFF6B47);
   }
 
-  @override
-  void dispose() {
-    _timer?.cancel();
-    super.dispose();
-  }
+  // ...existing code...
 
   @override
   Widget build(BuildContext context) {
@@ -454,193 +545,215 @@ class _ChronofyHomePageState extends State<ChronofyHomePage> {
 
     return Scaffold(
       backgroundColor: const Color(0xFF2A2D3A),
-      body: SafeArea(
-        child: Column(
-          children: [
-            // Top App Bar
-            _buildAppBar(),
-            
-            // Task Selection Dropdown (only show when idle)
-            if (_timerState == TimerState.idle) _buildTaskSelector(),
-            
-            // Main Timer Section
-            Expanded(
-              child: _buildTimerSection(),
+      body: Stack(
+        children: [
+          SafeArea(
+            child: Column(
+              children: [
+                // Top App Bar
+                _buildAppBar(),
+                // Task Selection Dropdown (only show when idle)
+                if (_timerState == TimerState.idle) _buildTaskSelector(),
+                // Main Timer Section
+                Expanded(
+                  child: _buildTimerSection(),
+                ),
+                // Mode Selection
+                _buildModeSelection(),
+                // Bottom Navigation
+                _buildBottomNavigation(),
+              ],
             ),
-            
-            // Mode Selection
-            _buildModeSelection(),
-            
-            // Bottom Navigation
-            _buildBottomNavigation(),
-          ],
-        ),
+          ),
+          // Confetti animation overlay
+          Align(
+            alignment: Alignment.topCenter,
+            child: ConfettiWidget(
+              confettiController: _confettiController,
+              blastDirectionality: BlastDirectionality.explosive,
+              shouldLoop: false,
+              colors: const [
+                Colors.orange,
+                Colors.green,
+                Colors.blue,
+                Colors.purple,
+                Colors.red,
+              ],
+              emissionFrequency: 0.05,
+              numberOfParticles: 20,
+              maxBlastForce: 20,
+              minBlastForce: 8,
+            ),
+          ),
+        ],
       ),
     );
   }
 
   Widget _buildCongratulationsScreen() {
-    return Scaffold(
-      backgroundColor: const Color(0xFF1A1D29),
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [Color(0xFF1A1D29), Color(0xFF2A2D3A)],
-          ),
-        ),
-        child: SafeArea(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              // Confetti and Trophy
-              Container(
-                width: 200,
-                height: 200,
-                child: Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    // Trophy
-                    Container(
-                      width: 120,
-                      height: 120,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFFFD700),
-                        borderRadius: BorderRadius.circular(20),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.orange.withOpacity(0.3),
-                            blurRadius: 20,
-                            spreadRadius: 5,
+    // Trigger confetti animation when this screen is built
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _confettiController.play();
+    });
+    
+    return Stack(
+      children: [
+        Scaffold(
+          backgroundColor: const Color(0xFF1A1D29),
+          body: Container(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [Color(0xFF1A1D29), Color(0xFF2A2D3A)],
+              ),
+            ),
+            child: SafeArea(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  // Confetti and Trophy
+                  Container(
+                    width: 200,
+                    height: 200,
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        // Trophy
+                        Container(
+                          width: 120,
+                          height: 120,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFFD700),
+                            borderRadius: BorderRadius.circular(20),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.orange.withOpacity(0.3),
+                                blurRadius: 20,
+                                spreadRadius: 5,
+                              ),
+                            ],
                           ),
-                        ],
-                      ),
-                      child: const Icon(
-                        Icons.emoji_events,
-                        size: 80,
-                        color: Color(0xFFFFA000),
-                      ),
+                          child: const Icon(
+                            Icons.emoji_events,
+                            size: 80,
+                            color: Color(0xFFFFA000),
+                          ),
+                        ),
+                      ],
                     ),
-                    
-                    // Confetti particles
-                    ...List.generate(15, (index) {
-                      final double angle = (index * 24) * 3.14159 / 180;
-                      final double radius = 80 + (index % 3) * 20;
-                      return Positioned(
-                        left: 100 + radius * 0.8 * (index % 2 == 0 ? 1 : -1),
-                        top: 100 + radius * 0.6 * (index % 3 == 0 ? 1 : -1),
-                        child: Transform.rotate(
-                          angle: angle,
+                  ),
+                  
+                  const SizedBox(height: 40),
+                  
+                  // Congratulations text
+                  const Text(
+                    'Congratulations!',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 28,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  
+                  const SizedBox(height: 16),
+                  
+                  Text(
+                    'You\'ve completed the task\n\'$_selectedTask\'',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: Colors.grey[400],
+                      fontSize: 16,
+                      height: 1.5,
+                    ),
+                  ),
+                  
+                  const SizedBox(height: 60),
+                  
+                  // Buttons
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 40),
+                    child: Row(
+                      children: [
+                        Expanded(
                           child: Container(
-                            width: 6,
-                            height: 15,
-                            decoration: BoxDecoration(
-                              color: [
-                                const Color(0xFFFF6B47),
-                                const Color(0xFF4CAF50),
-                                const Color(0xFF2196F3),
-                                const Color(0xFFFFD700),
-                                const Color(0xFFE91E63),
-                              ][index % 5],
-                              borderRadius: BorderRadius.circular(3),
+                            height: 56,
+                            child: ElevatedButton(
+                              onPressed: _resetToHome,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.transparent,
+                                foregroundColor: Colors.white,
+                                elevation: 0,
+                                side: const BorderSide(color: Colors.white, width: 1),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(28),
+                                ),
+                              ),
+                              child: const Text(
+                                'Back to Home',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
                             ),
                           ),
                         ),
-                      );
-                    }),
-                  ],
-                ),
-              ),
-              
-              const SizedBox(height: 40),
-              
-              // Congratulations text
-              const Text(
-                'Congratulations!',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 28,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              
-              const SizedBox(height: 16),
-              
-              Text(
-                'You\'ve completed the task\n\'$_selectedTask\'',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: Colors.grey[400],
-                  fontSize: 16,
-                  height: 1.5,
-                ),
-              ),
-              
-              const SizedBox(height: 60),
-              
-              // Buttons
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 40),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Container(
-                        height: 56,
-                        child: ElevatedButton(
-                          onPressed: _resetToHome,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.transparent,
-                            foregroundColor: Colors.white,
-                            elevation: 0,
-                            side: const BorderSide(color: Colors.white, width: 1),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(28),
-                            ),
-                          ),
-                          child: const Text(
-                            'Back to Home',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w500,
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Container(
+                            height: 56,
+                            child: ElevatedButton(
+                              onPressed: () {
+                                // View Report functionality - placeholder
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFFFF6B47),
+                                foregroundColor: Colors.white,
+                                elevation: 0,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(28),
+                                ),
+                              ),
+                              child: const Text(
+                                'View Report',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
                             ),
                           ),
                         ),
-                      ),
+                      ],
                     ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Container(
-                        height: 56,
-                        child: ElevatedButton(
-                          onPressed: () {
-                            // View Report functionality - placeholder
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFFFF6B47),
-                            foregroundColor: Colors.white,
-                            elevation: 0,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(28),
-                            ),
-                          ),
-                          child: const Text(
-                            'View Report',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
         ),
-      ),
+        // Confetti animation overlay on trophy page
+        Align(
+          alignment: Alignment.topCenter,
+          child: ConfettiWidget(
+            confettiController: _confettiController,
+            blastDirectionality: BlastDirectionality.explosive,
+            shouldLoop: false,
+            colors: const [
+              Colors.orange,
+              Colors.green,
+              Colors.blue,
+              Colors.purple,
+              Colors.red,
+            ],
+            emissionFrequency: 0.05,
+            numberOfParticles: 30,
+            maxBlastForce: 25,
+            minBlastForce: 10,
+          ),
+        ),
+      ],
     );
   }
 
@@ -795,11 +908,17 @@ class _ChronofyHomePageState extends State<ChronofyHomePage> {
                   Container(
                     width: 280,
                     height: 280,
-                    child: CircularProgressIndicator(
-                      value: _getProgress(),
-                      strokeWidth: 8,
-                      backgroundColor: Colors.transparent,
-                      valueColor: AlwaysStoppedAnimation<Color>(_getProgressColor()),
+                    child: AnimatedBuilder(
+                      animation: _progressAnimation,
+                      builder: (context, child) {
+                        return CircularProgressIndicator(
+                          value: _progressAnimation.value,
+                          strokeWidth: 8,
+                          backgroundColor: Colors.transparent,
+                          valueColor: AlwaysStoppedAnimation<Color>(_getProgressColor()),
+                          strokeCap: StrokeCap.round,
+                        );
+                      },
                     ),
                   ),
                   
@@ -874,9 +993,9 @@ class _ChronofyHomePageState extends State<ChronofyHomePage> {
                 borderRadius: BorderRadius.circular(28),
               ),
             ),
-            child: const Row(
+            child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
-              children: [
+              children: const [
                 Icon(Icons.play_arrow, size: 24),
                 SizedBox(width: 8),
                 Text(
@@ -906,9 +1025,9 @@ class _ChronofyHomePageState extends State<ChronofyHomePage> {
                 borderRadius: BorderRadius.circular(28),
               ),
             ),
-            child: const Row(
+            child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
-              children: [
+              children: const [
                 Icon(Icons.pause, size: 24),
                 SizedBox(width: 8),
                 Text(
@@ -928,26 +1047,22 @@ class _ChronofyHomePageState extends State<ChronofyHomePage> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Container(
-              width: 90,
+              width: 120,
               height: 56,
               child: ElevatedButton(
-                onPressed: () {
-                  // Stop functionality - placeholder for now
-                },
+                onPressed: _pauseTimer,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF4A4A4A),
-                  foregroundColor: Colors.white,
+                  backgroundColor: Colors.transparent,
+                  foregroundColor: Color(0xFFFF6B47),
                   elevation: 0,
+                  side: BorderSide(color: Color(0xFFFF6B47), width: 2),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(28),
                   ),
                 ),
                 child: const Text(
                   'Stop',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w500,
-                  ),
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
                 ),
               ),
             ),
@@ -967,10 +1082,7 @@ class _ChronofyHomePageState extends State<ChronofyHomePage> {
                 ),
                 child: const Text(
                   'Continue',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w500,
-                  ),
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
                 ),
               ),
             ),
@@ -1086,7 +1198,7 @@ class _ChronofyHomePageState extends State<ChronofyHomePage> {
             ),
             child: Icon(
               icon,
-              color: isSelected ? Colors.white : Colors.grey[400],
+              color: Colors.white,
               size: 24,
             ),
           ),
@@ -1094,78 +1206,8 @@ class _ChronofyHomePageState extends State<ChronofyHomePage> {
           Text(
             label,
             style: TextStyle(
-              color: isSelected ? const Color(0xFFFF6B47) : Colors.grey[400],
+              color: isSelected ? const Color(0xFFFF6B47) : Colors.white,
               fontSize: 12,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildBottomNavigation() {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 20),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: [
-          _buildNavItem(
-            icon: Icons.timer,
-            label: 'Pomodoro',
-            isSelected: _selectedIndex == 0,
-            onTap: () => setState(() => _selectedIndex = 0),
-          ),
-          _buildNavItem(
-            icon: Icons.apps,
-            label: 'Manage',
-            isSelected: _selectedIndex == 1,
-            onTap: () => setState(() => _selectedIndex = 1),
-          ),
-          _buildNavItem(
-            icon: Icons.calendar_today,
-            label: 'Calendar',
-            isSelected: _selectedIndex == 2,
-            onTap: () => setState(() => _selectedIndex = 2),
-          ),
-          _buildNavItem(
-            icon: Icons.trending_up,
-            label: 'Report',
-            isSelected: _selectedIndex == 3,
-            onTap: () => setState(() => _selectedIndex = 3),
-          ),
-          _buildNavItem(
-            icon: Icons.settings,
-            label: 'Settings',
-            isSelected: _selectedIndex == 4,
-            onTap: () => setState(() => _selectedIndex = 4),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildNavItem({
-    required IconData icon,
-    required String label,
-    required bool isSelected,
-    required VoidCallback onTap,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Column(
-        children: [
-          Icon(
-            icon,
-            color: isSelected ? const Color(0xFFFF6B47) : Colors.grey[600],
-            size: 24,
-          ),
-          const SizedBox(height: 4),
-          Text(
-            label,
-            style: TextStyle(
-              color: isSelected ? const Color(0xFFFF6B47) : Colors.grey[600],
-              fontSize: 10,
               fontWeight: FontWeight.w500,
             ),
           ),
