@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart'; // Add this import
 import 'login.dart';
+import 'tasks.dart';
 
 void main() {
   runApp(const MyApp());
@@ -108,6 +109,16 @@ class _MyHomePageState extends State<MyHomePage> {
                 );
               },
               child: const Text('Go to Second Page'),
+            ),
+            const SizedBox(height: 20), // Add some spacing
+            ElevatedButton(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => TasksPage()),
+                );
+              },
+              child: const Text('Go to Tasks Page'),
             ),
           ],
         ),
