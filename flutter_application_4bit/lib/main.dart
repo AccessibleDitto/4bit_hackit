@@ -432,6 +432,16 @@ class _MyHomePageState extends State<MyHomePage>
                   'Login',
                   onPressed: _handleLogin,
                 ),
+                const SizedBox(height: 16),
+                _buildSecondaryButton(
+                  'tasks test button',
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => TasksPage()),
+                    );
+                  },
+                ),
               ],
             ),
           ),
