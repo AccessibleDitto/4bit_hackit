@@ -1,4 +1,8 @@
 import 'package:flutter/material.dart'; // Import Flutter Material widgets and themes
+import 'package:cloud_firestore/cloud_firestore.dart';
+// Initialize Firestore instance
+
+final db = FirebaseFirestore.instance; // Initialize Firestore instance
 
 // Define a stateful widget for the login page
 class LoginPage extends StatefulWidget {
@@ -26,9 +30,10 @@ class _LoginPageState extends State<LoginPage> {
     if (_formKey.currentState!.validate()) {
       // Save the form fields (triggers onSaved for each field)
       _formKey.currentState!.save();
-
-      // Show a dialog displaying the entered email and password
-      showDialog(
+      db.collection('users').doc(_email).set({// Save email and password to Firestore
+        'password': _password,
+      }).then(
+        (value) =>       showDialog(
         context: context,
         builder: (context) => AlertDialog(
           title: const Text('Login Info'),
@@ -40,8 +45,48 @@ class _LoginPageState extends State<LoginPage> {
             ),
           ],
         ),
-      );
+      ), // Print success message on successful addition
+      ).catchError(
+        (error) => print("Failed to add user: $error"));
+      // Show a dialog displaying the entered email and password
+
     }
+  }
+  void _forgetPassword() {
+    // Logic to handle password reset or forget password functionality
+    db.collection('users').doc(_email).get().then((doc) {
+      if (doc.exists) {
+        // If the user exists, show a dialog with the email
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Forgot Password'),
+            content: Text(doc.data()?["password"] ?? 'No password set for this user.'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context), // Close the dialog
+                child: const Text('OK'),
+              ),
+            ],
+          ),
+        );
+      } else {
+        // If the user does not exist, show an error message
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Error'),
+            content: const Text('User does not exist. Please sign up first.'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context), // Close the dialog
+                child: const Text('OK'),
+              ),
+            ],
+          ),
+        );
+      }
+    });
   }
 
   @override
@@ -54,8 +99,23 @@ class _LoginPageState extends State<LoginPage> {
           child: Form(
             key: _formKey, // Connect form with the global key for validation
             child: Column(
-              mainAxisSize: MainAxisSize.min, // Column takes only as much space as needed
+              mainAxisSize: MainAxisSize.max, // Column takes only as much space as needed
               children: [
+                // Add a text box above the text fields
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    'Join xxx Today \u{1F464}',
+                    style: TextStyle(
+                      fontSize: 20, // Font size for the text
+                      color: Colors.blue, // Text color
+                      fontWeight: FontWeight.bold, // Make the text bold
+                      ),
+                    textAlign: TextAlign.left,
+                  ),
+                ),
+                const SizedBox(height: 24), // Space between text and fields
+
                 // Email input field
                 TextFormField(
                   decoration: const InputDecoration(
@@ -100,6 +160,15 @@ class _LoginPageState extends State<LoginPage> {
                   child: ElevatedButton(
                     onPressed: _login, // Call _login function when pressed
                     child: const Text('Login'), // Button label
+                  ),
+                ),
+                const SizedBox(height: 16), // Space before forget password button
+                // Full-width forget password button
+                SizedBox(
+                  width: double.infinity, // Button stretches full width
+                  child: ElevatedButton(
+                    onPressed: _forgetPassword, // Call _forgetPassword function when pressed
+                    child: const Text('Forget Password'), // Button label
                   ),
                 ),
               ],
