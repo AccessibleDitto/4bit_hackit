@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_application_4bit/main.dart';
 import 'register.dart';
-
+import 'homepage.dart';
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
 
@@ -31,7 +30,7 @@ class _LoginPageState extends State<LoginPage> {
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
-            builder: (context) => const MyHomePage(title: 'Khronofy'),
+            builder: (context) => const ChronofyHomePage(),
           ),
         );
         _usernameController.clear();
