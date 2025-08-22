@@ -216,7 +216,7 @@ class CalendarPageState extends State<CalendarPage> {
           ? DayView(
               controller: _eventController,
               eventTileBuilder: (date, events, boundary, startDuration, endDuration) => 
-                EventTileBuilder.buildEventTile(
+                MyEventTileBuilder.buildEventTile(
                   date, events, boundary, startDuration, endDuration,
                   _showEventDetails, _showEventOptions, context,
                 ),
@@ -290,7 +290,7 @@ class CalendarPageState extends State<CalendarPage> {
                 WeekView(
                   controller: _eventController,
                   eventTileBuilder: (date, events, boundary, startDuration, endDuration) => 
-                    EventTileBuilder.buildEventTile(
+                    MyEventTileBuilder.buildEventTile(
                       date, events, boundary, startDuration, endDuration,
                       _showEventDetails, _showEventOptions, context,
                     ),

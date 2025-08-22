@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:calendar_view/calendar_view.dart';
 import '../models/calendar_models.dart';
 
-class EventTileBuilder {
+class MyEventTileBuilder {
   static Widget buildEventTile(
     DateTime date, 
     List<CalendarEventData<Object?>> events, 
