@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart'; // Import Flutter Material widgets and themes
+import 'calendar_page.dart';
 
 // Define a stateful widget for the login page
 class LoginPage extends StatefulWidget {
@@ -22,27 +23,14 @@ class _LoginPageState extends State<LoginPage> {
 
   // Function to handle login button press
   void _login() {
-    // Validate the form fields
-    if (_formKey.currentState!.validate()) {
-      // Save the form fields (triggers onSaved for each field)
-      _formKey.currentState!.save();
-
-      // Show a dialog displaying the entered email and password
-      showDialog(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: const Text('Login Info'),
-          content: Text('Email: $_email\nPassword: $_password'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context), // Close the dialog
-              child: const Text('OK'),
-            ),
-          ],
-        ),
-      );
-    }
+      if (_formKey.currentState!.validate()) {
+    _formKey.currentState!.save();
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (context) => const CalendarPage()),
+    );
   }
+}
 
   @override
   Widget build(BuildContext context) {
