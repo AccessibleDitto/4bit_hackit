@@ -1,100 +1,189 @@
-import 'package:flutter/material.dart'; // Import Flutter Material widgets and themes
-import 'calendar_page.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_application_4bit/main.dart';
+import 'register.dart';
 
-// Define a stateful widget for the login page
 class LoginPage extends StatefulWidget {
-  const LoginPage({super.key}); // Constructor with optional key for widget identity
+  const LoginPage({super.key});
 
   @override
-  State<LoginPage> createState() => _LoginPageState(); // Link the widget to its state
+  State<LoginPage> createState() => _LoginPageState();
 }
 
-// State class that holds data and logic for the LoginPage widget
 class _LoginPageState extends State<LoginPage> {
-  // Global key to uniquely identify the Form widget and allow form validation/saving
-  final _formKey = GlobalKey<FormState>();
+  final TextEditingController _usernameController = TextEditingController();
+  final TextEditingController _passwordController = TextEditingController();
+  String? _errorMessage;
 
-  // Variables to store user input
-  String _email = '';
-  String _password = '';
+  // just sample user for demonstration
+  final String _mockUsername = 'user';
+  final String _mockPassword = 'password123';
 
-  // Controls whether the password is hidden or visible
-  bool _obscureText = true;
-
-  // Function to handle login button press
   void _login() {
-      if (_formKey.currentState!.validate()) {
-    _formKey.currentState!.save();
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(builder: (context) => const CalendarPage()),
-    );
+    setState(() {
+      _errorMessage = null;
+      if (_usernameController.text.isEmpty || _passwordController.text.isEmpty) {
+        _errorMessage = 'Please enter both username and password.';
+      } else if (_usernameController.text != _mockUsername || _passwordController.text != _mockPassword) {
+        _errorMessage = 'Invalid username or password.';
+      } else {
+        _errorMessage = null;
+        // Will change this to navigate to home page after successful login
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => const MyHomePage(title: 'Khronofy'),
+          ),
+        );
+        _usernameController.clear();
+        _passwordController.clear();
+      }
+    });
   }
-}
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Login')), // App bar with title
-      body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24.0), // Add padding around the form
-          child: Form(
-            key: _formKey, // Connect form with the global key for validation
-            child: Column(
-              mainAxisSize: MainAxisSize.min, // Column takes only as much space as needed
-              children: [
-                // Email input field
-                TextFormField(
-                  decoration: const InputDecoration(
-                    labelText: 'Email', // Label above the field
-                    border: OutlineInputBorder(), // Outline border
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      theme: ThemeData.dark().copyWith(
+        scaffoldBackgroundColor: const Color(0xFF181829),
+        inputDecorationTheme: InputDecorationTheme(
+          filled: true,
+          fillColor: const Color(0xFF2D223A),
+          hintStyle: const TextStyle(color: Colors.white70),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(18),
+            borderSide: BorderSide.none,
+          ),
+        ),
+        textTheme: const TextTheme(
+          bodyLarge: TextStyle(color: Colors.white),
+          bodyMedium: TextStyle(color: Colors.white70),
+          titleLarge: TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        appBarTheme: const AppBarTheme(
+          backgroundColor: Colors.transparent,
+          foregroundColor: Colors.white,
+          elevation: 0,
+        ),
+        elevatedButtonTheme: ElevatedButtonThemeData(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Color(0xFF8F5CF7),
+            foregroundColor: Colors.white,
+            shape: const StadiumBorder(),
+            padding: EdgeInsets.symmetric(vertical: 16),
+          ),
+        ),
+        textButtonTheme: TextButtonThemeData(
+          style: TextButton.styleFrom(foregroundColor: Color(0xFFFFA726)),
+        ),
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: Color(0xFF8F5CF7),
+        ).copyWith(secondary: Color(0xFFFFA726)),
+      ),
+      home: Scaffold(
+        appBar: AppBar(
+          leading: Navigator.canPop(context)
+              ? IconButton(
+                  icon: const Icon(Icons.arrow_back),
+                  onPressed: () => Navigator.of(context).pop(),
+                )
+              : null,
+        ),
+        body: Container(
+          margin: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              _header(context),
+              _inputField(context),
+              if (_errorMessage != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8.0),
+                  child: Text(
+                    _errorMessage!,
+                    style: const TextStyle(color: Colors.redAccent),
                   ),
-                  keyboardType: TextInputType.emailAddress, // Email-specific keyboard
-                  validator: (value) =>
-                      value == null || value.isEmpty ? 'Enter your email' : null, // Validation
-                  onSaved: (value) => _email = value ?? '', // Save input to _email
                 ),
-                const SizedBox(height: 16), // Space between fields
-
-                // Password input field
-                TextFormField(
-                  decoration: InputDecoration(
-                    labelText: 'Password', // Label above the field
-                    border: const OutlineInputBorder(),
-                    // Add an eye icon to toggle visibility
-                    suffixIcon: IconButton(
-                      icon: Icon(
-                        _obscureText ? Icons.visibility : Icons.visibility_off,
-                      ),
-                      onPressed: () {
-                        setState(() {
-                          // Toggle password visibility and update UI
-                          _obscureText = !_obscureText;
-                        });
-                      },
-                    ),
-                  ),
-                  obscureText: _obscureText, // Hide text when true
-                  validator: (value) =>
-                      value == null || value.isEmpty ? 'Enter your password' : null, // Validation
-                  onSaved: (value) => _password = value ?? '', // Save input to _password
-                ),
-                const SizedBox(height: 24), // Space before button
-
-                // Full-width login button
-                SizedBox(
-                  width: double.infinity, // Button stretches full width
-                  child: ElevatedButton(
-                    onPressed: _login, // Call _login function when pressed
-                    child: const Text('Login'), // Button label
-                  ),
-                ),
-              ],
-            ),
+              _signup(context),
+            ],
           ),
         ),
       ),
+    );
+  }
+
+  _header(context) {
+    return Column(
+      children: const [
+        Text(
+          "Welcome Back",
+          style: TextStyle(
+            fontSize: 40,
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+          ),
+        ),
+        SizedBox(height: 8),
+        Text(
+          "Enter your credential to login",
+          style: TextStyle(color: Colors.white70),
+        ),
+      ],
+    );
+  }
+
+  _inputField(context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        TextField(
+          controller: _usernameController,
+          style: const TextStyle(color: Colors.white),
+          decoration: InputDecoration(
+            hintText: "Username",
+            prefixIcon: const Icon(Icons.person, color: Color(0xFF8F5CF7)),
+          ),
+        ),
+        const SizedBox(height: 10),
+        TextField(
+          controller: _passwordController,
+          style: const TextStyle(color: Colors.white),
+          decoration: InputDecoration(
+            hintText: "Password",
+            prefixIcon: const Icon(Icons.password, color: Color(0xFF8F5CF7)),
+          ),
+          obscureText: true,
+        ),
+        const SizedBox(height: 10),
+        ElevatedButton(onPressed: _login, child: const Text("Login")),
+      ],
+    );
+  }
+
+  _signup(context) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        const Text(
+          "Don't have an account? ",
+          style: TextStyle(color: Colors.white70),
+        ),
+        TextButton(
+          onPressed: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => SignupPage()),
+            );
+          },
+          child: const Text(
+            "Sign Up",
+            style: TextStyle(color: Color(0xFFFFA726)),
+          ),
+        ),
+      ],
     );
   }
 }
