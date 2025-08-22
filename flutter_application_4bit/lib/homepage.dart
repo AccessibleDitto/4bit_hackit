@@ -276,6 +276,7 @@ class _TimerModePageState extends State<TimerModePage> with TickerProviderStateM
               Expanded(
                 child: ListView.builder(
                   padding: const EdgeInsets.symmetric(horizontal: 24),
+                  physics: BouncingScrollPhysics(),
                   itemCount: _tasks.length,
                   itemBuilder: (context, index) {
                     final task = _tasks[index];
@@ -1042,26 +1043,28 @@ class _TimerModePageState extends State<TimerModePage> with TickerProviderStateM
             ),
           
           // Timer Circle
-          Container(
+          SizedBox(
             width: 300,
             height: 300,
             child: Stack(
+              alignment: Alignment.center,
               children: [
                 // Outer Circle
-                Container(
+                SizedBox(
                   width: 300,
                   height: 300,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: const Color(0xFF27272A),
-                      width: 8,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: const Color(0xFF27272A),
+                        width: 8,
+                      ),
                     ),
                   ),
                 ),
-                
-                // Progress Circle
-                Container(
+                // Progress Circle (same size)
+                SizedBox(
                   width: 300,
                   height: 300,
                   child: AnimatedBuilder(
@@ -1069,15 +1072,14 @@ class _TimerModePageState extends State<TimerModePage> with TickerProviderStateM
                     builder: (context, child) {
                       return CircularProgressIndicator(
                         value: _progressAnimation.value,
-                        strokeWidth: 8,
-                        backgroundColor: Colors.transparent,
+                        strokeWidth: 16, // match the total width of the outer border (8+8)
+                        backgroundColor: const Color(0xFF27272A), // match the outer circle border color
                         valueColor: AlwaysStoppedAnimation<Color>(_getProgressColor()),
                         strokeCap: StrokeCap.round,
                       );
                     },
                   ),
                 ),
-                
                 // Timer Content
                 Center(
                   child: Column(
@@ -1334,7 +1336,6 @@ class _TimerModePageState extends State<TimerModePage> with TickerProviderStateM
             onTap: () {
               showModalBottomSheet(
                 context: context,
-                backgroundColor: Colors.white,
                 shape: const RoundedRectangleBorder(
                   borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
                 ),
@@ -1370,7 +1371,6 @@ class _TimerModePageState extends State<TimerModePage> with TickerProviderStateM
             onTap: () {
               showModalBottomSheet(
                 context: context,
-                backgroundColor: Colors.white,
                 shape: const RoundedRectangleBorder(
                   borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
                 ),
@@ -1404,7 +1404,62 @@ class _TimerModePageState extends State<TimerModePage> with TickerProviderStateM
             isSelected: _isWhiteNoise,
             color: const Color(0xFF3B82F6),
             onTap: () {
-              setState(() => _isWhiteNoise = !_isWhiteNoise);
+              showModalBottomSheet(
+                context: context,
+                shape: const RoundedRectangleBorder(
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+                ),
+                builder: (context) => SingleChildScrollView(
+                  child: Container(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('White Noise Selection', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                        const SizedBox(height: 16),
+                        const Text('Choose a background sound to help you focus.'),
+                        const SizedBox(height: 24),
+                        ListTile(
+                          title: const Text('None'),
+                          onTap: () {
+                            setState(() { /* your state update here */ });
+                            Navigator.pop(context);
+                          },
+                        ),
+                        ListTile(
+                          title: const Text('Cafe Ambiance'),
+                          onTap: () {
+                            setState(() { /* your state update here */ });
+                            Navigator.pop(context);
+                          },
+                        ),
+                        ListTile(
+                          title: const Text('Rainforest Sound'),
+                          onTap: () {
+                            setState(() { /* your state update here */ });
+                            Navigator.pop(context);
+                          },
+                        ),
+                        ListTile(
+                          title: const Text('Beach Waves'),
+                          onTap: () {
+                            setState(() { /* your state update here */ });
+                            Navigator.pop(context);
+                          },
+                        ),
+                        ListTile(
+                          title: const Text('Forest'),
+                          onTap: () {
+                            setState(() { /* your state update here */ });
+                            Navigator.pop(context);
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              );
               HapticFeedback.selectionClick();
             },
           ),
@@ -1428,16 +1483,16 @@ class _TimerModePageState extends State<TimerModePage> with TickerProviderStateM
             width: 56,
             height: 56,
             decoration: BoxDecoration(
-              color: isSelected ? color : Colors.transparent,
+              color: Colors.transparent,
               borderRadius: BorderRadius.circular(16),
               border: Border.all(
-                color: isSelected ? color : color.withOpacity(0.3),
+                color: color,
                 width: 2,
               ),
             ),
             child: Icon(
               icon,
-              color: isSelected ? Colors.white : color,
+              color: color,
               size: 24,
             ),
           ),
@@ -1445,7 +1500,7 @@ class _TimerModePageState extends State<TimerModePage> with TickerProviderStateM
           Text(
             label,
             style: GoogleFonts.inter(
-              color: isSelected ? color : const Color(0xFFA1A1AA),
+              color: color,
               fontSize: 12,
               fontWeight: FontWeight.w500,
             ),
