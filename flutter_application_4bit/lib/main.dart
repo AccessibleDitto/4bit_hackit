@@ -6,7 +6,8 @@ import 'login.dart';
 import 'dart:ui';
 import 'homepage.dart';
 import 'tasks.dart';
-
+import 'profile.dart';
+import 'settings.dart';
 void main() {
   runApp(const MyApp());
 }
@@ -450,6 +451,16 @@ class _MyHomePageState extends State<MyHomePage>
                     Navigator.push(
                       context,
                       MaterialPageRoute(builder: (context) => TimerModePage()),
+                    );
+                  },
+                ),
+                const SizedBox(height: 16),
+                _buildSecondaryButton(
+                  'settings test',
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => SettingsScreen()),
                     );
                   },
                 ),

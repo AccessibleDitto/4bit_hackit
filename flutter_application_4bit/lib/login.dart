@@ -30,7 +30,7 @@ class _LoginPageState extends State<LoginPage> {
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
-            builder: (context) => const ChronofyHomePage(),
+            builder: (context) => const TimerModePage(),
           ),
         );
         _usernameController.clear();
