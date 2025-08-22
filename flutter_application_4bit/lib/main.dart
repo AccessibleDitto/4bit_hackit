@@ -4,6 +4,7 @@ import 'package:flutter_application_4bit/register.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'login.dart';
 import 'dart:ui';
+import 'homepage.dart';
 import 'tasks.dart';
 
 void main() {
@@ -439,6 +440,16 @@ class _MyHomePageState extends State<MyHomePage>
                     Navigator.push(
                       context,
                       MaterialPageRoute(builder: (context) => TasksPage()),
+                    );
+                  },
+                ),
+                const SizedBox(height: 16),
+                _buildSecondaryButton(
+                  'homepage test',
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => TimerModePage()),
                     );
                   },
                 ),
