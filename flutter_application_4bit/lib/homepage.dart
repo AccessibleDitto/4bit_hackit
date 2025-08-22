@@ -16,79 +16,6 @@ enum TimerState { idle, focusRunning, focusPaused, breakIdle, breakRunning, comp
 
 class _TimerModePageState extends State<TimerModePage> with TickerProviderStateMixin {
   int _selectedIndex = 0;
-  // ...existing code...
-
-  // Place the navigation bar code at the end of the class
-  Widget _buildNavItem({
-    required IconData icon,
-    required String label,
-    required bool isSelected,
-    required VoidCallback onTap,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            icon,
-            color: isSelected ? const Color(0xFF9333EA) : const Color(0xFFA1A1AA),
-            size: 28,
-          ),
-          const SizedBox(height: 4),
-          Text(
-            label,
-            style: GoogleFonts.inter(
-              color: isSelected ? const Color(0xFF9333EA) : const Color(0xFFA1A1AA),
-              fontSize: 12,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildBottomNavigation() {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 20),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: [
-          _buildNavItem(
-            icon: Icons.timer,
-            label: 'Pomodoro',
-            isSelected: _selectedIndex == 0,
-            onTap: () => setState(() => _selectedIndex = 0),
-          ),
-          _buildNavItem(
-            icon: Icons.apps,
-            label: 'Manage',
-            isSelected: _selectedIndex == 1,
-            onTap: () => setState(() => _selectedIndex = 1),
-          ),
-          _buildNavItem(
-            icon: Icons.calendar_today,
-            label: 'Calendar',
-            isSelected: _selectedIndex == 2,
-            onTap: () => setState(() => _selectedIndex = 2),
-          ),
-          _buildNavItem(
-            icon: Icons.trending_up,
-            label: 'Report',
-            isSelected: _selectedIndex == 3,
-            onTap: () => setState(() => _selectedIndex = 3),
-          ),
-          _buildNavItem(
-            icon: Icons.settings,
-            label: 'Settings',
-            isSelected: _selectedIndex == 4,
-            onTap: () => setState(() => _selectedIndex = 4),
-          ),
-        ],
-      ),
-    );
-  }
   
   late ConfettiController _confettiController;
   late AnimationController _progressAnimationController;
@@ -276,6 +203,7 @@ class _TimerModePageState extends State<TimerModePage> with TickerProviderStateM
               Expanded(
                 child: ListView.builder(
                   padding: const EdgeInsets.symmetric(horizontal: 24),
+                  physics: BouncingScrollPhysics(),
                   itemCount: _tasks.length,
                   itemBuilder: (context, index) {
                     final task = _tasks[index];
@@ -1014,22 +942,45 @@ class _TimerModePageState extends State<TimerModePage> with TickerProviderStateM
   }
 
   Widget _buildTimerSection() {
+    // Get screen dimensions
+    final screenWidth = MediaQuery.of(context).size.width;
+    final screenHeight = MediaQuery.of(context).size.height;
+    
+    // Calculate responsive circle size
+    // Use 70% of screen width or 300px, whichever is smaller
+    // Also ensure it doesn't exceed available height minus padding
+    final maxCircleSize = screenWidth * 0.7;
+    final availableHeight = screenHeight * 0.4; // 40% of screen height for circle
+    final circleSize = [maxCircleSize, availableHeight, 300.0].reduce((a, b) => a < b ? a : b);
+    
+    // Calculate stroke width relative to circle size
+    final strokeWidth = circleSize * 0.025; // 2.5% of circle size
+    final minStrokeWidth = 4.0;
+    final maxStrokeWidth = 12.0;
+    final responsiveStrokeWidth = strokeWidth.clamp(minStrokeWidth, maxStrokeWidth);
+    
+    // Calculate font sizes relative to circle size
+    final timerFontSize = circleSize * 0.16; // 16% of circle size
+    final subtextFontSize = circleSize * 0.053; // 5.3% of circle size
+    
     return Container(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          
           // Session indicator
           if (_timerState != TimerState.idle)
             Container(
-              margin: const EdgeInsets.only(bottom: 40),
+              margin: EdgeInsets.only(bottom: circleSize * 0.133), // Responsive margin
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: List.generate(_totalSessions, (index) {
+                  final dotSize = circleSize * 0.04; // 4% of circle size
+                  final activeDotSize = circleSize * 0.048; // 4.8% of circle size
+                  
                   return Container(
-                    margin: const EdgeInsets.symmetric(horizontal: 4),
-                    width: index < _currentSession ? 12 : 8,
-                    height: index < _currentSession ? 12 : 8,
+                    margin: EdgeInsets.symmetric(horizontal: circleSize * 0.013),
+                    width: index < _currentSession ? activeDotSize : dotSize,
+                    height: index < _currentSession ? activeDotSize : dotSize,
                     decoration: BoxDecoration(
                       color: index < _currentSession 
                         ? const Color(0xFF9333EA)
@@ -1042,26 +993,28 @@ class _TimerModePageState extends State<TimerModePage> with TickerProviderStateM
             ),
           
           // Timer Circle
-          Container(
+          SizedBox(
             width: 300,
             height: 300,
             child: Stack(
+              alignment: Alignment.center,
               children: [
                 // Outer Circle
-                Container(
+                SizedBox(
                   width: 300,
                   height: 300,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: const Color(0xFF27272A),
-                      width: 8,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: const Color(0xFF27272A),
+                        width: 8,
+                      ),
                     ),
                   ),
                 ),
-                
-                // Progress Circle
-                Container(
+                // Progress Circle (same size)
+                SizedBox(
                   width: 300,
                   height: 300,
                   child: AnimatedBuilder(
@@ -1069,8 +1022,8 @@ class _TimerModePageState extends State<TimerModePage> with TickerProviderStateM
                     builder: (context, child) {
                       return CircularProgressIndicator(
                         value: _progressAnimation.value,
-                        strokeWidth: 8,
-                        backgroundColor: Colors.transparent,
+                        strokeWidth: 16, // match the total width of the outer border (8+8)
+                        backgroundColor: const Color(0xFF27272A), // match the outer circle border color
                         valueColor: AlwaysStoppedAnimation<Color>(_getProgressColor()),
                         strokeCap: StrokeCap.round,
                       );
@@ -1078,40 +1031,46 @@ class _TimerModePageState extends State<TimerModePage> with TickerProviderStateM
                   ),
                 ),
                 
-                // Timer Content
-                Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        _formatTime(_currentSeconds),
-                        style: GoogleFonts.inter(
-                          color: Colors.white,
-                          fontSize: 48,
-                          fontWeight: FontWeight.w300,
-                          letterSpacing: -1,
-                        ),
+                // Timer Content - Now properly centered
+                Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      _formatTime(_currentSeconds),
+                      style: GoogleFonts.inter(
+                        color: Colors.white,
+                        fontSize: timerFontSize,
+                        fontWeight: FontWeight.w300,
+                        letterSpacing: -1,
                       ),
-                      const SizedBox(height: 8),
-                      Text(
+                    ),
+                    SizedBox(height: circleSize * 0.027), // Responsive spacing
+                    Padding(
+                      padding: EdgeInsets.symmetric(horizontal: circleSize * 0.1),
+                      child: Text(
                         _getTimerSubtext(),
+                        textAlign: TextAlign.center,
                         style: GoogleFonts.inter(
                           color: const Color(0xFFA1A1AA),
-                          fontSize: 16,
+                          fontSize: subtextFontSize,
                           fontWeight: FontWeight.w500,
                         ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ],
             ),
           ),
           
+          // Responsive spacing before action buttons
+          SizedBox(height: circleSize * 0.133),
+          
           // Action Buttons
           _buildActionButtons(),
-          
-
         ],
       ),
     );
@@ -1133,11 +1092,17 @@ class _TimerModePageState extends State<TimerModePage> with TickerProviderStateM
   }
 
   Widget _buildActionButtons() {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final buttonWidth = (screenWidth * 0.6).clamp(200.0, 280.0);
+    final smallButtonWidth = (screenWidth * 0.35).clamp(120.0, 180.0);
+    final buttonHeight = 56.0;
+    final fontSize = (screenWidth * 0.04).clamp(14.0, 18.0);
+    
     switch (_timerState) {
       case TimerState.idle:
-        return Container(
-          width: 220,
-          height: 56,
+        return SizedBox(
+          width: buttonWidth,
+          height: buttonHeight,
           child: ElevatedButton(
             onPressed: _selectedTask != 'Select Task' ? _startFocusTimer : null,
             style: ElevatedButton.styleFrom(
@@ -1154,13 +1119,18 @@ class _TimerModePageState extends State<TimerModePage> with TickerProviderStateM
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.play_arrow, size: 21),
-                Text(
-                  'Start Focus Session',
-                  style: GoogleFonts.inter(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
+                Icon(Icons.play_arrow, size: fontSize + 4),
+                SizedBox(width: 8),
+                Flexible(
+                  child: Text(
+                    'Start Focus Session',
+                    style: GoogleFonts.inter(
+                      fontSize: fontSize,
+                      fontWeight: FontWeight.w600,
+                    ),
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
               ],
@@ -1169,9 +1139,9 @@ class _TimerModePageState extends State<TimerModePage> with TickerProviderStateM
         );
         
       case TimerState.focusRunning:
-        return Container(
-          width: 220,
-          height: 56,
+        return SizedBox(
+          width: buttonWidth,
+          height: buttonHeight,
           child: ElevatedButton(
             onPressed: _pauseTimer,
             style: ElevatedButton.styleFrom(
@@ -1185,12 +1155,14 @@ class _TimerModePageState extends State<TimerModePage> with TickerProviderStateM
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.pause, size: 24),
+                Icon(Icons.pause, size: fontSize + 4),
+                SizedBox(width: 8),
                 Text(
                   'Pause',
                   style: GoogleFonts.inter(
-                    fontSize: 16,
+                    fontSize: fontSize,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -1203,9 +1175,9 @@ class _TimerModePageState extends State<TimerModePage> with TickerProviderStateM
         return Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Container(
-              width: 120,
-              height: 56,
+            SizedBox(
+              width: smallButtonWidth,
+              height: buttonHeight,
               child: OutlinedButton(
                 onPressed: _resetToHome,
                 style: OutlinedButton.styleFrom(
@@ -1219,16 +1191,16 @@ class _TimerModePageState extends State<TimerModePage> with TickerProviderStateM
                 child: Text(
                   'Stop',
                   style: GoogleFonts.inter(
-                    fontSize: 16,
+                    fontSize: fontSize,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
               ),
             ),
-            const SizedBox(width: 20),
-            Container(
-              width: 120,
-              height: 56,
+            const SizedBox(width: 16),
+            SizedBox(
+              width: smallButtonWidth,
+              height: buttonHeight,
               child: ElevatedButton(
                 onPressed: _continueTimer,
                 style: ElevatedButton.styleFrom(
@@ -1241,8 +1213,10 @@ class _TimerModePageState extends State<TimerModePage> with TickerProviderStateM
                 ),
                 child: Text(
                   'Continue',
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 1, 
                   style: GoogleFonts.inter(
-                    fontSize: 16,
+                    fontSize: fontSize,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -1252,9 +1226,9 @@ class _TimerModePageState extends State<TimerModePage> with TickerProviderStateM
         );
         
       case TimerState.breakIdle:
-        return Container(
-          width: 220,
-          height: 56,
+        return SizedBox(
+          width: buttonWidth,
+          height: buttonHeight,
           child: ElevatedButton(
             onPressed: _startBreakTimer,
             style: ElevatedButton.styleFrom(
@@ -1267,13 +1241,14 @@ class _TimerModePageState extends State<TimerModePage> with TickerProviderStateM
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.coffee, size: 24),
+                Icon(Icons.coffee, size: fontSize + 4),
                 SizedBox(width: 8),
                 Text(
                   'Start Break',
                   style: GoogleFonts.inter(
-                    fontSize: 16,
+                    fontSize: fontSize,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -1283,9 +1258,9 @@ class _TimerModePageState extends State<TimerModePage> with TickerProviderStateM
         );
         
       case TimerState.breakRunning:
-        return Container(
-          width: 220,
-          height: 56,
+        return SizedBox(
+          width: buttonWidth,
+          height: buttonHeight,
           child: OutlinedButton(
             onPressed: _skipBreak,
             style: OutlinedButton.styleFrom(
@@ -1299,7 +1274,7 @@ class _TimerModePageState extends State<TimerModePage> with TickerProviderStateM
             child: Text(
               'Skip Break',
               style: GoogleFonts.inter(
-                fontSize: 16,
+                fontSize: fontSize,
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -1313,8 +1288,8 @@ class _TimerModePageState extends State<TimerModePage> with TickerProviderStateM
 
   Widget _buildModeSelection() {
     return Container(
-      margin: const EdgeInsets.all(24),
-      padding: const EdgeInsets.all(20),
+      margin: const EdgeInsets.all(20),
+      // padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: const Color(0xFF18181B).withOpacity(0.8),
         borderRadius: BorderRadius.circular(20),
@@ -1334,7 +1309,6 @@ class _TimerModePageState extends State<TimerModePage> with TickerProviderStateM
             onTap: () {
               showModalBottomSheet(
                 context: context,
-                backgroundColor: Colors.white,
                 shape: const RoundedRectangleBorder(
                   borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
                 ),
@@ -1370,7 +1344,6 @@ class _TimerModePageState extends State<TimerModePage> with TickerProviderStateM
             onTap: () {
               showModalBottomSheet(
                 context: context,
-                backgroundColor: Colors.white,
                 shape: const RoundedRectangleBorder(
                   borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
                 ),
@@ -1404,7 +1377,62 @@ class _TimerModePageState extends State<TimerModePage> with TickerProviderStateM
             isSelected: _isWhiteNoise,
             color: const Color(0xFF3B82F6),
             onTap: () {
-              setState(() => _isWhiteNoise = !_isWhiteNoise);
+              showModalBottomSheet(
+                context: context,
+                shape: const RoundedRectangleBorder(
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+                ),
+                builder: (context) => SingleChildScrollView(
+                  child: Container(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('White Noise Selection', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                        const SizedBox(height: 16),
+                        const Text('Choose a background sound to help you focus.'),
+                        const SizedBox(height: 24),
+                        ListTile(
+                          title: const Text('None'),
+                          onTap: () {
+                            setState(() { /* your state update here */ });
+                            Navigator.pop(context);
+                          },
+                        ),
+                        ListTile(
+                          title: const Text('Cafe Ambiance'),
+                          onTap: () {
+                            setState(() { /* your state update here */ });
+                            Navigator.pop(context);
+                          },
+                        ),
+                        ListTile(
+                          title: const Text('Rainforest Sound'),
+                          onTap: () {
+                            setState(() { /* your state update here */ });
+                            Navigator.pop(context);
+                          },
+                        ),
+                        ListTile(
+                          title: const Text('Beach Waves'),
+                          onTap: () {
+                            setState(() { /* your state update here */ });
+                            Navigator.pop(context);
+                          },
+                        ),
+                        ListTile(
+                          title: const Text('Forest'),
+                          onTap: () {
+                            setState(() { /* your state update here */ });
+                            Navigator.pop(context);
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              );
               HapticFeedback.selectionClick();
             },
           ),
@@ -1428,16 +1456,16 @@ class _TimerModePageState extends State<TimerModePage> with TickerProviderStateM
             width: 56,
             height: 56,
             decoration: BoxDecoration(
-              color: isSelected ? color : Colors.transparent,
+              color: Colors.transparent,
               borderRadius: BorderRadius.circular(16),
               border: Border.all(
-                color: isSelected ? color : color.withOpacity(0.3),
+                color: color,
                 width: 2,
               ),
             ),
             child: Icon(
               icon,
-              color: isSelected ? Colors.white : color,
+              color: color,
               size: 24,
             ),
           ),
@@ -1445,10 +1473,82 @@ class _TimerModePageState extends State<TimerModePage> with TickerProviderStateM
           Text(
             label,
             style: GoogleFonts.inter(
-              color: isSelected ? color : const Color(0xFFA1A1AA),
+              color: color,
               fontSize: 12,
               fontWeight: FontWeight.w500,
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Place the navigation bar code at the end of the class
+  Widget _buildNavItem({
+    required IconData icon,
+    required String label,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            icon,
+            color: isSelected ? const Color(0xFF9333EA) : const Color(0xFFA1A1AA),
+            size: 28,
+          ),
+          const SizedBox(height: 4),
+          Text(
+            label,
+            style: GoogleFonts.inter(
+              color: isSelected ? const Color(0xFF9333EA) : const Color(0xFFA1A1AA),
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBottomNavigation() {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 20),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceAround,
+        children: [
+          _buildNavItem(
+            icon: Icons.timer,
+            label: 'Pomodoro',
+            isSelected: _selectedIndex == 0,
+            onTap: () => setState(() => _selectedIndex = 0),
+          ),
+          _buildNavItem(
+            icon: Icons.apps,
+            label: 'Manage',
+            isSelected: _selectedIndex == 1,
+            onTap: () => setState(() => _selectedIndex = 1),
+          ),
+          _buildNavItem(
+            icon: Icons.calendar_today,
+            label: 'Calendar',
+            isSelected: _selectedIndex == 2,
+            onTap: () => setState(() => _selectedIndex = 2),
+          ),
+          _buildNavItem(
+            icon: Icons.trending_up,
+            label: 'Report',
+            isSelected: _selectedIndex == 3,
+            onTap: () => setState(() => _selectedIndex = 3),
+          ),
+          _buildNavItem(
+            icon: Icons.settings,
+            label: 'Settings',
+            isSelected: _selectedIndex == 4,
+            onTap: () => setState(() => _selectedIndex = 4),
           ),
         ],
       ),

@@ -434,7 +434,6 @@ class _MyHomePageState extends State<MyHomePage>
                   'Login',
                   onPressed: _handleLogin,
                 ),
-                const SizedBox(height: 16),
                 _buildSecondaryButton(
                   'tasks test button',
                   onPressed: () {
@@ -444,7 +443,6 @@ class _MyHomePageState extends State<MyHomePage>
                     );
                   },
                 ),
-                const SizedBox(height: 16),
                 _buildSecondaryButton(
                   'homepage test',
                   onPressed: () {
