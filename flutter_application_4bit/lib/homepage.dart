@@ -1093,10 +1093,10 @@ class _TimerModePageState extends State<TimerModePage> with TickerProviderStateM
 
   Widget _buildActionButtons() {
     final screenWidth = MediaQuery.of(context).size.width;
-    final buttonWidth = (screenWidth * 0.6).clamp(200.0, 280.0); // 60% of screen width, clamped
-    final smallButtonWidth = (screenWidth * 0.28).clamp(100.0, 140.0); // 28% of screen width, clamped
+    final buttonWidth = (screenWidth * 0.6).clamp(200.0, 280.0);
+    final smallButtonWidth = (screenWidth * 0.35).clamp(120.0, 180.0);
     final buttonHeight = 56.0;
-    final fontSize = (screenWidth * 0.04).clamp(14.0, 18.0); // Responsive font size
+    final fontSize = (screenWidth * 0.04).clamp(14.0, 18.0);
     
     switch (_timerState) {
       case TimerState.idle:
@@ -1213,6 +1213,8 @@ class _TimerModePageState extends State<TimerModePage> with TickerProviderStateM
                 ),
                 child: Text(
                   'Continue',
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 1, 
                   style: GoogleFonts.inter(
                     fontSize: fontSize,
                     fontWeight: FontWeight.w600,
