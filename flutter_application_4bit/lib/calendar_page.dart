@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:calendar_view/calendar_view.dart';
+import 'package:flutter_application_4bit/event_parser.dart';
 import '../models/calendar_models.dart';
 import '../utils/date_utils.dart';
 import '../widgets/event_tile_builder.dart';
@@ -62,7 +63,8 @@ class CalendarPageState extends State<CalendarPage> {
       _assignProjectColorIfNeeded(p);
     }
 
-    _addSampleEvents();
+    _addSampleEvents('[ { "id": "evt1", "title": "MECHANIC 29MAMT PS12", "description": "BLK 47 # 03-03 ONG CHEE KHOON", "date": null, "startTime": "2023-03-14T10:00:00", "endTime": "2023-03-14T11:00:00", "color": "#FFA500", "priority": "medium", "project": null, "recurring": "weekly" }, { "id": "evt2", "title": "ELECTRO 93PHY1 TS12", "description": "BLK 8 # 03-03 FUNG HO WANG", "date": null, "startTime": "2023-03-16T10:00:00", "endTime": "2023-03-16T11:00:00", "color": "#FFA500", "priority": "medium", "project": null, "recurring": "weekly" }, { "id": "evt3", "title": "ECE 23 440BOP PS12", "description": "BLK 8 # 03-01 HOCK CHUE HA", "date": null, "startTime": "2023-03-17T10:00:00", "endTime": "2023-03-17T11:00:00", "color": "#FFA500", "priority": "medium", "project": null, "recurring": "weekly" }, { "id": "evt4", "title": "MECHANIC 29TMFD TS12", "description": "BLK 8 # 03-03 TAN PECK HOR", "date": null, "startTime": "2023-03-13T13:00:00", "endTime": "2023-03-13T14:00:00", "color": "#FFA500", "priority": "medium", "project": null, "recurring": "weekly" }, { "id": "evt5", "title": "CAEM 838CAEM1 T09", "description": "BLK 8 # 03-02 LI ZHONGQIANG", "date": null, "startTime": "2023-03-14T13:00:00", "endTime": "2023-03-14T14:00:00", "color": "#FFA500", "priority": "medium", "project": null, "recurring": "weekly" }, { "id": "evt6", "title": "C_ENG 23 38EGSU PS12", "description": "BLK 8 # 03-04 KOH FOOK LEONG", "date": null, "startTime": "2023-03-17T13:00:00", "endTime": "2023-03-17T14:00:00", "color": "#FFA500", "priority": "medium", "project": null, "recurring": "weekly" }, { "id": "evt7", "title": "PLP_PS1POHBT08", "description": "BLK 51 #07-02 JEANETTE D/O HOUMAYUNE", "date": null, "startTime": "2023-03-15T16:00:00", "endTime": "2023-03-15T17:00:00", "color": "#FFA500", "priority": "medium", "project": null, "recurring": "weekly" }, { "id": "evt8", "title": "PASTORAL PCSOE2 TS12", "description": "BLK 8 # 03-01 HOCK CHUE HA", "date": null, "startTime": "2023-03-17T09:00:00", "endTime": "2023-03-17T10:00:00", "color": "#FFA500", "priority": "medium", "project": null, "recurring": "weekly" } ]');
+    
   }
 
   void _assignProjectColorIfNeeded(String project) {
@@ -80,9 +82,14 @@ class CalendarPageState extends State<CalendarPage> {
     return PriorityHelper.priorityColors[priority]!;
   }
 
-  void _addSampleEvents() {
+  void _addSampleEvents(jsonString) {
     final now = DateTime.now();
+    final events = parseEventsFromJson(jsonString);
 
+    // Add each event using your existing method
+    for (final event in events) {
+      _addEventWithRecurring(event);
+    }
     // Use _addEventWithRecurring() instead of _eventController.add()
     _addEventWithRecurring(
       ExtendedCalendarEventData(
@@ -363,33 +370,47 @@ class CalendarPageState extends State<CalendarPage> {
           : IndexedStack(
               index: _selectedIndex,
               children: [
-                // Month View
-                MonthView(
-                  controller: _eventController,
-                  onCellTap: (events, date) => _showDayView(date),
-                  onDateLongPress: (date) => EventDialogs.showDayEvents(
-                    context,
-                    _eventController.getEventsOnDay(date),
-                    date,
-                    _showEventDetails,
-                    _showEventOptions,
-                    _showAddEventDialog,
-                  ),
-                  onEventTap: (event, date) =>
-                      _showEventDetails(context, event),
-                  headerBuilder: (date) => Container(
-                    color: Colors.blue.shade50,
-                    padding: const EdgeInsets.all(16),
-                    child: Text(
-                      "${CalendarDateUtils.getMonthName(date.month)} ${date.year}",
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.blue.shade800,
-                      ),
-                    ),
-                  ),
+
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    // Total rows = 6 for full month view (to cover all possible days)
+                    // double totalRows = 8; 
+                    // double cellHeight = constraints.maxHeight / totalRows;
+                    // double cellWidth = constraints.maxWidth / 7; // 7 columns (days in a week)
+                    
+                    // double dynamicAspectRatio = cellWidth / cellHeight;
+
+                    return MonthView( // Month View
+                        controller: _eventController,
+                        cellAspectRatio: 0.7,
+                        // cellAspectRatio: dynamicAspectRatio,
+                        onCellTap: (events, date) => _showDayView(date),
+                        onDateLongPress: (date) => EventDialogs.showDayEvents(
+                          context,
+                          _eventController.getEventsOnDay(date),
+                          date,
+                          _showEventDetails,
+                          _showEventOptions,
+                          _showAddEventDialog,
+                        ),
+                        onEventTap: (event, date) =>
+                            _showEventDetails(context, event),
+                        headerBuilder: (date) => Container(
+                          color: Colors.blue.shade50,
+                          padding: const EdgeInsets.all(16),
+                          child: Text(
+                            "${CalendarDateUtils.getMonthName(date.month)} ${date.year}",
+                            style: TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.blue.shade800,
+                            ),
+                          ),
+                        ),
+                      );
+                  },
                 ),
+
                 // Week View
                 WeekView(
                   controller: _eventController,

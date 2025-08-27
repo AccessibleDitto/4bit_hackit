@@ -38,7 +38,7 @@ class ExtendedCalendarEventData extends CalendarEventData {
   final Priority priority;
   final String? project;
   final RecurringType recurring;
-  final String seriesId; // <-- NEW FIELD
+  final String seriesId; 
 
   ExtendedCalendarEventData({
     required String title,
@@ -51,13 +51,14 @@ class ExtendedCalendarEventData extends CalendarEventData {
     this.project,
     this.recurring = RecurringType.none,
     String? seriesId,
-  })  : seriesId = seriesId ?? UniqueKey().toString(), // Auto-generate if not provided
-        super(
-          title: title,
-          description: description,
-          date: date,
-          startTime: startTime,
-          endTime: endTime,
-          color: color,
-        );
+  }) : seriesId =
+           seriesId ?? UniqueKey().toString(), // Auto-generate if not provided
+       super(
+         title: title,
+         description: description,
+         date: date,
+         startTime: startTime,
+         endTime: endTime,
+         color: color,
+       );
 }
