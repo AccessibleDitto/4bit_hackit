@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_application_4bit/main.dart';
 import 'register.dart';
+import 'calendar_page.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -15,28 +16,28 @@ class _LoginPageState extends State<LoginPage> {
   String? _errorMessage;
 
   // just sample user for demonstration
-  final String _mockUsername = 'user';
-  final String _mockPassword = 'password123';
+  final String _mockUsername = '';
+  final String _mockPassword = '';
 
   void _login() {
     setState(() {
-      _errorMessage = null;
-      if (_usernameController.text.isEmpty || _passwordController.text.isEmpty) {
-        _errorMessage = 'Please enter both username and password.';
-      } else if (_usernameController.text != _mockUsername || _passwordController.text != _mockPassword) {
-        _errorMessage = 'Invalid username or password.';
-      } else {
-        _errorMessage = null;
-        // Will change this to navigate to home page after successful login
+      // _errorMessage = null;
+      // if (_usernameController.text.isEmpty || _passwordController.text.isEmpty) {
+      //   _errorMessage = 'Please enter both username and password.';
+      // } else if (_usernameController.text != _mockUsername || _passwordController.text != _mockPassword) {
+      //   _errorMessage = 'Invalid username or password.';
+      // } else {
+      //   _errorMessage = null;
+      //   // Will change this to navigate to home page after successful login
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
-            builder: (context) => const MyHomePage(title: 'Khronofy'),
+            builder: (context) => CalendarPage(),
           ),
         );
         _usernameController.clear();
         _passwordController.clear();
-      }
+      // }
     });
   }
 

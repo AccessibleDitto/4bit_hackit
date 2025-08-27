@@ -44,10 +44,13 @@ class EventDialogs {
 
   static void showEventDetails(
     BuildContext context, 
-    CalendarEventData event,
+    CalendarEventData event, 
     Map<String?, Color> projectColors,
     Function(BuildContext, CalendarEventData) onEdit,
-    Function(BuildContext, CalendarEventData) onDelete,
+    Function(BuildContext, CalendarEventData) onDeleteEvent,
+    // Function(CalendarEventData) onDeleteEvent,
+    Function(String) onDeleteSeries,
+    
   ) {
     final extendedEvent = event is ExtendedCalendarEventData ? event : null;
 
@@ -162,7 +165,14 @@ class EventDialogs {
                   color: Colors.red,
                   onPressed: () {
                     Navigator.pop(context);
-                    onDelete(context, event);
+                    // onDelete(context, event);
+
+                    if (event is ExtendedCalendarEventData && event.recurring != RecurringType.none) {
+                      _showDeleteOptionsDialog(context, event as ExtendedCalendarEventData, onDeleteEvent, onDeleteSeries);
+                    } else {
+                      onDeleteEvent(context, event);
+                      // onDelete(context, event);
+                    }
                   },
                 ),
               ],
@@ -172,6 +182,38 @@ class EventDialogs {
       },
     );
   }
+    
+  static void _showDeleteOptionsDialog(
+    BuildContext context,
+    ExtendedCalendarEventData event,
+    Function(BuildContext, CalendarEventData) onDeleteEvent,
+    Function(String) onDeleteSeries, // add here
+  ) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Event'),
+        content: const Text('Do you want to delete only this event or the entire series?'),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              onDeleteEvent(context, event); // Delete only this one
+            },
+            child: const Text('Only this event'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              onDeleteSeries(event.seriesId!); // Call callback for entire series
+            },
+            child: const Text('Entire series'),
+          ),
+        ],
+      ),
+    );
+  }
+
 
   static void showEventOptions(
     BuildContext context, 

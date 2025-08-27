@@ -6,6 +6,7 @@ import '../widgets/event_tile_builder.dart';
 import '../widgets/custom_timeline.dart';
 import '../dialogs/event_dialogs.dart';
 import '../dialogs/event_form_dialog.dart';
+import 'package:flutter/foundation.dart';
 
 class CalendarPage extends StatefulWidget {
   const CalendarPage({Key? key}) : super(key: key);
@@ -20,7 +21,7 @@ class CalendarPageState extends State<CalendarPage> {
   DateTime? _selectedDayViewDate;
   bool _isInDayView = false;
   int _previousViewIndex = 0;
-  bool _condensed = false; // Condensed vertical density
+  final bool _condensed = true; // Condensed vertical density
 
   // Projects storage & color mapping
   final List<String> _projects = [
@@ -31,6 +32,10 @@ class CalendarPageState extends State<CalendarPage> {
     'Family',
     'Hobbies',
   ];
+
+  // bool _condensed = false;
+  // bool _isInDayView = false;  // Default: start in Month view
+  // int _selectedIndex = 0;     // 0 = Month, 1 = Week
 
   final Map<String, Color> _projectColors = {}; // assigned at init
   final List<Color> _projectPalette = const [
@@ -63,7 +68,8 @@ class CalendarPageState extends State<CalendarPage> {
   void _assignProjectColorIfNeeded(String project) {
     if (project.isEmpty) return;
     if (_projectColors.containsKey(project)) return;
-    _projectColors[project] = _projectPalette[_paletteIndex % _projectPalette.length];
+    _projectColors[project] =
+        _projectPalette[_paletteIndex % _projectPalette.length];
     _paletteIndex++;
   }
 
@@ -75,33 +81,44 @@ class CalendarPageState extends State<CalendarPage> {
   }
 
   void _addSampleEvents() {
-    // Add some sample events
     final now = DateTime.now();
 
-    _eventController.add(ExtendedCalendarEventData(
-      title: "Team Meeting",
-      date: now,
-      startTime: DateTime(now.year, now.month, now.day, now.hour, 0),
-      endTime: DateTime(now.year, now.month, now.day, now.hour, 0).add(const Duration(hours: 1)),
-      description: "Weekly team sync",
-      priority: Priority.high,
-      project: 'Work',
-      recurring: RecurringType.weekly,
-      color: _resolveEventColor(project: 'Work', priority: Priority.high),
-    ));
+    // Use _addEventWithRecurring() instead of _eventController.add()
+    _addEventWithRecurring(
+      ExtendedCalendarEventData(
+        title: "Team Meeting",
+        date: now,
+        startTime: DateTime(now.year, now.month, now.day, now.hour, 0),
+        endTime: DateTime(
+          now.year,
+          now.month,
+          now.day,
+          now.hour,
+          0,
+        ).add(const Duration(hours: 1)),
+        description: "Weekly team sync",
+        priority: Priority.high,
+        project: 'Work',
+        recurring: RecurringType.weekly,
+        color: _resolveEventColor(project: 'Work', priority: Priority.high),
+      ),
+    );
 
     final tmr = now.add(const Duration(days: 1));
-    _eventController.add(ExtendedCalendarEventData(
-      title: "Lunch with Client",
-      date: tmr,
-      startTime: DateTime(tmr.year, tmr.month, tmr.day, 12, 0),
-      endTime: DateTime(tmr.year, tmr.month, tmr.day, 13, 0),
-      description: "Business lunch meeting",
-      priority: Priority.medium,
-      project: 'Work',
-      recurring: RecurringType.none,
-      color: _resolveEventColor(project: 'Work', priority: Priority.medium),
-    ));
+
+    _addEventWithRecurring(
+      ExtendedCalendarEventData(
+        title: "Lunch with Client",
+        date: tmr,
+        startTime: DateTime(tmr.year, tmr.month, tmr.day, 12, 0),
+        endTime: DateTime(tmr.year, tmr.month, tmr.day, 13, 0),
+        description: "Business lunch meeting",
+        priority: Priority.medium,
+        project: 'Work',
+        recurring: RecurringType.none,
+        color: _resolveEventColor(project: 'Work', priority: Priority.medium),
+      ),
+    );
   }
 
   void _showDayView(DateTime date) {
@@ -121,18 +138,20 @@ class CalendarPageState extends State<CalendarPage> {
 
   void _showEventDetails(BuildContext context, CalendarEventData event) {
     EventDialogs.showEventDetails(
-      context, 
-      event, 
-      _projectColors, 
+      context,
+      event,
+      _projectColors,
       _showEditEventDialog,
       _deleteEvent,
+      _deleteAllOccurrences,
+      // resolveEventColor: _resolveEventColor,
     );
   }
 
   void _showEventOptions(BuildContext context, CalendarEventData event) {
     EventDialogs.showEventOptions(
-      context, 
-      event, 
+      context,
+      event,
       _showEditEventDialog,
       _deleteEvent,
     );
@@ -148,6 +167,7 @@ class CalendarPageState extends State<CalendarPage> {
       onAddProject: _addProject,
       onSaveEvent: _addEventWithRecurring,
       onDeleteEvent: (event) => _deleteEvent(context, event),
+      onDeleteSeries: _deleteAllOccurrences,
       resolveEventColor: _resolveEventColor,
     );
   }
@@ -165,7 +185,14 @@ class CalendarPageState extends State<CalendarPage> {
         _addEventWithRecurring(newEvent, overrideRecurring: overrideRecurring);
       },
       onDeleteEvent: (event) => _deleteEvent(context, event),
+      onDeleteSeries: _deleteAllOccurrences,
       resolveEventColor: _resolveEventColor,
+    );
+  }
+
+  void _deleteAllOccurrences(String seriesId) {
+    _eventController.removeWhere(
+      (e) => e is ExtendedCalendarEventData && e.seriesId == seriesId,
     );
   }
 
@@ -178,51 +205,127 @@ class CalendarPageState extends State<CalendarPage> {
 
   void _deleteEvent(BuildContext context, CalendarEventData event) {
     EventDialogs.showDeleteConfirmation(
-      context, 
-      event, 
+      context,
+      event,
       () => _eventController.remove(event),
+    );
+  }
+
+  Widget _buildViewToggleButton(String label, bool selected) {
+    return TextButton(
+      onPressed: () {
+        setState(() {
+          if (label == 'Day') {
+            _isInDayView = true;
+          } else {
+            _isInDayView = false;
+            _selectedIndex = (label == 'Week') ? 1 : 0;
+          }
+        });
+      },
+      style: TextButton.styleFrom(
+        backgroundColor: selected ? Colors.white.withOpacity(0.2) : null,
+        foregroundColor: Colors.white,
+      ),
+      child: Text(label),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    final double heightPerMinute = _condensed ? 0.6 : 1.2; // smaller => more condensed
+    final double heightPerMinute = _condensed
+        ? 0.6
+        : 1.2; // smaller => more condensed
 
+    // return Scaffold(
+    //   appBar: AppBar(
+    //     title: Text(_getAppBarTitle()),
+    //     backgroundColor: Colors.blue,
+    //     foregroundColor: Colors.white,
+    //     leading: _isInDayView
+    //         ? IconButton(
+    //             icon: const Icon(Icons.arrow_back),
+    //             onPressed: _exitDayView,
+    //           )
+    //         : null,
+    //     actions: [
+    //       IconButton(
+    //         tooltip: _condensed ? 'Normal density' : 'Condensed density',
+    //         icon: Icon(_condensed ? Icons.expand : Icons.compress),
+    //         onPressed: () => setState(() => _condensed = !_condensed),
+    //       ),
+    //       IconButton(
+    //         tooltip: 'Add Event',
+    //         icon: const Icon(Icons.add),
+    //         onPressed: () => _showAddEventDialog(context),
+    //       ),
+    //     ],
+    //   ),
     return Scaffold(
       appBar: AppBar(
         title: Text(_getAppBarTitle()),
         backgroundColor: Colors.blue,
         foregroundColor: Colors.white,
-        leading: _isInDayView
-            ? IconButton(
-                icon: const Icon(Icons.arrow_back),
-                onPressed: _exitDayView,
-              )
-            : null,
+        automaticallyImplyLeading: false,
+        // leading: _isInDayView
+        //     ? IconButton(
+        //         icon: const Icon(Icons.arrow_back),
+        //         onPressed: _exitDayView,
+        //       )
+        //     : null,
         actions: [
-          IconButton(
-            tooltip: _condensed ? 'Normal density' : 'Condensed density',
-            icon: Icon(_condensed ? Icons.expand : Icons.compress),
-            onPressed: () => setState(() => _condensed = !_condensed),
+          // View toggle buttons inside AppBar
+          Row(
+            children: [
+              _buildViewToggleButton('Day', _isInDayView),
+              _buildViewToggleButton(
+                'Week',
+                !_isInDayView && _selectedIndex == 1,
+              ),
+              Padding(
+                padding: const EdgeInsets.only(
+                  right: 8.0,
+                ), // 8 pixels right margin
+                child: _buildViewToggleButton(
+                  'Month',
+                  !_isInDayView && _selectedIndex == 0,
+                ),
+              ),
+            ],
           ),
-          IconButton(
-            tooltip: 'Add Event',
-            icon: const Icon(Icons.add),
-            onPressed: () => _showAddEventDialog(context),
-          ),
+          // IconButton(
+          //   tooltip: _condensed ? 'Normal density' : 'Condensed density',
+          //   icon: Icon(_condensed ? Icons.expand : Icons.compress),
+          //   onPressed: () => setState(() => _condensed = !_condensed),
+          // ),
+          // IconButton(
+          //   tooltip: 'Add Event',
+          //   icon: const Icon(Icons.add),
+          //   onPressed: () => _showAddEventDialog(context),
+          // ),
         ],
       ),
+
       body: _isInDayView
           ? DayView(
               controller: _eventController,
-              eventTileBuilder: (date, events, boundary, startDuration, endDuration) => 
-                MyEventTileBuilder.buildEventTile(
-                  date, events, boundary, startDuration, endDuration,
-                  _showEventDetails, _showEventOptions, context,
-                ),
-              initialDay: _selectedDayViewDate!,
-              onEventTap: (events, date) => _showEventDetails(context, events.first),
-              timeLineBuilder: (date) => CustomTimeline.buildTimeLineBuilder(date),
+              eventTileBuilder:
+                  (date, events, boundary, startDuration, endDuration) =>
+                      MyEventTileBuilder.buildEventTile(
+                        date,
+                        events,
+                        boundary,
+                        startDuration,
+                        endDuration,
+                        _showEventDetails,
+                        _showEventOptions,
+                        context,
+                      ),
+              initialDay: _selectedDayViewDate ?? DateTime.now(),
+              onEventTap: (events, date) =>
+                  _showEventDetails(context, events.first),
+              timeLineBuilder: (date) =>
+                  CustomTimeline.buildTimeLineBuilder(date),
               dayTitleBuilder: (date) => Container(
                 color: Colors.blue.shade50,
                 padding: const EdgeInsets.all(16),
@@ -265,14 +368,15 @@ class CalendarPageState extends State<CalendarPage> {
                   controller: _eventController,
                   onCellTap: (events, date) => _showDayView(date),
                   onDateLongPress: (date) => EventDialogs.showDayEvents(
-                    context, 
-                    _eventController.getEventsOnDay(date), 
+                    context,
+                    _eventController.getEventsOnDay(date),
                     date,
                     _showEventDetails,
                     _showEventOptions,
                     _showAddEventDialog,
                   ),
-                  onEventTap: (event, date) => _showEventDetails(context, event),
+                  onEventTap: (event, date) =>
+                      _showEventDetails(context, event),
                   headerBuilder: (date) => Container(
                     color: Colors.blue.shade50,
                     padding: const EdgeInsets.all(16),
@@ -289,34 +393,43 @@ class CalendarPageState extends State<CalendarPage> {
                 // Week View
                 WeekView(
                   controller: _eventController,
-                  eventTileBuilder: (date, events, boundary, startDuration, endDuration) => 
-                    MyEventTileBuilder.buildEventTile(
-                      date, events, boundary, startDuration, endDuration,
-                      _showEventDetails, _showEventOptions, context,
-                    ),
+                  eventTileBuilder:
+                      (date, events, boundary, startDuration, endDuration) =>
+                          MyEventTileBuilder.buildEventTile(
+                            date,
+                            events,
+                            boundary,
+                            startDuration,
+                            endDuration,
+                            _showEventDetails,
+                            _showEventOptions,
+                            context,
+                          ),
                   onDateTap: (date) => _showDayView(date),
-                  onEventTap: (events, date) => _showEventDetails(context, events.first),
-                  timeLineBuilder: (date) => CustomTimeline.buildTimeLineBuilder(date),
+                  onEventTap: (events, date) =>
+                      _showEventDetails(context, events.first),
+                  timeLineBuilder: (date) =>
+                      CustomTimeline.buildTimeLineBuilder(date),
                   heightPerMinute: heightPerMinute,
                 ),
               ],
             ),
-      bottomNavigationBar: _isInDayView
-          ? null
-          : BottomNavigationBar(
-              currentIndex: _selectedIndex,
-              onTap: (index) => setState(() => _selectedIndex = index),
-              items: const [
-                BottomNavigationBarItem(
-                  icon: Icon(Icons.calendar_month),
-                  label: 'Month',
-                ),
-                BottomNavigationBarItem(
-                  icon: Icon(Icons.view_week),
-                  label: 'Week',
-                ),
-              ],
-            ),
+      // bottomNavigationBar: _isInDayView
+      //     ? null
+      //     : BottomNavigationBar(
+      //         currentIndex: _selectedIndex,
+      //         onTap: (index) => setState(() => _selectedIndex = index),
+      //         items: const [
+      //           BottomNavigationBarItem(
+      //             icon: Icon(Icons.calendar_month),
+      //             label: 'Month',
+      //           ),
+      //           BottomNavigationBarItem(
+      //             icon: Icon(Icons.view_week),
+      //             label: 'Week',
+      //           ),
+      //         ],
+      //       ),
       floatingActionButton: FloatingActionButton(
         backgroundColor: Colors.blue,
         onPressed: () => _showAddEventDialog(context),
@@ -327,7 +440,9 @@ class CalendarPageState extends State<CalendarPage> {
 
   String _getAppBarTitle() {
     if (_isInDayView) {
-      return 'Day View - ${CalendarDateUtils.getMonthName(_selectedDayViewDate!.month)} ${_selectedDayViewDate!.day}';
+      final date = _selectedDayViewDate ?? DateTime.now();
+      return 'Day View';
+      // return 'Day View - ${CalendarDateUtils.getMonthName(date.month)} ${date.day}';
     }
     switch (_selectedIndex) {
       case 0:
@@ -340,78 +455,127 @@ class CalendarPageState extends State<CalendarPage> {
   }
 
   // Add event + generate future recurrences (color comes from project)
-  void _addEventWithRecurring(ExtendedCalendarEventData event, {RecurringType? overrideRecurring}) {
+  void _addEventWithRecurring(
+    ExtendedCalendarEventData event, {
+    RecurringType? overrideRecurring,
+  }) {
     final recurrence = overrideRecurring ?? event.recurring;
-
-    // Always ensure color is consistent with current project/priority
-    final color = _resolveEventColor(project: event.project, priority: event.priority);
-    _eventController.add(ExtendedCalendarEventData(
-      title: event.title,
-      description: event.description,
-      date: event.date,
-      startTime: event.startTime,
-      endTime: event.endTime,
-      color: color,
-      priority: event.priority,
+    final color = _resolveEventColor(
       project: event.project,
-      recurring: recurrence,
-    ));
+      priority: event.priority,
+    );
 
-    if (recurrence == RecurringType.none) return;
+    final seriesId = event.seriesId; // <-- Capture seriesId for all occurrences
 
-    final baseDate = event.date;
-    final baseStart = event.startTime!;
-    final baseEnd = event.endTime!;
+    print("---- Adding Event ----");
+    print(
+      "Base event: ${event.title}, Date: ${event.date}, Recurring: $recurrence",
+    );
 
-    // Generate up to ~1 year of occurrences (tweak as desired)
-    final maxDaysAhead = 365;
+    // Add base event
+    _eventController.add(
+      ExtendedCalendarEventData(
+        title: event.title,
+        description: event.description,
+        date: _normalizeDate(event.date),
+        startTime: event.startTime ?? DateTime.now(),
+        endTime: event.endTime ?? DateTime.now().add(const Duration(hours: 1)),
+        color: color,
+        priority: event.priority,
+        project: event.project,
+        recurring: recurrence,
+        seriesId: seriesId, // <-- Assign seriesId
+      ),
+    );
+
+    if (recurrence == RecurringType.none) {
+      print("No recurrence. Only base event added.");
+      return;
+    }
+
+    // Add recurrences
+    final baseDate = _normalizeDate(event.date);
+    final baseStart = event.startTime ?? baseDate;
+    final baseEnd = event.endTime ?? baseDate.add(Duration(hours: 1));
+
+    const maxDaysAhead = 365;
     int i = 1;
+    int addedCount = 0;
+
     while (true) {
-      DateTime nextDate;
-      DateTime nextStart;
-      DateTime nextEnd;
+      DateTime nextDate = baseDate;
+      DateTime nextStart = baseStart;
+      DateTime nextEnd = baseEnd;
 
       switch (recurrence) {
         case RecurringType.daily:
-          nextDate = baseDate.add(Duration(days: i));
+          nextDate = _normalizeDate(baseDate.add(Duration(days: i)));
           nextStart = baseStart.add(Duration(days: i));
           nextEnd = baseEnd.add(Duration(days: i));
           break;
         case RecurringType.weekly:
-          nextDate = baseDate.add(Duration(days: i * 7));
+          nextDate = _normalizeDate(baseDate.add(Duration(days: i * 7)));
           nextStart = baseStart.add(Duration(days: i * 7));
           nextEnd = baseEnd.add(Duration(days: i * 7));
           break;
         case RecurringType.monthly:
-          nextDate = CalendarDateUtils.addMonths(baseDate, i);
+          nextDate = _normalizeDate(CalendarDateUtils.addMonths(baseDate, i));
           nextStart = CalendarDateUtils.addMonths(baseStart, i);
           nextEnd = CalendarDateUtils.addMonths(baseEnd, i);
           break;
         case RecurringType.yearly:
-          nextDate = DateTime(baseDate.year + i, baseDate.month, baseDate.day);
-          nextStart = DateTime(baseStart.year + i, baseStart.month, baseStart.day, baseStart.hour, baseStart.minute);
-          nextEnd = DateTime(baseEnd.year + i, baseEnd.month, baseEnd.day, baseEnd.hour, baseEnd.minute);
+          nextDate = _normalizeDate(
+            DateTime(baseDate.year + i, baseDate.month, baseDate.day),
+          );
+          nextStart = DateTime(
+            baseStart.year + i,
+            baseStart.month,
+            baseStart.day,
+            baseStart.hour,
+            baseStart.minute,
+          );
+          nextEnd = DateTime(
+            baseEnd.year + i,
+            baseEnd.month,
+            baseEnd.day,
+            baseEnd.hour,
+            baseEnd.minute,
+          );
           break;
         case RecurringType.none:
-          return;
+          break;
       }
 
-      if (nextDate.difference(baseDate).inDays > maxDaysAhead) break;
+      if (nextDate.difference(baseDate).inDays > maxDaysAhead) {
+        print("Reached max recurrence range. Breaking loop.");
+        break;
+      }
 
-      _eventController.add(ExtendedCalendarEventData(
-        title: event.title,
-        description: event.description,
-        date: nextDate,
-        startTime: nextStart,
-        endTime: nextEnd,
-        color: color, // same project color
-        priority: event.priority,
-        project: event.project,
-        recurring: RecurringType.none, // instances are not themselves recurring
-      ));
+      _eventController.add(
+        ExtendedCalendarEventData(
+          title: event.title,
+          description: event.description,
+          date: nextDate,
+          startTime: nextStart,
+          endTime: nextEnd,
+          color: color,
+          priority: event.priority,
+          project: event.project,
+          // recurring: RecurringType.none, // individual event was previously marked as non-recurring
+          recurring: recurrence, // <-- Keep same recurrence type,
+          seriesId: seriesId, // <-- Keep same seriesId
+        ),
+      );
 
+      addedCount++;
       i++;
-      if (i > 400) break; // hard cap safety
+      if (i > 400) break;
     }
+
+    print("Total recurring events added: $addedCount");
+  }
+
+  DateTime _normalizeDate(DateTime date) {
+    return DateTime(date.year, date.month, date.day);
   }
 }

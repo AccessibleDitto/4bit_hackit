@@ -83,7 +83,7 @@ class MyEventTileBuilder {
             fontWeight: FontWeight.bold,
           ),
           overflow: TextOverflow.ellipsis,
-          maxLines: 2,
+          maxLines: 1,
         ),
         if (isExtended) ...[
           const SizedBox(height: 1),

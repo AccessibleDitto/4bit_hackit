@@ -3,6 +3,7 @@ import 'package:calendar_view/calendar_view.dart';
 import '../models/calendar_models.dart';
 import '../utils/date_utils.dart';
 import 'event_dialogs.dart';
+// import 'package:flutter_application_4bit/calendar_page.dart';
 
 class EventFormDialog {
   static void showEventDialog(
@@ -16,6 +17,7 @@ class EventFormDialog {
     required Function(ExtendedCalendarEventData, {RecurringType? overrideRecurring}) onSaveEvent,
     required Function(CalendarEventData) onDeleteEvent,
     required Color Function({String? project, required Priority priority}) resolveEventColor,
+    required Function(String) onDeleteSeries,
   }) {
     final isExtended = event is ExtendedCalendarEventData;
     final extendedEvent = isExtended ? event as ExtendedCalendarEventData : null;
@@ -215,6 +217,7 @@ class EventFormDialog {
                   onChanged: (value) {
                     setState(() {
                       selectedRecurring = value!;
+                      print("Selected Recurring: $selectedRecurring");
                     });
                   },
                 ),
@@ -247,18 +250,25 @@ class EventFormDialog {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                if (isEdit)
-                  EventDialogs.buildActionButton(
-                    onPressed: () {
-                      Navigator.pop(context);
+                // if (isEdit)
+                EventDialogs.buildActionButton(
+                  onPressed: () {
+                    Navigator.pop(context);
+                    print(event);
+                    
+                    if (event is ExtendedCalendarEventData && event.recurring != RecurringType.none) {
+                      _showDeleteOptionsDialog(context, event as ExtendedCalendarEventData, onDeleteEvent, onDeleteSeries);
+                    } else {
                       onDeleteEvent(event!);
-                    },
-                    text: "Delete",
-                    icon: Icons.delete,
-                    color: Colors.red,
-                  )
-                else
-                  const SizedBox(width: 100), // Spacer when not editing
+                    }
+                  },
+                  text: "Delete",
+                  icon: Icons.delete,
+                  color: Colors.red,
+                ),
+
+                // else
+                //   const SizedBox(width: 100), // Spacer when not editing
 
                 EventDialogs.buildActionButton(
                   onPressed: () {
@@ -301,6 +311,38 @@ class EventFormDialog {
             )
           ],
         ),
+      ),
+    );
+  }
+
+  
+  static void _showDeleteOptionsDialog(
+    BuildContext context,
+    ExtendedCalendarEventData event,
+    Function(CalendarEventData) onDeleteEvent,
+    Function(String) onDeleteSeries, // add here
+  ) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Event'),
+        content: const Text('Do you want to delete only this event or the entire series?'),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              onDeleteEvent(event); // Delete only this one
+            },
+            child: const Text('Only this event'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              onDeleteSeries(event.seriesId!); // Call callback for entire series
+            },
+            child: const Text('Entire series'),
+          ),
+        ],
       ),
     );
   }
