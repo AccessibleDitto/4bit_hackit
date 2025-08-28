@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'register.dart';
-import 'calendar_page.dart';
+// import 'calendar_page.dart';
+import 'homepage.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -15,19 +16,19 @@ class _LoginPageState extends State<LoginPage> {
   String? _errorMessage;
 
   // just sample user for demonstration
-  final String _mockUsername = '';
-  final String _mockPassword = '';
+  final String _mockUsername = 'user';
+  final String _mockPassword = '123';
 
   void _login() {
     setState(() {
-      // _errorMessage = null;
-      // if (_usernameController.text.isEmpty || _passwordController.text.isEmpty) {
-      //   _errorMessage = 'Please enter both username and password.';
-      // } else if (_usernameController.text != _mockUsername || _passwordController.text != _mockPassword) {
-      //   _errorMessage = 'Invalid username or password.';
-      // } else {
-      //   _errorMessage = null;
-      //   // Will change this to navigate to home page after successful login
+      _errorMessage = null;
+      if (_usernameController.text.isEmpty || _passwordController.text.isEmpty) {
+        _errorMessage = 'Please enter both username and password.';
+      } else if (_usernameController.text != _mockUsername || _passwordController.text != _mockPassword) {
+        _errorMessage = 'Invalid username or password.';
+      } else {
+        _errorMessage = null;
+        // Will change this to navigate to home page after successful login
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
@@ -36,7 +37,7 @@ class _LoginPageState extends State<LoginPage> {
         );
         _usernameController.clear();
         _passwordController.clear();
-      // }
+      }
     });
   }
 
