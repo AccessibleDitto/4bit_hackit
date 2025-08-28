@@ -6,7 +6,8 @@ import 'login.dart';
 import 'dart:ui';
 import 'homepage.dart';
 import 'tasks.dart';
-
+import 'profile.dart';
+import 'settings.dart';
 void main() {
   runApp(const MyApp());
 }
@@ -203,8 +204,8 @@ class _MyHomePageState extends State<MyHomePage>
                     shape: BoxShape.circle,
                     gradient: RadialGradient(
                       colors: [
-                        const Color(0xFF9333EA).withOpacity(0.8),
-                        const Color(0xFF9333EA).withOpacity(0.2),
+                        const Color(0xFF9333EA).withValues(alpha: 0.8),
+                        const Color(0xFF9333EA).withValues(alpha: 0.2),
                         Colors.transparent,
                       ],
                     ),
@@ -227,7 +228,7 @@ class _MyHomePageState extends State<MyHomePage>
             shape: BoxShape.circle,
             boxShadow: [
               BoxShadow(
-                color: const Color(0xFF9333EA).withOpacity(0.4),
+                color: const Color(0xFF9333EA).withValues(alpha: 0.4),
                 blurRadius: 40,
                 spreadRadius: 10,
                 offset: const Offset(0, 10),
@@ -236,7 +237,7 @@ class _MyHomePageState extends State<MyHomePage>
           ),
           child: CircleAvatar(
             radius: 56,
-            backgroundColor: Colors.white.withOpacity(0.1),
+            backgroundColor: Colors.white.withValues(alpha: 0.1),
             child: ShaderMask(
               shaderCallback: (bounds) => const LinearGradient(
                 colors: [
@@ -279,7 +280,7 @@ class _MyHomePageState extends State<MyHomePage>
           ).createShader(bounds),
           child: Text(
             'Khronofy',
-            style: GoogleFonts.pacifico(
+            style: GoogleFonts.inter(
               fontSize: 48,
               fontWeight: FontWeight.w400,
               color: Colors.white,
@@ -334,22 +335,22 @@ class _MyHomePageState extends State<MyHomePage>
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            const Color(0xFF18181B).withOpacity(0.9),
-            const Color(0xFF18181B).withOpacity(0.7),
+            const Color(0xFF18181B).withValues(alpha: 0.9),
+            const Color(0xFF18181B).withValues(alpha: 0.7),
           ],
         ),
         border: Border.all(
-          color: const Color(0xFF9333EA).withOpacity(0.2),
+          color: const Color(0xFF9333EA).withValues(alpha: 0.2),
           width: 1,
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.8),
+            color: Colors.black.withValues(alpha: 0.8),
             blurRadius: 50,
             offset: const Offset(0, 25),
           ),
           BoxShadow(
-            color: const Color(0xFF9333EA).withOpacity(0.1),
+            color: const Color(0xFF9333EA).withValues(alpha: 0.1),
             blurRadius: 100,
             spreadRadius: 10,
           ),
@@ -392,7 +393,7 @@ class _MyHomePageState extends State<MyHomePage>
                           gradient: LinearGradient(
                             colors: [
                               Colors.transparent,
-                              const Color(0xFF9333EA).withOpacity(0.3),
+                              const Color(0xFF9333EA).withValues(alpha: 0.3),
                               Colors.transparent,
                             ],
                           ),
@@ -416,7 +417,7 @@ class _MyHomePageState extends State<MyHomePage>
                           gradient: LinearGradient(
                             colors: [
                               Colors.transparent,
-                              const Color(0xFF9333EA).withOpacity(0.3),
+                              const Color(0xFF9333EA).withValues(alpha: 0.3),
                               Colors.transparent,
                             ],
                           ),
@@ -451,6 +452,16 @@ class _MyHomePageState extends State<MyHomePage>
                     );
                   },
                 ),
+                const SizedBox(height: 16),
+                _buildSecondaryButton(
+                  'settings test',
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => SettingsScreen()),
+                    );
+                  },
+                ),
               ],
             ),
           ),
@@ -482,7 +493,7 @@ class _MyHomePageState extends State<MyHomePage>
             ),
             boxShadow: [
               BoxShadow(
-                color: const Color(0xFF9333EA).withOpacity(0.4),
+                color: const Color(0xFF9333EA).withValues(alpha: 0.4),
                 blurRadius: 25,
                 offset: const Offset(0, 8),
               ),
@@ -511,10 +522,10 @@ class _MyHomePageState extends State<MyHomePage>
       child: OutlinedButton(
         onPressed: onPressed,
         style: OutlinedButton.styleFrom(
-          backgroundColor: const Color(0xFF27272A).withOpacity(0.8),
+          backgroundColor: const Color(0xFF27272A).withValues(alpha: 0.8),
           foregroundColor: Colors.white,
           side: BorderSide(
-            color: const Color(0xFF9333EA).withOpacity(0.3),
+            color: const Color(0xFF9333EA).withValues(alpha: 0.3),
             width: 2,
           ),
           shape: RoundedRectangleBorder(
@@ -870,10 +881,10 @@ class _MyHomePageState extends State<MyHomePage>
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFF27272A).withOpacity(0.5),
+        color: const Color(0xFF27272A).withValues(alpha: 0.5),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: const Color(0xFF9333EA).withOpacity(0.1),
+          color: const Color(0xFF9333EA).withValues(alpha: 0.1),
           width: 1,
         ),
       ),
@@ -895,68 +906,6 @@ class _MyHomePageState extends State<MyHomePage>
               fontSize: 14,
               color: const Color(0xFFA1A1AA),
               height: 1.4,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildContactItem(IconData icon, String title, String subtitle, String description) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: const Color(0xFF27272A).withOpacity(0.5),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: const Color(0xFF9333EA).withOpacity(0.1),
-          width: 1,
-        ),
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: const Color(0xFF9333EA).withOpacity(0.2),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(
-              icon,
-              color: const Color(0xFF9333EA),
-              size: 24,
-            ),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: GoogleFonts.inter(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.white,
-                  ),
-                ),
-                Text(
-                  subtitle,
-                  style: GoogleFonts.inter(
-                    fontSize: 14,
-                    color: const Color(0xFF9333EA),
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                Text(
-                  description,
-                  style: GoogleFonts.inter(
-                    fontSize: 12,
-                    color: const Color(0xFF71717A),
-                  ),
-                ),
-              ],
             ),
           ),
         ],

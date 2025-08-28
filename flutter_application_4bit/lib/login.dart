@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_application_4bit/main.dart';
 import 'register.dart';
 import 'calendar_page.dart';
 
@@ -32,7 +31,7 @@ class _LoginPageState extends State<LoginPage> {
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
-            builder: (context) => CalendarPage(),
+            builder: (context) => const TimerModePage(),
           ),
         );
         _usernameController.clear();
