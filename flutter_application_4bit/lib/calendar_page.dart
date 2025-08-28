@@ -7,6 +7,7 @@ import '../widgets/event_tile_builder.dart';
 import '../widgets/custom_timeline.dart';
 import '../dialogs/event_dialogs.dart';
 import '../dialogs/event_form_dialog.dart';
+import '../widgets/navigation_widgets.dart';
 import 'package:flutter/foundation.dart';
 
 class CalendarPage extends StatefulWidget {
@@ -455,6 +456,10 @@ class CalendarPageState extends State<CalendarPage> {
         backgroundColor: Colors.blue,
         onPressed: () => _showAddEventDialog(context),
         child: const Icon(Icons.add),
+      ),
+      bottomNavigationBar: BottomNavigation(
+        selectedIndex: 2,
+        isStrictMode: false,
       ),
     );
   }

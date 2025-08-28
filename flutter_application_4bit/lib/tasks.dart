@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../widgets/navigation_widgets.dart';
 
 class TasksPage extends StatefulWidget {
   @override
@@ -285,6 +286,10 @@ class _TasksPageState extends State<TasksPage> {
               backgroundColor: Colors.red,
               child: Icon(Icons.add, color: Colors.white),
             ),
+      bottomNavigationBar: BottomNavigation(
+        selectedIndex: 1,
+        isStrictMode: false,
+      ),
     );
   }
 

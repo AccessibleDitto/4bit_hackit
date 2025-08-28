@@ -261,26 +261,11 @@ class CompletionButtons extends StatelessWidget {
                 ),
               ),
               child: Text(
-                'Start New Session',
+                'Back to Home',
                 style: GoogleFonts.inter(
                   fontSize: 18,
                   fontWeight: FontWeight.w600,
                 ),
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-          TextButton(
-            onPressed: () {
-              onBackToHome();
-              HapticFeedback.lightImpact();
-            },
-            child: Text(
-              'Back to Home',
-              style: GoogleFonts.inter(
-                color: const Color(0xFF9333EA),
-                fontSize: 16,
-                fontWeight: FontWeight.w500,
               ),
             ),
           ),

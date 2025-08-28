@@ -1,54 +1,96 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../homepage.dart';
+import '../calendar_page.dart';
+import '../tasks.dart';
+import '../settings.dart';
 
 class BottomNavigation extends StatelessWidget {
   final int selectedIndex;
-  final Function(int) onItemSelected;
+  final bool isStrictMode;
 
   const BottomNavigation({
     super.key,
     required this.selectedIndex,
-    required this.onItemSelected,
+    this.isStrictMode = false,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 20),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: [
-          NavigationItem(
-            icon: Icons.timer,
-            label: 'Pomodoro',
-            isSelected: selectedIndex == 0,
-            onTap: () => onItemSelected(0),
-          ),
-          NavigationItem(
-            icon: Icons.apps,
-            label: 'Manage',
-            isSelected: selectedIndex == 1,
-            onTap: () => onItemSelected(1),
-          ),
-          NavigationItem(
-            icon: Icons.calendar_today,
-            label: 'Calendar',
-            isSelected: selectedIndex == 2,
-            onTap: () => onItemSelected(2),
-          ),
-          NavigationItem(
-            icon: Icons.trending_up,
-            label: 'Report',
-            isSelected: selectedIndex == 3,
-            onTap: () => onItemSelected(3),
-          ),
-          NavigationItem(
-            icon: Icons.settings,
-            label: 'Settings',
-            isSelected: selectedIndex == 4,
-            onTap: () => onItemSelected(4),
-          ),
-        ],
+    return Builder(
+      builder: (context) => Container(
+        padding: const EdgeInsets.symmetric(vertical: 20),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceAround,
+          children: [
+            NavigationItem(
+              icon: Icons.timer,
+              label: 'Pomodoro',
+              isSelected: selectedIndex == 0,
+              onTap: isStrictMode
+                  ? null
+                  : () {
+                      if (selectedIndex != 0) {
+                        Navigator.pushReplacement(
+                          context,
+                          MaterialPageRoute(builder: (context) => const TimerModePage()),
+                        );
+                      }
+                    },
+            ),
+            NavigationItem(
+              icon: Icons.apps,
+              label: 'Manage',
+              isSelected: selectedIndex == 1,
+              onTap: isStrictMode
+                  ? null
+                  : () {
+                      if (selectedIndex != 1) {
+                        Navigator.pushReplacement(
+                          context,
+                          MaterialPageRoute(builder: (context) => TasksPage()),
+                        );
+                      }
+                    },
+            ),
+            NavigationItem(
+              icon: Icons.calendar_today,
+              label: 'Calendar',
+              isSelected: selectedIndex == 2,
+              onTap: isStrictMode
+                  ? null
+                  : () {
+                      if (selectedIndex != 2) {
+                        Navigator.pushReplacement(
+                          context,
+                          MaterialPageRoute(builder: (context) => const CalendarPage()),
+                        );
+                      }
+                    },
+            ),
+            NavigationItem(
+              icon: Icons.trending_up,
+              label: 'Report',
+              isSelected: selectedIndex == 3,
+              onTap: null, // Not implemented
+            ),
+            NavigationItem(
+              icon: Icons.settings,
+              label: 'Settings',
+              isSelected: selectedIndex == 4,
+              onTap: isStrictMode
+                  ? null
+                  : () {
+                      if (selectedIndex != 4) {
+                        Navigator.pushReplacement(
+                          context,
+                          MaterialPageRoute(builder: (context) => SettingsScreen()),
+                        );
+                      }
+                    },
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -58,7 +100,7 @@ class NavigationItem extends StatelessWidget {
   final IconData icon;
   final String label;
   final bool isSelected;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
 
   const NavigationItem({
     super.key,
@@ -72,7 +114,10 @@ class NavigationItem extends StatelessWidget {
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
-      child: Column(
+      behavior: HitTestBehavior.opaque,
+      child: Opacity(
+        opacity: onTap == null ? 0.4 : 1.0,
+        child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(
@@ -91,6 +136,6 @@ class NavigationItem extends StatelessWidget {
           ),
         ],
       ),
-    );
+    ));
   }
 }
