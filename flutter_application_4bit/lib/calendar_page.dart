@@ -84,12 +84,12 @@ class CalendarPageState extends State<CalendarPage> {
 
   void _addSampleEvents(jsonString) {
     final now = DateTime.now();
-    final events = parseEventsFromJson(jsonString);
+    // final events = parseEventsFromJson(jsonString);
 
-    // Add each event using your existing method
-    for (final event in events) {
-      _addEventWithRecurring(event);
-    }
+    // // Add each event using your existing method
+    // for (final event in events) {
+    //   _addEventWithRecurring(event);
+    // }
     // Use _addEventWithRecurring() instead of _eventController.add()
     _addEventWithRecurring(
       ExtendedCalendarEventData(
