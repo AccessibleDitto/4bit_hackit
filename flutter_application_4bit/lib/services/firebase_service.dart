@@ -76,12 +76,6 @@ class FirebaseService {
 
         print('Success on attempt $attempt!');
 
-        DocumentSnapshot doc = await _firestore
-            .collection('test')
-            .doc('connection')
-            .get()
-            .timeout(const Duration(seconds: 10));
-            
         return; 
       } catch (e) {
         print('Firestore connection failed on attempt $attempt: $e');

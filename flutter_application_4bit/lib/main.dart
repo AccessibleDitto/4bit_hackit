@@ -1,6 +1,5 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_application_4bit/register.dart';
@@ -11,7 +10,6 @@ import 'dart:ui';
 import 'homepage.dart';
 import 'tasks.dart';
 import 'settings.dart';
-import 'services/firebase_service.dart';
 
 // Initialize Firestore instance
 final db = FirebaseFirestore.instance; 
