@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'services/firebase_service.dart';
 import 'register.dart';
 import 'homepage.dart';
+
+// Firebase Authentication login page
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
 
@@ -9,34 +13,64 @@ class LoginPage extends StatefulWidget {
 }
 
 class _LoginPageState extends State<LoginPage> {
-  final TextEditingController _usernameController = TextEditingController();
+  final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
+  final FirebaseService _firebaseService = FirebaseService();
   String? _errorMessage;
+  bool _isLoading = false;
 
-  // just sample user for demonstration
-  final String _mockUsername = 'user';
-  final String _mockPassword = 'password123';
-
-  void _login() {
+  void _login() async {
     setState(() {
       _errorMessage = null;
-      if (_usernameController.text.isEmpty || _passwordController.text.isEmpty) {
-        _errorMessage = 'Please enter both username and password.';
-      } else if (_usernameController.text != _mockUsername || _passwordController.text != _mockPassword) {
-        _errorMessage = 'Invalid username or password.';
-      } else {
-        _errorMessage = null;
-        // Will change this to navigate to home page after successful login
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (context) => const TimerModePage(),
-          ),
-        );
-        _usernameController.clear();
-        _passwordController.clear();
-      }
+      _isLoading = true;
     });
+
+    if (_emailController.text.isEmpty || _passwordController.text.isEmpty) {
+      setState(() {
+        _errorMessage = 'Please enter both email and password.';
+        _isLoading = false;
+      });
+      return;
+    }
+
+    try {
+      // Test Firestore connection and retrieve data
+      await _firebaseService.testFirestoreConnection();
+      
+      // Get all users from Firestore
+      List<Map<String, dynamic>> users = await _firebaseService.getAllUsers();
+      print('Found ${users.length} users in Firestore');
+      
+      // Get all tasks from Firestore
+      List<Map<String, dynamic>> tasks = await _firebaseService.getAllTasks();
+      print('Found ${tasks.length} tasks in Firestore');
+      
+      // Check if user with this email exists
+      bool userExists = users.any((user) => user['email'] == _emailController.text.trim());
+      
+      if (userExists) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Firestore test successful! Found user data and ${tasks.length} tasks.'),
+              backgroundColor: Colors.green,
+            ),
+          );
+          
+          Navigator.pushReplacementNamed(context, '/home');
+        }
+      } else {
+        setState(() {
+          _errorMessage = 'User not found. Try registering first.';
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _errorMessage = 'Firestore connection failed: ${e.toString()}';
+        _isLoading = false;
+      });
+    }
   }
 
   @override
@@ -139,12 +173,13 @@ class _LoginPageState extends State<LoginPage> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         TextField(
-          controller: _usernameController,
+          controller: _emailController,
           style: const TextStyle(color: Colors.white),
           decoration: InputDecoration(
-            hintText: "Username",
-            prefixIcon: const Icon(Icons.person, color: Color(0xFF8F5CF7)),
+            hintText: "Email",
+            prefixIcon: const Icon(Icons.email, color: Color(0xFF8F5CF7)),
           ),
+          keyboardType: TextInputType.emailAddress,
         ),
         const SizedBox(height: 10),
         TextField(
@@ -157,7 +192,16 @@ class _LoginPageState extends State<LoginPage> {
           obscureText: true,
         ),
         const SizedBox(height: 10),
-        ElevatedButton(onPressed: _login, child: const Text("Login")),
+        ElevatedButton(
+          onPressed: _isLoading ? null : _login,
+          child: _isLoading 
+            ? const SizedBox(
+                height: 20,
+                width: 20,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            : const Text("Login"),
+        ),
       ],
     );
   }

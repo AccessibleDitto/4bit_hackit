@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'services/firebase_service.dart';
 import 'profile.dart';
+import 'pomodoro_preferences.dart';
+import 'login.dart';
 // app theme 
 // theme mode
 enum AppThemeMode { light, dark, system }
@@ -71,6 +75,7 @@ class _SettingsScreenState extends State<SettingsScreen>
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
+  final FirebaseService _firebaseService = FirebaseService();
 
   // Settings states
   bool _notificationsEnabled = true;
@@ -264,6 +269,185 @@ class _SettingsScreenState extends State<SettingsScreen>
     );
   }
 
+  void _showSignOutDialog() {
+    HapticFeedback.mediumImpact();
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: _colors.surface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        title: Text(
+          'Sign Out',
+          style: GoogleFonts.inter(
+            fontSize: 18,
+            fontWeight: FontWeight.w600,
+            color: _colors.onSurface,
+          ),
+        ),
+        content: Text(
+          'Are you sure you want to sign out?',
+          style: GoogleFonts.inter(
+            fontSize: 14,
+            color: _colors.onSurfaceVariant,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(
+              'Cancel',
+              style: GoogleFonts.inter(
+                color: _colors.primary,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              try {
+                await _firebaseService.signOut();
+                if (mounted) {
+                  Navigator.of(context).pushAndRemoveUntil(
+                    MaterialPageRoute(builder: (context) => const LoginPage()),
+                    (route) => false,
+                  );
+                }
+              } catch (e) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Failed to sign out'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              }
+            },
+            child: Text(
+              'Sign Out',
+              style: GoogleFonts.inter(
+                color: _colors.error,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showDeleteAccountDialog() {
+    HapticFeedback.mediumImpact();
+    showDialog(
+      context: context,
+      builder: (context) => AnimatedContainer(
+        duration: const Duration(milliseconds: 300),
+        child: AlertDialog(
+          backgroundColor: _colors.surface,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: Text(
+            'Delete Account',
+            style: GoogleFonts.inter(
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+              color: _colors.error,
+            ),
+          ),
+          content: Text(
+            'Are you sure you want to permanently delete your account? This action cannot be undone.',
+            style: GoogleFonts.inter(
+              fontSize: 14,
+              color: _colors.onSurfaceVariant,
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text(
+                'Cancel',
+                style: GoogleFonts.inter(
+                  color: _colors.primary,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+            TextButton(
+              onPressed: () async {
+                Navigator.pop(context);
+                try {
+                  // Show loading indicator
+                  showDialog(
+                    context: context,
+                    barrierDismissible: false,
+                    builder: (context) => const Center(
+                      child: CircularProgressIndicator(),
+                    ),
+                  );
+                  
+                  // Delete account using Firebase
+                  await _firebaseService.deleteAccount();
+                  
+                  if (mounted) {
+                    Navigator.pop(context); // Close loading dialog
+                    _showSuccessSnackBar('Account deleted successfully');
+                    
+                    // Navigate to login page
+                    Navigator.of(context).pushAndRemoveUntil(
+                      MaterialPageRoute(builder: (context) => const LoginPage()),
+                      (route) => false,
+                    );
+                  }
+                } on FirebaseAuthException catch (e) {
+                  if (mounted) {
+                    Navigator.pop(context); // Close loading dialog
+                    String errorMessage = 'Failed to delete account';
+                    
+                    switch (e.code) {
+                      case 'requires-recent-login':
+                        errorMessage = 'Please sign in again before deleting your account';
+                        break;
+                      default:
+                        errorMessage = 'Error: ${e.message}';
+                    }
+                    
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(errorMessage),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                  }
+                } catch (e) {
+                  if (mounted) {
+                    Navigator.pop(context); // Close loading dialog
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('An unexpected error occurred'),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                  }
+                }
+              },
+              child: Text(
+                'Delete',
+                style: GoogleFonts.inter(
+                  color: _colors.error,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildAccountSection() {
     return Column(
       children: [
@@ -276,11 +460,27 @@ class _SettingsScreenState extends State<SettingsScreen>
         ),
         const SizedBox(height: 12),
         _buildSettingsItem(
+          title: 'Sign Out',
+          subtitle: 'Sign out of your account',
+          icon: Icons.logout,
+          onTap: _showSignOutDialog,
+          isDestructive: false,
+        ),
+        const SizedBox(height: 12),
+        _buildSettingsItem(
           title: 'Account & Security',
           subtitle: 'Password, privacy, and security settings',
           icon: Icons.security_outlined,
           onTap: () => _handleSettingsTap('Account & Security'),
           showArrow: true,
+        ),
+        const SizedBox(height: 12),
+        _buildSettingsItem(
+          title: 'Delete Account',
+          subtitle: 'Permanently delete your account',
+          icon: Icons.delete_forever,
+          onTap: _showDeleteAccountDialog,
+          isDestructive: true,
         ),
       ],
     );
@@ -293,7 +493,7 @@ class _SettingsScreenState extends State<SettingsScreen>
           title: 'Pomodoro Preferences',
           subtitle: 'Customize your focus and break timers',
           icon: Icons.timer_outlined,
-          onTap: () => _handleSettingsTap('Pomodoro Preferences'),
+          onTap: () => _navigateToPomodoroPreferences(),
           showArrow: true,
         ),
         const SizedBox(height: 12),
@@ -438,8 +638,8 @@ class _SettingsScreenState extends State<SettingsScreen>
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
                     color: isDestructive
-                        ? _colors.error.withOpacity(0.1)
-                        : _colors.primary.withOpacity(0.1),
+                        ? _colors.error.withValues(alpha: 0.1)
+                        : _colors.primary.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Icon(
@@ -532,7 +732,7 @@ class _SettingsScreenState extends State<SettingsScreen>
               duration: const Duration(milliseconds: 200),
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: _colors.primary.withOpacity(0.1),
+                color: _colors.primary.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Icon(
@@ -572,8 +772,8 @@ class _SettingsScreenState extends State<SettingsScreen>
               child: Switch(
                 value: value,
                 onChanged: onChanged,
-                activeColor: _colors.primary,
-                activeTrackColor: _colors.primary.withOpacity(0.3),
+                activeThumbColor: _colors.primary,
+                activeTrackColor: _colors.primary.withValues(alpha: 0.3),
                 inactiveThumbColor: _isDarkMode ? const Color(0xFF666666) : const Color(0xFFBBBBBB),
                 inactiveTrackColor: _isDarkMode ? const Color(0xFF333333) : const Color(0xFFE0E0E0),
               ),
@@ -637,7 +837,7 @@ class _SettingsScreenState extends State<SettingsScreen>
               width: 40,
               height: 4,
               decoration: BoxDecoration(
-                color: _colors.onSurfaceVariant.withOpacity(0.3),
+                color: _colors.onSurfaceVariant.withValues(alpha: 0.3),
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -686,7 +886,7 @@ class _SettingsScreenState extends State<SettingsScreen>
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: isSelected 
-              ? _colors.primary.withOpacity(0.1)
+              ? _colors.primary.withValues(alpha: 0.1)
               : (_isDarkMode ? const Color(0xFF2A2A2A) : const Color(0xFFF5F5F5)),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
@@ -734,8 +934,127 @@ class _SettingsScreenState extends State<SettingsScreen>
     );
   }
 
+  void _navigateToPomodoroPreferences() {
+    HapticFeedback.mediumImpact();
+    Navigator.push(
+      context,
+      PageRouteBuilder(
+        pageBuilder: (context, animation, secondaryAnimation) => const PomodoroPreferencesScreen(),
+        transitionDuration: const Duration(milliseconds: 300),
+        transitionsBuilder: (context, animation, secondaryAnimation, child) {
+          const begin = Offset(1.0, 0.0);
+          const end = Offset.zero;
+          const curve = Curves.easeInOut;
+          var tween = Tween(begin: begin, end: end).chain(CurveTween(curve: curve));
+          return SlideTransition(
+            position: animation.drive(tween),
+            child: child,
+          );
+        },
+      ),
+    );
+  }
+
   void _handleSettingsTap(String setting) {
-    _showSuccessSnackBar('$setting opened');
+    String title = setting;
+    String content = '';
+    Widget? customContent;
+    switch (setting) {
+      case 'Account & Security':
+        content = 'Manage your password, privacy, and security settings here. (Feature coming soon)';
+        break;
+      case 'Date & Time':
+        content = 'Set your time zone and date/time format preferences. (Feature coming soon)';
+        break;
+      case 'Help & Support':
+        customContent = Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('Frequently Asked Questions',
+              style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.bold, color: _colors.onSurface)),
+            const SizedBox(height: 16),
+            _buildFAQItem('How do I reset my password?',
+                'On the login screen, tap "Forgot Password" and follow the instructions.'),
+            _buildFAQItem('Is my data secure?',
+                'Absolutely. We use industry-standard encryption to protect your data and never share it with third parties.'),
+            _buildFAQItem('How do I delete my account?',
+                'Go to Settings > Account > Delete Account. Note that this action is irreversible.'),
+          ],
+        );
+        break;
+      case 'About':
+        content = '4bit Hackit\nVersion 1.0.0\n\nMade with ❤️.';
+        break;
+      default:
+        content = '$setting opened.';
+    }
+    showDialog(
+      context: context,
+      builder: (context) => AnimatedContainer(
+        duration: const Duration(milliseconds: 300),
+        child: AlertDialog(
+          backgroundColor: _colors.surface,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: Text(
+            title,
+            style: GoogleFonts.inter(
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+              color: _colors.onSurface,
+            ),
+          ),
+          content: customContent ?? Text(
+            content,
+            style: GoogleFonts.inter(
+              fontSize: 14,
+              color: _colors.onSurfaceVariant,
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text(
+                'Close',
+                style: GoogleFonts.inter(
+                  color: _colors.primary,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFAQItem(String question, String answer) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            question,
+            style: GoogleFonts.inter(
+              fontSize: 15,
+              fontWeight: FontWeight.w600,
+              color: _colors.onSurface,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            answer,
+            style: GoogleFonts.inter(
+              fontSize: 13,
+              color: _colors.onSurfaceVariant,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   void _showLogoutDialog() {

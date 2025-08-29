@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:qr_flutter/qr_flutter.dart';
+import 'models/user_stats.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -13,6 +16,7 @@ class _ProfileScreenState extends State<ProfileScreen>
     with TickerProviderStateMixin {
   late AnimationController _animationController;
   late AnimationController _editAnimationController;
+  late TabController _tabController;
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
   late Animation<double> _editModeAnimation;
@@ -26,6 +30,9 @@ class _ProfileScreenState extends State<ProfileScreen>
   String _selectedAvatar = '👤';
   bool _isEditing = false;
   bool _isSaving = false;
+
+  // User stats instance
+  final UserStats _userStats = UserStats();
 
   // Sample data
   String _currentFullName = 'Albert Einstein';
@@ -48,6 +55,9 @@ class _ProfileScreenState extends State<ProfileScreen>
   void initState() {
     super.initState();
     
+    // Initialize user stats with sample data
+    _userStats.initializeSampleData();
+    
     // Initialize form with current data
     _fullNameController.text = _currentFullName;
     _usernameController.text = _currentUsername;
@@ -63,6 +73,8 @@ class _ProfileScreenState extends State<ProfileScreen>
       duration: const Duration(milliseconds: 400),
       vsync: this,
     );
+
+    _tabController = TabController(length: 2, vsync: this);
 
     _fadeAnimation = CurvedAnimation(
       parent: _animationController,
@@ -98,6 +110,7 @@ class _ProfileScreenState extends State<ProfileScreen>
   void dispose() {
     _animationController.dispose();
     _editAnimationController.dispose();
+    _tabController.dispose();
     _fullNameController.dispose();
     _usernameController.dispose();
     super.dispose();
@@ -111,44 +124,23 @@ class _ProfileScreenState extends State<ProfileScreen>
         child: Column(
           children: [
             _buildAppBar(),
+            ScaleTransition(
+              scale: _scaleAnimation,
+              child: _buildProfileSection(),
+            ),
+            const SizedBox(height: 20),
+            _buildTabBar(),
             Expanded(
               child: FadeTransition(
                 opacity: _fadeAnimation,
                 child: SlideTransition(
                   position: _slideAnimation,
-                  child: SingleChildScrollView(
-                    physics: const BouncingScrollPhysics(),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 20),
-                      child: Column(
-                        children: [
-                          const SizedBox(height: 20),
-                          ScaleTransition(
-                            scale: _scaleAnimation,
-                            child: _buildProfileSection(),
-                          ),
-                          const SizedBox(height: 30),
-                          AnimatedBuilder(
-                            animation: _editModeAnimation,
-                            builder: (context, child) {
-                              return AnimatedContainer(
-                                duration: const Duration(milliseconds: 400),
-                                curve: Curves.easeInOut,
-                                height: _isEditing ? null : 0,
-                                child: AnimatedOpacity(
-                                  opacity: _isEditing ? 1.0 : 0.0,
-                                  duration: const Duration(milliseconds: 400),
-                                  child: _buildEditableFields(),
-                                ),
-                              );
-                            },
-                          ),
-                          if (_isEditing) const SizedBox(height: 30),
-                          _buildQuickActions(),
-                          const SizedBox(height: 30),
-                        ],
-                      ),
-                    ),
+                  child: TabBarView(
+                    controller: _tabController,
+                    children: [
+                      _buildPersonalDetailsTab(),
+                      _buildAchievementsTab(),
+                    ],
                   ),
                 ),
               ),
@@ -223,7 +215,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                     ),
               style: IconButton.styleFrom(
                 backgroundColor: _isEditing 
-                    ? const Color(0xFFFF8C42).withOpacity(0.1)
+                    ? const Color(0xFFFF8C42).withValues(alpha:0.1)
                     : const Color(0xFF1E1E1E),
                 padding: const EdgeInsets.all(12),
                 shape: RoundedRectangleBorder(
@@ -262,7 +254,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                     boxShadow: _isEditing
                         ? [
                             BoxShadow(
-                              color: const Color(0xFFFF8C42).withOpacity(0.3),
+                              color: const Color(0xFFFF8C42).withValues(alpha: 0.3),
                               blurRadius: 20,
                               spreadRadius: 2,
                             ),
@@ -295,7 +287,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                           ),
                           boxShadow: [
                             BoxShadow(
-                              color: const Color(0xFFFF8C42).withOpacity(0.4),
+                              color: const Color(0xFFFF8C42).withValues(alpha: 0.4),
                               blurRadius: 10,
                               offset: const Offset(0, 2),
                             ),
@@ -390,7 +382,7 @@ class _ProfileScreenState extends State<ProfileScreen>
         ),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFFFF8C42).withOpacity(0.1),
+            color: const Color(0xFFFF8C42).withValues(alpha: 0.1),
             blurRadius: 20,
             offset: const Offset(0, 4),
           ),
@@ -595,34 +587,10 @@ class _ProfileScreenState extends State<ProfileScreen>
           _buildQuickActionButton(
             icon: Icons.share_outlined,
             label: 'Share Profile',
-            onTap: () {
+            onTap: () async {
               HapticFeedback.lightImpact();
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Row(
-                    children: [
-                      const Icon(
-                        Icons.share,
-                        color: Colors.white,
-                        size: 20,
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        'Profile shared!',
-                        style: GoogleFonts.inter(
-                          fontWeight: FontWeight.w500,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ],
-                  ),
-                  backgroundColor: const Color(0xFFFF8C42),
-                  behavior: SnackBarBehavior.floating,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-              );
+              final String shareText = 'Check out my Khronofy profile!\n\nName: ${_currentFullName}\nUsername: ${_currentUsername}\nGender: ${_currentGender}';
+              await Share.share(shareText);
             },
           ),
           Container(
@@ -635,31 +603,38 @@ class _ProfileScreenState extends State<ProfileScreen>
             label: 'QR Code',
             onTap: () {
               HapticFeedback.lightImpact();
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Row(
-                    children: [
-                      const Icon(
-                        Icons.qr_code,
-                        color: Colors.white,
-                        size: 20,
+              showDialog(
+                context: context,
+                builder: (context) {
+                  final String qrData = 'Name: ${_currentFullName}\nUsername: ${_currentUsername}\nGender: ${_currentGender}';
+                  return AlertDialog(
+                    backgroundColor: const Color(0xFF181829),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                    title: const Text('Profile QR Code', style: TextStyle(color: Colors.white)),
+                    content: SizedBox(
+                      width: 250,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          QrImageView(
+                            data: qrData,
+                            version: QrVersions.auto,
+                            size: 200.0,
+                            backgroundColor: Colors.white,
+                          ),
+                          const SizedBox(height: 16),
+                          SelectableText(qrData, style: const TextStyle(color: Colors.white70, fontSize: 12)),
+                        ],
                       ),
-                      const SizedBox(width: 8),
-                      Text(
-                        'QR code generated!',
-                        style: GoogleFonts.inter(
-                          fontWeight: FontWeight.w500,
-                          color: Colors.white,
-                        ),
+                    ),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.of(context).pop(),
+                        child: const Text('Close'),
                       ),
                     ],
-                  ),
-                  backgroundColor: const Color(0xFFFF8C42),
-                  behavior: SnackBarBehavior.floating,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
+                  );
+                },
               );
             },
           ),
@@ -805,7 +780,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                       color: Colors.white,
                     ),
                   ),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 10),
                   GridView.builder(
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
@@ -830,7 +805,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                           duration: const Duration(milliseconds: 200),
                           decoration: BoxDecoration(
                             color: isSelected 
-                                ? const Color(0xFFFF8C42).withOpacity(0.2)
+                                ? const Color(0xFFFF8C42).withValues(alpha: 0.2)
                                 : const Color(0xFF2A2A2A),
                             borderRadius: BorderRadius.circular(16),
                             border: Border.all(
@@ -857,6 +832,615 @@ class _ProfileScreenState extends State<ProfileScreen>
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildTabBar() {
+    return Container(
+      height: 50,
+      margin: const EdgeInsets.symmetric(horizontal: 20),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1A1A1A),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: const Color(0xFF404040), width: 1),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.3),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: TabBar(
+        controller: _tabController,
+        indicator: BoxDecoration(
+          borderRadius: BorderRadius.circular(8),
+          color: const Color(0xFFFF8C42),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFFFF8C42).withValues(alpha: 0.3),
+              blurRadius: 6,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        indicatorSize: TabBarIndicatorSize.tab,
+        indicatorPadding: const EdgeInsets.all(4),
+        labelColor: Colors.white,
+        unselectedLabelColor: const Color(0xFF999999),
+        labelStyle: GoogleFonts.inter(
+          fontSize: 13,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 0.5,
+        ),
+        unselectedLabelStyle: GoogleFonts.inter(
+          fontSize: 13,
+          fontWeight: FontWeight.w500,
+        ),
+        tabs: const [
+          Tab(
+            height: 42,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.person_outline, size: 18),
+                SizedBox(width: 6),
+                Text('Personal'),
+              ],
+            ),
+          ),
+          Tab(
+            height: 42,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.emoji_events_outlined, size: 18),
+                SizedBox(width: 6),
+                Text('Achievements'),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPersonalDetailsTab() {
+    return SingleChildScrollView(
+      physics: const BouncingScrollPhysics(),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          children: [
+            AnimatedBuilder(
+              animation: _editModeAnimation,
+              builder: (context, child) {
+                return AnimatedContainer(
+                  duration: const Duration(milliseconds: 400),
+                  curve: Curves.easeInOut,
+                  height: _isEditing ? null : 0,
+                  child: AnimatedOpacity(
+                    opacity: _isEditing ? 1.0 : 0.0,
+                    duration: const Duration(milliseconds: 400),
+                    child: _buildEditableFields(),
+                  ),
+                );
+              },
+            ),
+            if (_isEditing) const SizedBox(height: 30),
+            _buildQuickActions(),
+            const SizedBox(height: 20),
+            _buildPersonalInfo(),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAchievementsTab() {
+    return SingleChildScrollView(
+      physics: const BouncingScrollPhysics(),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          children: [
+            _buildStatsGrid(),
+            const SizedBox(height: 30),
+            _buildBadgesSection(),
+            const SizedBox(height: 30),
+            _buildRecentAchievements(),
+            const SizedBox(height: 20),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPersonalInfo() {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1E1E1E),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFF333333)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Personal Information',
+            style: GoogleFonts.inter(
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+              color: Colors.white,
+            ),
+          ),
+          const SizedBox(height: 20),
+          _buildInfoRow('Full Name', _currentFullName, Icons.person),
+          const SizedBox(height: 16),
+          _buildInfoRow('Username', '@$_currentUsername', Icons.alternate_email),
+          const SizedBox(height: 16),
+          _buildInfoRow('Gender', _currentGender, Icons.wc),
+          const SizedBox(height: 16),
+          _buildInfoRow('Joined', 'December 2024', Icons.calendar_today),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInfoRow(String label, String value, IconData icon) {
+    return Row(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: const Color(0xFFFF8C42).withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(
+            icon,
+            color: const Color(0xFFFF8C42),
+            size: 16,
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: GoogleFonts.inter(
+                  fontSize: 12,
+                  color: const Color(0xFF888888),
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                value,
+                style: GoogleFonts.inter(
+                  fontSize: 14,
+                  color: Colors.white,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildStatsGrid() {
+    return GridView.count(
+      crossAxisCount: 2,
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      mainAxisSpacing: 16,
+      crossAxisSpacing: 16,
+      childAspectRatio: 1.2,
+      children: [
+        _buildStatCard('Pomodoros\nCompleted', '${_userStats.pomodorosCompleted}', Icons.timer, const Color(0xFFFF8C42)),
+        _buildStatCard('Total Focus\nTime', _userStats.totalFocusTime, Icons.access_time, const Color(0xFF10B981)),
+        _buildStatCard('Streak\nDays', '${_userStats.streakDays}', Icons.local_fire_department, const Color(0xFFF59E0B)),
+        _buildStatCard('Tasks\nCompleted', '${_userStats.tasksCompleted}', Icons.check_circle, const Color(0xFF8B5CF6)),
+      ],
+    );
+  }
+
+  Widget _buildStatCard(String title, String value, IconData icon, Color color) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1E1E1E),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFF333333)),
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(
+              icon,
+              color: color,
+              size: 16,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            value,
+            style: GoogleFonts.inter(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            title,
+            textAlign: TextAlign.center,
+            style: GoogleFonts.inter(
+              fontSize: 12,
+              color: const Color(0xFF888888),
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBadgesSection() {
+    final allBadges = _userStats.allAvailableBadges;
+
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1E1E1E),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFF333333)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.2),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFF8C42).withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(
+                  Icons.emoji_events,
+                  color: Color(0xFFFF8C42),
+                  size: 18,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Text(
+                'Badges Earned',
+                style: GoogleFonts.inter(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.white,
+                ),
+              ),
+              const Spacer(),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFF8C42).withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  '${_userStats.earnedBadges.length}/${allBadges.length}',
+                  style: GoogleFonts.inter(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: const Color(0xFFFF8C42),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              return GridView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 2,
+                  childAspectRatio: constraints.maxWidth > 400 ? 1.6 : 1.3,
+                  crossAxisSpacing: 8,
+                  mainAxisSpacing: 8,
+                ),
+                itemCount: allBadges.length,
+                itemBuilder: (context, index) {
+                  final badgeId = allBadges[index];
+                  final isEarned = _userStats.earnedBadges.contains(badgeId);
+                  final badge = _userStats.getBadgeInfo(badgeId);
+                  return _buildEnhancedBadge(badge.emoji, badge.title, badge.description, isEarned);
+                },
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEnhancedBadge(String emoji, String title, String description, bool isEarned) {
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 300),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: isEarned 
+          ? const Color(0xFF2A2A2A)
+          : const Color(0xFF1A1A1A),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: isEarned 
+            ? const Color(0xFFFF8C42).withValues(alpha: 0.5)
+            : const Color(0xFF333333),
+          width: isEarned ? 2 : 1,
+        ),
+        boxShadow: isEarned ? [
+          BoxShadow(
+            color: const Color(0xFFFF8C42).withValues(alpha: 0.1),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ] : null,
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Stack(
+            children: [
+              Container(
+                width: 38,
+                height: 38,
+                decoration: BoxDecoration(
+                  color: isEarned 
+                    ? const Color(0xFFFF8C42).withValues(alpha: 0.1)
+                    : const Color(0xFF333333).withValues(alpha: 0.3),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Center(
+                  child: Text(
+                    emoji,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: isEarned ? Colors.white : Colors.grey.withValues(alpha: 0.5),
+                    ),
+                  ),
+                ),
+              ),
+              if (isEarned)
+                Positioned(
+                  right: -2,
+                  top: -2,
+                  child: Container(
+                    width: 17,
+                    height: 17,
+                    decoration: const BoxDecoration(
+                      color: Color(0xFF10B981),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.check,
+                      size: 9,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Flexible(
+            child: Text(
+              title,
+              textAlign: TextAlign.center,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: GoogleFonts.inter(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: isEarned ? Colors.white : const Color(0xFF666666),
+              ),
+            ),
+          ),
+          const SizedBox(height: 2),
+          Flexible(
+            child: Text(
+              description,
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: GoogleFonts.inter(
+                fontSize: 8.5,
+                color: isEarned ? const Color(0xFF999999) : const Color(0xFF555555),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRecentAchievements() {
+    final achievements = _userStats.recentAchievements;
+    
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1E1E1E),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFF333333)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.2),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF10B981).withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(
+                  Icons.history,
+                  color: Color(0xFF10B981),
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Text(
+                'Recent Achievements',
+                style: GoogleFonts.inter(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.white,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          if (achievements.isEmpty)
+            Container(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                children: [
+                  Icon(
+                    Icons.star_outline,
+                    size: 48,
+                    color: Colors.grey.withValues(alpha: 0.5),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    'No achievements yet',
+                    style: GoogleFonts.inter(
+                      fontSize: 14,
+                      color: const Color(0xFF888888),
+                    ),
+                  ),
+                  Text(
+                    'Complete tasks and pomodoros to unlock achievements!',
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.inter(
+                      fontSize: 12,
+                      color: const Color(0xFF666666),
+                    ),
+                  ),
+                ],
+              ),
+            )
+          else
+            ...achievements.take(3).map((achievement) {
+              final timeAgo = _getTimeAgo(achievement.timestamp);
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: _buildAchievementItem(
+                  achievement.emoji,
+                  achievement.title,
+                  achievement.description,
+                  timeAgo,
+                ),
+              );
+            }).toList(),
+        ],
+      ),
+    );
+  }
+
+  String _getTimeAgo(DateTime timestamp) {
+    final now = DateTime.now();
+    final difference = now.difference(timestamp);
+    
+    if (difference.inDays > 0) {
+      return '${difference.inDays} day${difference.inDays == 1 ? '' : 's'} ago';
+    } else if (difference.inHours > 0) {
+      return '${difference.inHours} hour${difference.inHours == 1 ? '' : 's'} ago';
+    } else if (difference.inMinutes > 0) {
+      return '${difference.inMinutes} minute${difference.inMinutes == 1 ? '' : 's'} ago';
+    } else {
+      return 'Just now';
+    }
+  }
+
+  Widget _buildAchievementItem(String emoji, String title, String description, String time) {
+    return Row(
+      children: [
+        Container(
+          width: 40,
+          height: 40,
+          decoration: BoxDecoration(
+            color: const Color(0xFFFF8C42).withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Center(
+            child: Text(
+              emoji,
+              style: const TextStyle(fontSize: 20),
+            ),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: GoogleFonts.inter(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.white,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                description,
+                style: GoogleFonts.inter(
+                  fontSize: 12,
+                  color: const Color(0xFF888888),
+                ),
+              ),
+            ],
+          ),
+        ),
+        Text(
+          time,
+          style: GoogleFonts.inter(
+            fontSize: 11,
+            color: const Color(0xFF666666),
+          ),
+        ),
+      ],
     );
   }
 }
