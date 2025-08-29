@@ -38,23 +38,27 @@ class ExtendedCalendarEventData extends CalendarEventData {
   final Priority priority;
   final String? project;
   final RecurringType recurring;
+  final String seriesId; 
 
   ExtendedCalendarEventData({
     required String title,
     String? description,
     required DateTime date,
-    DateTime? startTime,
-    DateTime? endTime,
-    Color? color,
-    this.priority = Priority.medium,
+    required DateTime startTime,
+    required DateTime endTime,
+    required Color color,
+    required this.priority,
     this.project,
     this.recurring = RecurringType.none,
-  }) : super(
-          title: title,
-          description: description,
-          date: date,
-          startTime: startTime,
-          endTime: endTime,
-          color: color ?? Colors.blue,
-        );
+    String? seriesId,
+  }) : seriesId =
+           seriesId ?? UniqueKey().toString(), // Auto-generate if not provided
+       super(
+         title: title,
+         description: description,
+         date: date,
+         startTime: startTime,
+         endTime: endTime,
+         color: color,
+       );
 }

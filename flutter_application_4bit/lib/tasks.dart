@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../widgets/navigation_widgets.dart';
 import 'models/user_stats.dart';
 import 'models/task_manager.dart';
 
@@ -266,6 +267,10 @@ class _TasksPageState extends State<TasksPage> {
               backgroundColor: Colors.red,
               child: Icon(Icons.add, color: Colors.white),
             ),
+      bottomNavigationBar: BottomNavigation(
+        selectedIndex: 1,
+        isStrictMode: false,
+      ),
     );
   }
 

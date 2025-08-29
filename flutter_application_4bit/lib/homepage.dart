@@ -1,7 +1,7 @@
+import 'package:just_audio/just_audio.dart';
 import 'package:confetti/confetti.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'dart:async';
 
 // Import the modular files
@@ -24,6 +24,48 @@ class TimerModePage extends StatefulWidget {
 }
 
 class _TimerModePageState extends State<TimerModePage> with TickerProviderStateMixin {
+  late AudioPlayer _audioPlayer;
+  OverlayEntry? _topNotificationEntry;
+
+  void _showTopNotification(String message, {Color backgroundColor = Colors.black87}) {
+    _topNotificationEntry?.remove();
+    _topNotificationEntry = OverlayEntry(
+      builder: (context) => Positioned(
+        top: MediaQuery.of(context).padding.top + 56,
+        left: 0,
+        right: 0,
+        child: Material(
+          color: Colors.transparent,
+          child: Container(
+            margin: const EdgeInsets.symmetric(horizontal: 24),
+            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 20),
+            decoration: BoxDecoration(
+              color: backgroundColor,
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black26,
+                  blurRadius: 8,
+                  offset: Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Center(
+              child: Text(
+                message,
+                style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  Overlay.of(context, rootOverlay: true).insert(_topNotificationEntry!);
+    Future.delayed(const Duration(seconds: 5), () {
+      _topNotificationEntry?.remove();
+      _topNotificationEntry = null;
+    });
+  }
   int _selectedIndex = 0;
   
   late ConfettiController _confettiController;
@@ -45,6 +87,8 @@ class _TimerModePageState extends State<TimerModePage> with TickerProviderStateM
       parent: _progressAnimationController,
       curve: Curves.linear,
     ));
+
+  _audioPlayer = AudioPlayer();
   }
 
   @override
@@ -52,6 +96,7 @@ class _TimerModePageState extends State<TimerModePage> with TickerProviderStateM
     _timer?.cancel();
     _confettiController.dispose();
     _progressAnimationController.dispose();
+  _audioPlayer.dispose();
     super.dispose();
   }
 
@@ -61,11 +106,12 @@ class _TimerModePageState extends State<TimerModePage> with TickerProviderStateM
   int _currentSeconds = 25 * 60;
   TimerState _timerState = TimerState.idle;
   int _currentSession = 0;
-  int _totalSessions = 4;
+  int _totalSessions = 1;
   bool _isBreakTime = false;
   bool _isStrictMode = false;
   bool _isTimerMode = true;
   bool _isWhiteNoise = false;
+  String _selectedWhiteNoise = 'None';
   String _selectedTask = 'Select Task';
 
   final UserStats _userStats = UserStats();
@@ -172,6 +218,7 @@ class _TimerModePageState extends State<TimerModePage> with TickerProviderStateM
     
     if (_currentSession >= _totalSessions) {
       // All sessions completed
+      debugPrint('All Pomodoro sessions completed!');
       setState(() {
         _timerState = TimerState.completed;
       });
@@ -277,45 +324,6 @@ class _TimerModePageState extends State<TimerModePage> with TickerProviderStateM
     );
   }
 
-  void _showWhiteNoiseModal() {
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) => SingleChildScrollView(
-        child: Container(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text('White Noise Selection', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 16),
-              const Text('Choose a background sound to help you focus.'),
-              const SizedBox(height: 24),
-              ...[
-                'None',
-                'Cafe Ambiance',
-                'Rainforest Sound',
-                'Beach Waves',
-                'Forest',
-              ].map((sound) => ListTile(
-                title: Text(sound),
-                onTap: () {
-                  setState(() {
-                    _isWhiteNoise = sound != 'None';
-                  });
-                  Navigator.pop(context);
-                },
-              )),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     if (_timerState == TimerState.completed) {
@@ -335,124 +343,149 @@ class _TimerModePageState extends State<TimerModePage> with TickerProviderStateM
       );
     }
 
-    return Scaffold(
-      backgroundColor: const Color(0xFF0F0F0F),
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              Color(0xFF0F0F0F),
-              Color(0xFF1A1A1A),
-              Color(0xFF0A0A0A),
+    return StrictModeController(
+      isStrictMode: _isStrictMode,
+      onStrictModeChanged: (value) {
+        setState(() => _isStrictMode = value);
+      },
+      strictModeDesc: 'Strict Mode prevents you from navigating away or exiting this page until you disable it. Enable this to avoid distractions during focus sessions.',
+      child: Scaffold(
+        backgroundColor: const Color(0xFF0F0F0F),
+        body: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                Color(0xFF0F0F0F),
+                Color(0xFF1A1A1A),
+                Color(0xFF0A0A0A),
+              ],
+            ),
+          ),
+          child: Stack(
+            children: [
+              SafeArea(
+                child: Column(
+                  children: [
+                    // Top App Bar
+                    TimerAppBar(
+                      selectedTask: _selectedTask,
+                      timerState: _timerState,
+                      onBackPressed: () {
+                        if (!_isStrictMode) {
+                          Navigator.pop(context);
+                        }
+                      },
+                      onResetToHome: _resetToHome,
+                      onSettingsPressed: () {
+                        // Settings functionality
+                      },
+                    ),
+                    // Task Selection Dropdown (only show when idle)
+                    if (_timerState == TimerState.idle)
+                      TaskSelector(
+                        selectedTask: _selectedTask,
+                        onTap: _showTaskSelectionModal,
+                      ),
+                    // Main Timer Section
+                    Expanded(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          // Session indicator
+                          if (_timerState != TimerState.idle)
+                            SessionIndicator(
+                              currentSession: _currentSession,
+                              totalSessions: _totalSessions,
+                            ),
+                          // Timer Circle
+                          TimerCircle(
+                            currentSeconds: _currentSeconds,
+                            timerState: _timerState,
+                            isBreakTime: _isBreakTime,
+                            focusSeconds: _focusSeconds,
+                            breakSeconds: _breakSeconds,
+                            progressAnimation: _progressAnimation,
+                          ),
+                          const SizedBox(height: 40),
+                          // Action Buttons
+                          TimerActionButtons(
+                            timerState: _timerState,
+                            selectedTask: _selectedTask,
+                            onStartFocus: _startFocusTimer,
+                            onPause: _pauseTimer,
+                            onContinue: _continueTimer,
+                            onStartBreak: _startBreakTimer,
+                            onSkipBreak: _skipBreak,
+                            onReset: _resetToHome,
+                          ),
+                        ],
+                      ),
+                    ),
+                    // Mode Selection
+                    ModeSelectionBar(
+                      isStrictMode: _isStrictMode,
+                      isTimerMode: _isTimerMode,
+                      isWhiteNoise: _isWhiteNoise,
+                      selectedWhiteNoise: _selectedWhiteNoise,
+                      onStrictModePressed: () => _showModeModal(
+                        'Strict Mode Settings',
+                        'Strict Mode prevents you from navigating away or exiting this page until you disable it. Enable this to avoid distractions during focus sessions.',
+                        _isStrictMode,
+                        (value) {
+                          setState(() => _isStrictMode = value);
+                        },
+                      ),
+                      onTimerModePressed: () => _showModeModal(
+                        'Timer Mode Settings',
+                        'Here you can configure timer mode options.',
+                        _isTimerMode,
+                        (value) {
+                          setState(() => _isTimerMode = value);
+                          _showTopNotification(
+                            value ? 'Timer Mode Enabled' : 'Timer Mode Disabled',
+                            backgroundColor: value ? Colors.blueAccent : Colors.green,
+                          );
+                        },
+                      ),
+                      onWhiteNoiseChanged: (enabled) {
+                        setState(() => _isWhiteNoise = enabled);
+                      },
+                      onWhiteNoiseOptionChanged: (sound) {
+                        setState(() => _selectedWhiteNoise = sound);
+                      },
+                    ),
+                  ],
+                ),
+              ),
+              // Confetti animation overlay
+              Align(
+                alignment: Alignment.topCenter,
+                child: ConfettiWidget(
+                  confettiController: _confettiController,
+                  blastDirectionality: BlastDirectionality.explosive,
+                  shouldLoop: false,
+                  colors: const [
+                    Color(0xFF9333EA),
+                    Color(0xFF10B981),
+                    Color(0xFF3B82F6),
+                    Color(0xFFEF4444),
+                    Color(0xFFF59E0B),
+                  ],
+                  emissionFrequency: 0.05,
+                  numberOfParticles: 20,
+                  maxBlastForce: 20,
+                  minBlastForce: 8,
+                ),
+              ),
             ],
           ),
         ),
-        child: Stack(
-          children: [
-            SafeArea(
-              child: Column(
-                children: [
-                  // Top App Bar
-                  TimerAppBar(
-                    selectedTask: _selectedTask,
-                    timerState: _timerState,
-                    onBackPressed: () => Navigator.pop(context),
-                    onResetToHome: _resetToHome,
-                    onSettingsPressed: () {
-                      // Settings functionality
-                    },
-                  ),
-                  // Task Selection Dropdown (only show when idle)
-                  if (_timerState == TimerState.idle) 
-                    TaskSelector(
-                      selectedTask: _selectedTask,
-                      onTap: _showTaskSelectionModal,
-                    ),
-                  // Main Timer Section
-                  Expanded(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        // Session indicator
-                        if (_timerState != TimerState.idle)
-                          SessionIndicator(
-                            currentSession: _currentSession,
-                            totalSessions: _totalSessions,
-                          ),
-                        // Timer Circle
-                        TimerCircle(
-                          currentSeconds: _currentSeconds,
-                          timerState: _timerState,
-                          isBreakTime: _isBreakTime,
-                          focusSeconds: _focusSeconds,
-                          breakSeconds: _breakSeconds,
-                          progressAnimation: _progressAnimation,
-                        ),
-                        const SizedBox(height: 40),
-                        // Action Buttons
-                        TimerActionButtons(
-                          timerState: _timerState,
-                          selectedTask: _selectedTask,
-                          onStartFocus: _startFocusTimer,
-                          onPause: _pauseTimer,
-                          onContinue: _continueTimer,
-                          onStartBreak: _startBreakTimer,
-                          onSkipBreak: _skipBreak,
-                          onReset: _resetToHome,
-                        ),
-                      ],
-                    ),
-                  ),
-                  // Mode Selection
-                  ModeSelectionBar(
-                    isStrictMode: _isStrictMode,
-                    isTimerMode: _isTimerMode,
-                    isWhiteNoise: _isWhiteNoise,
-                    onStrictModePressed: () => _showModeModal(
-                      'Strict Mode Settings',
-                      'Here you can configure strict mode options.',
-                      _isStrictMode,
-                      (value) => setState(() => _isStrictMode = value),
-                    ),
-                    onTimerModePressed: () => _showModeModal(
-                      'Timer Mode Settings',
-                      'Here you can configure timer mode options.',
-                      _isTimerMode,
-                      (value) => setState(() => _isTimerMode = value),
-                    ),
-                    onWhiteNoisePressed: _showWhiteNoiseModal,
-                  ),
-                ],
-              ),
-            ),
-            // Confetti animation overlay
-            Align(
-              alignment: Alignment.topCenter,
-              child: ConfettiWidget(
-                confettiController: _confettiController,
-                blastDirectionality: BlastDirectionality.explosive,
-                shouldLoop: false,
-                colors: const [
-                  Color(0xFF9333EA),
-                  Color(0xFF10B981),
-                  Color(0xFF3B82F6),
-                  Color(0xFFEF4444),
-                  Color(0xFFF59E0B),
-                ],
-                emissionFrequency: 0.05,
-                numberOfParticles: 20,
-                maxBlastForce: 20,
-                minBlastForce: 8,
-              ),
-            ),
-          ],
+        bottomNavigationBar: BottomNavigation(
+          selectedIndex: _selectedIndex,
+          isStrictMode: _isStrictMode,
         ),
-      ),
-      bottomNavigationBar: BottomNavigation(
-        selectedIndex: _selectedIndex,
-        onItemSelected: (index) => setState(() => _selectedIndex = index),
       ),
     );
   }

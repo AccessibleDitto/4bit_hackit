@@ -1,23 +1,152 @@
+import 'package:just_audio/just_audio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
+
+class WhiteNoiseController extends StatefulWidget {
+  final bool isWhiteNoise;
+  final String selectedWhiteNoise;
+  final ValueChanged<bool> onWhiteNoiseChanged;
+  final ValueChanged<String> onWhiteNoiseOptionChanged;
+
+  const WhiteNoiseController({
+    super.key,
+    required this.isWhiteNoise,
+    required this.selectedWhiteNoise,
+    required this.onWhiteNoiseChanged,
+    required this.onWhiteNoiseOptionChanged,
+  });
+
+  @override
+  State<WhiteNoiseController> createState() => _WhiteNoiseControllerState();
+}
+
+class _WhiteNoiseControllerState extends State<WhiteNoiseController> {
+  late AudioPlayer _audioPlayer;
+  late String _selectedWhiteNoise;
+
+  @override
+  void initState() {
+    super.initState();
+    _audioPlayer = AudioPlayer();
+    _selectedWhiteNoise = widget.selectedWhiteNoise;
+  }
+
+  @override
+  void dispose() {
+    _audioPlayer.dispose();
+    super.dispose();
+  }
+
+  void _showWhiteNoiseModal() {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => SingleChildScrollView(
+        child: Container(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('White Noise Selection', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 16),
+              const Text('Choose a background sound to help you focus.'),
+              const SizedBox(height: 24),
+              ...[
+                'None',
+                'White Noise',
+                // Add more sounds as needed
+              ].map((sound) => ListTile(
+                title: Text(sound),
+                trailing: _selectedWhiteNoise == sound
+                    ? const Icon(Icons.check, color: Colors.green)
+                    : null,
+                onTap: () async {
+                  setState(() {
+                    _selectedWhiteNoise = sound;
+                  });
+                  widget.onWhiteNoiseOptionChanged(sound);
+                  widget.onWhiteNoiseChanged(sound != 'None');
+                  if (sound == 'White Noise') {
+                    await _audioPlayer.setAsset('assets/white_noise.mp3');
+                    _audioPlayer.setLoopMode(LoopMode.one);
+                    _audioPlayer.play();
+                  } else {
+                    _audioPlayer.stop();
+                  }
+                  Navigator.pop(context);
+                },
+              )),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ModeOption(
+      icon: Icons.music_note,
+      label: 'White Noise',
+      isSelected: widget.isWhiteNoise,
+      color: const Color(0xFF3B82F6),
+      onTap: _showWhiteNoiseModal,
+    );
+  }
+}
+
+class StrictModeController extends StatefulWidget {
+  final Widget child;
+  final bool isStrictMode;
+  final ValueChanged<bool> onStrictModeChanged;
+  final String strictModeDesc;
+
+  const StrictModeController({
+    super.key,
+    required this.child,
+    required this.isStrictMode,
+    required this.onStrictModeChanged,
+    required this.strictModeDesc,
+  });
+
+  @override
+  State<StrictModeController> createState() => _StrictModeControllerState();
+}
+
+class _StrictModeControllerState extends State<StrictModeController> {
+  @override
+  Widget build(BuildContext context) {
+    return WillPopScope(
+      onWillPop: () async => !widget.isStrictMode,
+      child: widget.child,
+    );
+  }
+}
 
 class ModeSelectionBar extends StatelessWidget {
   final bool isStrictMode;
   final bool isTimerMode;
   final bool isWhiteNoise;
+  final String selectedWhiteNoise;
   final VoidCallback onStrictModePressed;
   final VoidCallback onTimerModePressed;
-  final VoidCallback onWhiteNoisePressed;
+  final ValueChanged<bool> onWhiteNoiseChanged;
+  final ValueChanged<String> onWhiteNoiseOptionChanged;
 
   const ModeSelectionBar({
     super.key,
     required this.isStrictMode,
     required this.isTimerMode,
     required this.isWhiteNoise,
+    required this.selectedWhiteNoise,
     required this.onStrictModePressed,
     required this.onTimerModePressed,
-    required this.onWhiteNoisePressed,
+    required this.onWhiteNoiseChanged,
+    required this.onWhiteNoiseOptionChanged,
   });
 
   @override
@@ -49,13 +178,12 @@ class ModeSelectionBar extends StatelessWidget {
             color: const Color(0xFF10B981),
             onTap: onTimerModePressed,
           ),
-          ModeOption(
-            icon: Icons.music_note,
-            label: 'White Noise',
-            isSelected: isWhiteNoise,
-            color: const Color(0xFF3B82F6),
-            onTap: onWhiteNoisePressed,
-          ),
+            WhiteNoiseController(
+              isWhiteNoise: isWhiteNoise,
+              selectedWhiteNoise: selectedWhiteNoise,
+              onWhiteNoiseChanged: onWhiteNoiseChanged,
+              onWhiteNoiseOptionChanged: onWhiteNoiseOptionChanged,
+            ),
         ],
       ),
     );

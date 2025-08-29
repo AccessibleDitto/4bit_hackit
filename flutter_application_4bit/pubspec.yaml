@@ -36,6 +36,7 @@ dependencies:
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
   calendar_view: ^1.4.0
+  just_audio: ^0.9.36
   qr_flutter: ^4.1.0
   share_plus: ^11.1.0
   
@@ -62,6 +63,8 @@ dev_dependencies:
 
 # The following section is specific to Flutter packages.
 flutter:
+  assets:
+    - assets/white_noise.mp3
 
   # The following line ensures that the Material Icons font is
   # included with your application, so that you can use the icons in
