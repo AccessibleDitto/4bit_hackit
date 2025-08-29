@@ -1,4 +1,5 @@
 // User performance statistics and gamification system
+import 'package:flutter/material.dart';
 import 'task_manager.dart';
 import '../services/firebase_service.dart';
 
@@ -63,21 +64,21 @@ class UserStats {
         _earnedBadges = List<String>.from(data['earnedBadges'] ?? []);
         _recentAchievements = await _firebaseService.loadAchievements();
         
-        print('User Stats loaded successfully');
+        debugPrint('User Stats loaded successfully');
       } else {
-        print('No user stats found, using defaults');
+        debugPrint('No user stats found, using defaults');
       }
     } catch (e) {
-      print('Error loading user stats from Firebase: $e');
+      debugPrint('Error loading user stats from Firebase: $e');
     }
   }
 
   Future<void> saveToFirebase() async {
     try {
       await _firebaseService.saveUserStats(this);
-      print('UserStats saved to Firebase successfully');
+      debugPrint('UserStats saved to Firebase successfully');
     } catch (e) {
-      print('Error saving user stats to Firebase: $e');
+      debugPrint('Error saving user stats to Firebase: $e');
     }
   }
 
@@ -236,11 +237,11 @@ class UserStats {
       await loadFromFirebase();
       
       if (_pomodorosCompleted == 0 && _earnedBadges.isEmpty) {
-        print('No Firebase data found, using sample data for demo');
+        debugPrint('No Firebase data found, using sample data for demo');
         initializeSampleData();
       }
     } catch (e) {
-      print('Error initializing from Firebase: $e');
+      debugPrint('Error initializing from Firebase: $e');
       initializeSampleData();
     }
   }

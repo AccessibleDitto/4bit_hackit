@@ -589,7 +589,7 @@ class _ProfileScreenState extends State<ProfileScreen>
             label: 'Share Profile',
             onTap: () async {
               HapticFeedback.lightImpact();
-              final String shareText = 'Check out my Khronofy profile!\n\nName: ${_currentFullName}\nUsername: ${_currentUsername}\nGender: ${_currentGender}';
+              final String shareText = 'Check out my Khronofy profile!\n\nName: $_currentFullName\nUsername: $_currentUsername\nGender: $_currentGender';
               await Share.share(shareText);
             },
           ),
@@ -606,7 +606,7 @@ class _ProfileScreenState extends State<ProfileScreen>
               showDialog(
                 context: context,
                 builder: (context) {
-                  final String qrData = 'Name: ${_currentFullName}\nUsername: ${_currentUsername}\nGender: ${_currentGender}';
+                  final String qrData = 'Name: $_currentFullName\nUsername: $_currentUsername\nGender: $_currentGender';
                   return AlertDialog(
                     backgroundColor: const Color(0xFF181829),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
@@ -718,8 +718,9 @@ class _ProfileScreenState extends State<ProfileScreen>
     });
 
     // Show success message
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
         content: Row(
           children: [
             const Icon(
@@ -744,6 +745,7 @@ class _ProfileScreenState extends State<ProfileScreen>
         ),
       ),
     );
+    }
   }
 
   void _showAvatarSelector() {
@@ -1371,7 +1373,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                   timeAgo,
                 ),
               );
-            }).toList(),
+            }),
         ],
       ),
     );

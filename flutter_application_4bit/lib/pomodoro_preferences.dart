@@ -37,7 +37,6 @@ class _PomodoroPreferencesScreenState extends State<PomodoroPreferencesScreen> w
   Color get _onSurfaceColor => Colors.white;
   Color get _onSurfaceVariantColor => const Color(0xFF888888);
   Color get _borderColor => const Color(0xFF333333);
-  Color get _shadowColor => const Color(0x00000000);
 
   @override
   void initState() {

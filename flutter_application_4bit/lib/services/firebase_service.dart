@@ -1,4 +1,3 @@
-// Firebase Service for authentication, Firestore, and storage
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -53,8 +52,8 @@ class FirebaseService {
         'createdAt': FieldValue.serverTimestamp(),
       });      
     } catch (e) {
-      print('Error creating user with Gmail ID: $e');
-      throw e;
+      debugPrint('Error creating user with Gmail ID: $e');
+      rethrow;
     }
   }
 
@@ -65,7 +64,7 @@ class FirebaseService {
     
     for (int attempt = 1; attempt <= maxRetries; attempt++) {
       try {
-        print('Testing Firestore connection (attempt $attempt/$maxRetries)...');
+        debugPrint('Testing Firestore connection (attempt $attempt/$maxRetries)...');
         
         await _firestore.collection('test').doc('connection').set({
           'message': 'Firestore connection successful!',
@@ -74,17 +73,17 @@ class FirebaseService {
           'attempt': attempt,
         }).timeout(const Duration(seconds: 10));
 
-        print('Success on attempt $attempt!');
+        debugPrint('Success on attempt $attempt!');
 
         return; 
       } catch (e) {
-        print('Firestore connection failed on attempt $attempt: $e');
+        debugPrint('Firestore connection failed on attempt $attempt: $e');
         
         if (attempt < maxRetries) {
-          print('⏳ Retrying in ${retryDelay.inSeconds} seconds...');
+          debugPrint('⏳ Retrying in ${retryDelay.inSeconds} seconds...');
           await Future.delayed(retryDelay);
         } else {
-          print('All Firestore connection attempts failed');
+          debugPrint('All Firestore connection attempts failed');
           rethrow;
         }
       }
@@ -100,14 +99,15 @@ class FirebaseService {
       for (var doc in snapshot.docs) {
         Map<String, dynamic> userData = doc.data() as Map<String, dynamic>;
         userData['id'] = doc.id;
-              }
+        users.add(userData);
+      }
       
-      print('Retrieved ${users.length} users from Firestore');
+      debugPrint('Retrieved ${users.length} users from Firestore');
       return users;
       
     } catch (e) {
-      print('Error retrieving users: $e');
-      throw e;
+      debugPrint('Error retrieving users: $e');
+      rethrow;
     }
   }
 
@@ -123,11 +123,11 @@ class FirebaseService {
         'priority': 'medium',
       });
       
-      print('Task created successfully: $title');
+      debugPrint('Task created successfully: $title');
       
     } catch (e) {
-      print('Error creating task: $e');
-      throw e;
+      debugPrint('Error creating task: $e');
+      rethrow;
     }
   }
   
@@ -146,19 +146,19 @@ class FirebaseService {
         tasks.add(taskData);
       }
       
-      print('Retrieved ${tasks.length} tasks from Firestore');
+      debugPrint('Retrieved ${tasks.length} tasks from Firestore');
       return tasks;
       
     } catch (e) {
-      print('Error retrieving tasks: $e');
-      throw e;
+      debugPrint('Error retrieving tasks: $e');
+      rethrow;
     }
   }
   
   // Sign up with email and password
   Future<UserCredential?> signUpWithEmailPassword(String email, String password) async {
     try {
-      print('Attempting to create user with email: $email');
+      debugPrint('Attempting to create user with email: $email');
       
       // Add timeout to handle network issues
       UserCredential userCredential = await _auth.createUserWithEmailAndPassword(
@@ -174,15 +174,15 @@ class FirebaseService {
         },
       );
       
-      print('User created successfully: ${userCredential.user?.uid}');
+      debugPrint('User created successfully: ${userCredential.user?.uid}');
       
       // Create initial user data in Firestore
       await _createUserProfile(userCredential.user!, email);
       
       return userCredential;
     } on FirebaseAuthException catch (e) {
-      print('Sign up error code: ${e.code}');
-      print('Sign up error message: ${e.message}');
+      debugPrint('Sign up error code: ${e.code}');
+      debugPrint('Sign up error message: ${e.message}');
       
       // Handle specific error codes
       switch (e.code) {
@@ -212,10 +212,10 @@ class FirebaseService {
             message: 'The password is too weak. Please choose a stronger password.',
           );
         default:
-          throw e;
+          rethrow;
       }
     } catch (e) {
-      print('Unexpected error during sign up: $e');
+      debugPrint('Unexpected error during sign up: $e');
       throw FirebaseAuthException(code: 'unknown', message: 'An unexpected error occurred: $e');
     }
   }
@@ -229,8 +229,8 @@ class FirebaseService {
       );
       return userCredential;
     } on FirebaseAuthException catch (e) {
-      print('Sign in error code: ${e.code}');
-      print('Sign in error message: ${e.message}');
+      debugPrint('Sign in error code: ${e.code}');
+      debugPrint('Sign in error message: ${e.message}');
       
       // Handle specific error codes
       switch (e.code) {
@@ -255,7 +255,7 @@ class FirebaseService {
             message: 'The email address is not valid.',
           );
         default:
-          throw e;
+          rethrow;
       }
     }
   }
@@ -265,8 +265,8 @@ class FirebaseService {
     try {
       await _auth.signOut();
     } catch (e) {
-      print('Sign out error: $e');
-      throw e;
+      debugPrint('Sign out error: $e');
+      rethrow;
     }
   }
 
@@ -288,8 +288,8 @@ class FirebaseService {
         'createdAt': FieldValue.serverTimestamp(),
       });
     } catch (e) {
-      print('Error creating user profile: $e');
-      throw e;
+      debugPrint('Error creating user profile: $e');
+      rethrow;
     }
   }
 
@@ -304,8 +304,8 @@ class FirebaseService {
       // Delete the user account
       await _auth.currentUser?.delete();
     } catch (e) {
-      print('Error deleting account: $e');
-      throw e;
+      debugPrint('Error deleting account: $e');
+      rethrow;
     }
   }
 
@@ -335,8 +335,8 @@ class FirebaseService {
       
       await batch.commit();
     } catch (e) {
-      print('Error deleting user data: $e');
-      throw e;
+      debugPrint('Error deleting user data: $e');
+      rethrow;
     }
   }
 
@@ -365,10 +365,10 @@ class FirebaseService {
         'updatedAt': FieldValue.serverTimestamp(),
       });
       
-      print('Task saved to Firebase: ${task.title}');
+      debugPrint('Task saved to Firebase: ${task.title}');
     } catch (e) {
-      print('Error saving task to Firebase: $e');
-      throw e;
+      debugPrint('Error saving task to Firebase: $e');
+      rethrow;
     }
   }
 
@@ -400,7 +400,7 @@ class FirebaseService {
         );
       }).toList();
     } catch (e) {
-      print('Error loading tasks: $e');
+      debugPrint('Error loading tasks: $e');
       return [];
     }
   }
@@ -421,8 +421,8 @@ class FirebaseService {
         'completedAt': isCompleted ? FieldValue.serverTimestamp() : null,
       });
     } catch (e) {
-      print('Error updating task completion: $e');
-      throw e;
+      debugPrint('Error updating task completion: $e');
+      rethrow;
     }
   }
 
@@ -438,8 +438,8 @@ class FirebaseService {
           .doc(taskId)
           .delete();
     } catch (e) {
-      print('Error deleting task: $e');
-      throw e;
+      debugPrint('Error deleting task: $e');
+      rethrow;
     }
   }
 
@@ -464,10 +464,10 @@ class FirebaseService {
         'updatedAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
       
-      print('User stats saved to Firebase successfully');
+      debugPrint('User stats saved to Firebase successfully');
     } catch (e) {
-      print('Error saving user stats: $e');
-      throw e;
+      debugPrint('Error saving user stats: $e');
+      rethrow;
     }
   }
 
@@ -488,7 +488,7 @@ class FirebaseService {
       }
       return null;
     } catch (e) {
-      print('Error loading user stats: $e');
+      debugPrint('Error loading user stats: $e');
       return null;
     }
   }
@@ -512,10 +512,10 @@ class FirebaseService {
         'createdAt': FieldValue.serverTimestamp(),
       });
       
-      print('Achievement saved to Firebase: ${achievement.title}');
+      debugPrint('Achievement saved to Firebase: ${achievement.title}');
     } catch (e) {
-      print('Error saving achievement: $e');
-      throw e;
+      debugPrint('Error saving achievement: $e');
+      rethrow;
     }
   }
 
@@ -542,7 +542,7 @@ class FirebaseService {
         );
       }).toList();
     } catch (e) {
-      print('Error loading achievements: $e');
+      debugPrint('Error loading achievements: $e');
       return [];
     }
   }
@@ -568,8 +568,8 @@ class FirebaseService {
         'updatedAt': FieldValue.serverTimestamp(),
       });
     } catch (e) {
-      print('Error saving project: $e');
-      throw e;
+      debugPrint('Error saving project: $e');
+      rethrow;
     }
   }
 
@@ -594,7 +594,7 @@ class FirebaseService {
         );
       }).toList();
     } catch (e) {
-      print('Error loading projects: $e');
+      debugPrint('Error loading projects: $e');
       return [];
     }
   }

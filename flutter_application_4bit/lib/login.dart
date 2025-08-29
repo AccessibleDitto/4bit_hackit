@@ -38,29 +38,43 @@ class _LoginPageState extends State<LoginPage> {
       
       // Get all users from Firestore
       List<Map<String, dynamic>> users = await _firebaseService.getAllUsers();
-      print('Found ${users.length} users in Firestore');
+      debugPrint('Found ${users.length} users in Firestore');
       
       // Get all tasks from Firestore
       List<Map<String, dynamic>> tasks = await _firebaseService.getAllTasks();
-      print('Found ${tasks.length} tasks in Firestore');
+      debugPrint('Found ${tasks.length} tasks in Firestore');
       
-      // Check if user with this email exists
-      bool userExists = users.any((user) => user['email'] == _emailController.text.trim());
+      // Check if user with this email exists and password matches
+      Map<String, dynamic>? matchingUser;
+      for (var user in users) {
+        if (user['email'] == _emailController.text.trim()) {
+          matchingUser = user;
+          break;
+        }
+      }
       
-      if (userExists) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Firestore test successful! Found user data and ${tasks.length} tasks.'),
-              backgroundColor: Colors.green,
-            ),
-          );
-          
-          Navigator.pushReplacementNamed(context, '/home');
+      if (matchingUser != null) {
+        // Check if password matches
+        if (matchingUser['password'] == _passwordController.text.trim()) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Login successful! Welcome back.'),
+                backgroundColor: Colors.green,
+              ),
+            );
+            
+            Navigator.pushReplacementNamed(context, '/home');
+          }
+        } else {
+          setState(() {
+            _errorMessage = 'Incorrect password. Please try again.';
+            _isLoading = false;
+          });
         }
       } else {
         setState(() {
-          _errorMessage = 'User not found. Try registering first.';
+          _errorMessage = 'User not found. Please register first.';
           _isLoading = false;
         });
       }
@@ -147,7 +161,7 @@ class _LoginPageState extends State<LoginPage> {
     );
   }
 
-  _header(context) {
+  Widget _header(BuildContext context) {
     return Column(
       children: const [
         Text(
@@ -167,7 +181,7 @@ class _LoginPageState extends State<LoginPage> {
     );
   }
 
-  _inputField(context) {
+  Widget _inputField(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -205,7 +219,7 @@ class _LoginPageState extends State<LoginPage> {
     );
   }
 
-  _signup(context) {
+  Widget _signup(BuildContext context) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
