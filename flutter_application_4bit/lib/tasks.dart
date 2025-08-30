@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../widgets/navigation_widgets.dart';
-import 'models/user_stats.dart';
-import 'models/task_manager.dart';
+import 'services/user_stats_service.dart';
+import 'services/task_manager.dart';
 
 class TasksPage extends StatefulWidget {
   @override

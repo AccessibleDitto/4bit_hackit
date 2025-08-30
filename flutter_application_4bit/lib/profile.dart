@@ -3,7 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:qr_flutter/qr_flutter.dart';
-import 'models/user_stats.dart';
+import 'services/user_stats_service.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});

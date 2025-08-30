@@ -1,7 +1,7 @@
 // User performance statistics and gamification system
 import 'package:flutter/material.dart';
 import 'task_manager.dart';
-import '../services/firebase_service.dart';
+import 'firebase_service.dart';
 
 class UserStats {
   static final UserStats _instance = UserStats._internal();

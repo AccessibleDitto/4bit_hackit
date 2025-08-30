@@ -1,7 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import '../models/user_stats.dart';
+import 'user_stats_service.dart';
 import '../tasks.dart';
 
 class FirebaseService {
@@ -34,7 +34,24 @@ class FirebaseService {
     try {
       String emailAsId = email; 
       
-      await _firestore.collection('users').doc(emailAsId).set({
+      // Check if user document already exists and clean it up if needed
+      final docRef = _firestore.collection('users').doc(emailAsId);
+      final existingDoc = await docRef.get();
+      
+      if (existingDoc.exists) {
+        debugPrint('User document already exists for $email, cleaning up...');
+        // Delete existing user stats collection
+        final statsQuery = await docRef.collection(userStatsCollection).get();
+        for (final doc in statsQuery.docs) {
+          await doc.reference.delete();
+        }
+        // Delete the main user document
+        await docRef.delete();
+        debugPrint('Cleaned up existing user data for $email');
+      }
+      
+      // Create fresh user document
+      await docRef.set({
         'email': email,
         'password': password,
         'gmail_based_id': emailAsId,
@@ -44,16 +61,32 @@ class FirebaseService {
       });
             
       // Initialize user stats with email-based ID
-      await _firestore.collection('users').doc(emailAsId).collection(userStatsCollection).doc('stats').set({
+      await docRef.collection(userStatsCollection).doc('stats').set({
         'pomodorosCompleted': 0,
         'totalFocusTimeMinutes': 0,
         'streakDays': 0,
         'earnedBadges': [],
         'createdAt': FieldValue.serverTimestamp(),
-      });      
+      });
+      
+      debugPrint('Successfully created fresh user account for $email');
     } catch (e) {
       debugPrint('Error creating user with Gmail ID: $e');
       rethrow;
+    }
+  }
+
+  // Clear any authentication state to ensure clean signup
+  Future<void> clearAuthState() async {
+    try {
+      // Sign out from Firebase Auth if there's an active session
+      if (_auth.currentUser != null) {
+        await _auth.signOut();
+        debugPrint('Cleared Firebase Auth state');
+      }
+    } catch (e) {
+      debugPrint('Error clearing auth state: $e');
+      // Don't rethrow - this is a cleanup operation
     }
   }
 
@@ -296,15 +329,45 @@ class FirebaseService {
   // Delete user account
   Future<void> deleteAccount() async {
     try {
-      if (userId == null) throw Exception('User not authenticated');
+      // Get current user info before deletion
+      final currentUserId = userId;
+      final userEmail = currentUserEmail;
       
-      // Delete user data from Firestore
-      await _deleteUserData(userId!);
+      // For Gmail-based authentication, we need to get the current user email differently
+      // since users might not be signed into Firebase Auth
+      if (currentUserId == null && userEmail == null) {
+        // Try to delete based on stored user session or throw a more specific error
+        throw Exception('No authenticated user found. Please sign in again.');
+      }
       
-      // Delete the user account
-      await _auth.currentUser?.delete();
+      // Delete user data from Firestore (both possible document locations)
+      if (currentUserId != null) {
+        debugPrint('Deleting Firebase Auth user data for UID: $currentUserId');
+        await _deleteUserData(currentUserId);
+        
+        // Delete the Firebase Auth user account
+        await _auth.currentUser?.delete();
+      }
+      
+      // Also delete Gmail-based ID document if it exists
+      if (userEmail != null) {
+        debugPrint('Deleting Gmail-based user data for email: $userEmail');
+        await _deleteGmailBasedUserData(userEmail);
+      }
+      
     } catch (e) {
       debugPrint('Error deleting account: $e');
+      rethrow;
+    }
+  }
+
+  // Delete account for Gmail-based authentication (when no Firebase Auth user exists)
+  Future<void> deleteGmailBasedAccount(String email) async {
+    try {
+      debugPrint('Deleting Gmail-based account for email: $email');
+      await _deleteGmailBasedUserData(email);
+    } catch (e) {
+      debugPrint('Error deleting Gmail-based account: $e');
       rethrow;
     }
   }
@@ -330,12 +393,55 @@ class FirebaseService {
         batch.delete(doc.reference);
       }
       
+      // Delete projects
+      QuerySnapshot projectsSnapshot = await _firestore.collection('users').doc(uid).collection(projectsCollection).get();
+      for (DocumentSnapshot doc in projectsSnapshot.docs) {
+        batch.delete(doc.reference);
+      }
+      
       // Delete user document
       batch.delete(_firestore.collection('users').doc(uid));
       
       await batch.commit();
     } catch (e) {
       debugPrint('Error deleting user data: $e');
+      rethrow;
+    }
+  }
+
+  // Delete Gmail-based user data from Firestore
+  Future<void> _deleteGmailBasedUserData(String email) async {
+    try {
+      // Delete user document with email as ID and all subcollections
+      WriteBatch batch = _firestore.batch();
+      
+      // Delete user stats
+      batch.delete(_firestore.collection('users').doc(email).collection(userStatsCollection).doc('stats'));
+      
+      // Delete tasks
+      QuerySnapshot tasksSnapshot = await _firestore.collection('users').doc(email).collection(tasksCollection).get();
+      for (DocumentSnapshot doc in tasksSnapshot.docs) {
+        batch.delete(doc.reference);
+      }
+      
+      // Delete achievements
+      QuerySnapshot achievementsSnapshot = await _firestore.collection('users').doc(email).collection(achievementsCollection).get();
+      for (DocumentSnapshot doc in achievementsSnapshot.docs) {
+        batch.delete(doc.reference);
+      }
+      
+      // Delete projects
+      QuerySnapshot projectsSnapshot = await _firestore.collection('users').doc(email).collection(projectsCollection).get();
+      for (DocumentSnapshot doc in projectsSnapshot.docs) {
+        batch.delete(doc.reference);
+      }
+      
+      // Delete user document
+      batch.delete(_firestore.collection('users').doc(email));
+      
+      await batch.commit();
+    } catch (e) {
+      debugPrint('Error deleting Gmail-based user data: $e');
       rethrow;
     }
   }

@@ -6,7 +6,7 @@ import 'services/firebase_service.dart';
 import 'profile.dart';
 import 'pomodoro_preferences.dart';
 import 'login.dart';
-// app theme 
+
 // theme mode
 enum AppThemeMode { light, dark, system }
 
@@ -269,76 +269,6 @@ class _SettingsScreenState extends State<SettingsScreen>
     );
   }
 
-  void _showSignOutDialog() {
-    HapticFeedback.mediumImpact();
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: _colors.surface,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-        ),
-        title: Text(
-          'Sign Out',
-          style: GoogleFonts.inter(
-            fontSize: 18,
-            fontWeight: FontWeight.w600,
-            color: _colors.onSurface,
-          ),
-        ),
-        content: Text(
-          'Are you sure you want to sign out?',
-          style: GoogleFonts.inter(
-            fontSize: 14,
-            color: _colors.onSurfaceVariant,
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text(
-              'Cancel',
-              style: GoogleFonts.inter(
-                color: _colors.primary,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ),
-          TextButton(
-            onPressed: () async {
-              Navigator.pop(context);
-              try {
-                await _firebaseService.signOut();
-                if (mounted) {
-                  Navigator.of(context).pushAndRemoveUntil(
-                    MaterialPageRoute(builder: (context) => const LoginPage()),
-                    (route) => false,
-                  );
-                }
-              } catch (e) {
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Failed to sign out'),
-                      backgroundColor: Colors.red,
-                    ),
-                  );
-                }
-              }
-            },
-            child: Text(
-              'Sign Out',
-              style: GoogleFonts.inter(
-                color: _colors.error,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   void _showDeleteAccountDialog() {
     HapticFeedback.mediumImpact();
     showDialog(
@@ -359,7 +289,7 @@ class _SettingsScreenState extends State<SettingsScreen>
             ),
           ),
           content: Text(
-            'Are you sure you want to permanently delete your account? This action cannot be undone.',
+            'Are you sure you want to permanently delete your account? This action cannot be undone.\n\nThis will delete:\n• All your tasks and projects\n• Your profile information\n• Your Pomodoro statistics\n• All achievements and progress',
             style: GoogleFonts.inter(
               fontSize: 14,
               color: _colors.onSurfaceVariant,
@@ -377,62 +307,10 @@ class _SettingsScreenState extends State<SettingsScreen>
               ),
             ),
             TextButton(
-              onPressed: () async {
+              onPressed: () {
                 Navigator.pop(context);
-                try {
-                  // Show loading indicator
-                  showDialog(
-                    context: context,
-                    barrierDismissible: false,
-                    builder: (context) => const Center(
-                      child: CircularProgressIndicator(),
-                    ),
-                  );
-                  
-                  // Delete account using Firebase
-                  await _firebaseService.deleteAccount();
-                  
-                  if (mounted) {
-                    Navigator.pop(context); // Close loading dialog
-                    _showSuccessSnackBar('Account deleted successfully');
-                    
-                    // Navigate to login page
-                    Navigator.of(context).pushAndRemoveUntil(
-                      MaterialPageRoute(builder: (context) => const LoginPage()),
-                      (route) => false,
-                    );
-                  }
-                } on FirebaseAuthException catch (e) {
-                  if (mounted) {
-                    Navigator.pop(context); // Close loading dialog
-                    String errorMessage = 'Failed to delete account';
-                    
-                    switch (e.code) {
-                      case 'requires-recent-login':
-                        errorMessage = 'Please sign in again before deleting your account';
-                        break;
-                      default:
-                        errorMessage = 'Error: ${e.message}';
-                    }
-                    
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(errorMessage),
-                        backgroundColor: Colors.red,
-                      ),
-                    );
-                  }
-                } catch (e) {
-                  if (mounted) {
-                    Navigator.pop(context); // Close loading dialog
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('An unexpected error occurred'),
-                        backgroundColor: Colors.red,
-                      ),
-                    );
-                  }
-                }
+                // Call the delete function after closing the dialog
+                _deleteFirebaseAccount();
               },
               child: Text(
                 'Delete',
@@ -443,9 +321,238 @@ class _SettingsScreenState extends State<SettingsScreen>
               ),
             ),
           ],
+        ), 
+      ), 
+    ); 
+  }
+
+  void _deleteFirebaseAccount() async {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const AlertDialog(
+        content: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            CircularProgressIndicator(),
+            SizedBox(width: 16),
+            Text('Deleting account...'),
+          ],
         ),
       ),
     );
+    
+    try {
+      final currentUser = _firebaseService.currentUser;
+      if (currentUser?.email != null) {
+        // User is signed into Firebase Auth
+        await _firebaseService.deleteAccount();
+      } else {
+        // User is using Gmail-based authentication without Firebase Auth
+        if (mounted) {
+          Navigator.pop(context); // Close loading dialog
+        }
+        if (mounted) {
+          _showEmailInputDialog();
+        }
+        return;
+      }
+      
+      // Close loading dialog
+      if (mounted) {
+        Navigator.pop(context);
+      }
+      
+      if (mounted) {
+        _showSuccessSnackBar('Account deleted successfully');
+        
+        // Navigate to login page immediately
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (context) => const LoginPage()),
+          (route) => false,
+        );
+      }
+    } on FirebaseAuthException catch (e) {
+      // Close loading dialog
+      if (mounted) {
+        Navigator.pop(context);
+      }
+      
+      if (mounted) {
+        String errorMessage = 'Failed to delete account';
+        
+        switch (e.code) {
+          case 'requires-recent-login':
+            errorMessage = 'For security reasons, please sign out and sign back in, then try deleting your account again.';
+            break;
+          case 'network-request-failed':
+            errorMessage = 'Network error. Please check your connection and try again';
+            break;
+          default:
+            errorMessage = 'Error: ${e.message}';
+        }
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(errorMessage),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      // Close loading dialog
+      if (mounted) {
+        Navigator.pop(context);
+      }
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('An unexpected error occurred'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  void _showEmailInputDialog() {
+    final TextEditingController emailController = TextEditingController();
+    
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: _colors.surface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        title: Text(
+          'Confirm Account Deletion',
+          style: GoogleFonts.inter(
+            fontSize: 18,
+            fontWeight: FontWeight.w600,
+            color: _colors.error,
+          ),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'Please enter your email address to confirm account deletion:',
+              style: GoogleFonts.inter(
+                fontSize: 14,
+                color: _colors.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: emailController,
+              decoration: InputDecoration(
+                labelText: 'Email Address',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              keyboardType: TextInputType.emailAddress,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              emailController.dispose();
+              Navigator.pop(context);
+            },
+            child: Text(
+              'Cancel',
+              style: GoogleFonts.inter(
+                color: _colors.primary,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+          TextButton(
+            onPressed: () {
+              final email = emailController.text.trim();
+              if (email.isEmpty || !email.contains('@')) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Please enter a valid email address'),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+                return;
+              }
+              
+              Navigator.pop(context);
+              emailController.dispose();
+              
+              // Call the delete function after closing the dialog
+              _deleteGmailAccount(email);
+            },
+            child: Text(
+              'Delete Account',
+              style: GoogleFonts.inter(
+                color: _colors.error,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _deleteGmailAccount(String email) async {
+    // Show loading indicator
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const AlertDialog(
+        content: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            CircularProgressIndicator(),
+            SizedBox(width: 16),
+            Text('Deleting account...'),
+          ],
+        ),
+      ),
+    );
+    
+    try {
+      // Delete Gmail-based account
+      await _firebaseService.deleteGmailBasedAccount(email);
+      
+      // Close loading dialog
+      if (mounted) {
+        Navigator.pop(context);
+      }
+      
+      if (mounted) {
+        _showSuccessSnackBar('Account deleted successfully');
+        
+        // Navigate to login page immediately
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (context) => const LoginPage()),
+          (route) => false,
+        );
+      }
+    } catch (e) {
+      // Close loading dialog
+      if (mounted) {
+        Navigator.pop(context);
+      }
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to delete account: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   Widget _buildAccountSection() {
@@ -457,15 +564,7 @@ class _SettingsScreenState extends State<SettingsScreen>
           icon: Icons.person_outline,
           onTap: () => _navigateToProfile(),
           showArrow: true,
-        ),
-        const SizedBox(height: 12),
-        _buildSettingsItem(
-          title: 'Sign Out',
-          subtitle: 'Sign out of your account',
-          icon: Icons.logout,
-          onTap: _showSignOutDialog,
-          isDestructive: false,
-        ),
+        ),        
         const SizedBox(height: 12),
         _buildSettingsItem(
           title: 'Account & Security',
@@ -1095,10 +1194,27 @@ class _SettingsScreenState extends State<SettingsScreen>
               ),
             ),
             TextButton(
-              onPressed: () {
-                Navigator.pop(context);
-                _showSuccessSnackBar('Logged out successfully');
-              },
+            onPressed: () async {
+              Navigator.pop(context);
+              try {
+                await _firebaseService.signOut();
+                if (mounted) {
+                  Navigator.of(context).pushAndRemoveUntil(
+                    MaterialPageRoute(builder: (context) => const LoginPage()),
+                    (route) => false,
+                  );
+                }
+              } catch (e) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Failed to sign out'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              }
+            },
               child: Text(
                 'Log Out',
                 style: GoogleFonts.inter(

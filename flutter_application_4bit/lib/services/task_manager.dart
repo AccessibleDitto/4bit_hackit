@@ -1,7 +1,8 @@
 // Task and Project Management
+import 'package:flutter/material.dart';
 import '../tasks.dart';
-import '../services/firebase_service.dart';
-import 'user_stats.dart';
+import 'firebase_service.dart';
+import 'user_stats_service.dart';
 
 class TaskManager {
   static final TaskManager _instance = TaskManager._internal();
@@ -99,27 +100,27 @@ class TaskManager {
     try {
       _tasks = await _firebaseService.loadTasks();
       _projects = await _firebaseService.loadProjects();
-      print('Tasks and projects loaded from Firebase successfully');
+      debugPrint('Tasks and projects loaded from Firebase successfully');
     } catch (e) {
-      print('Error loading tasks from Firebase: $e');
+      debugPrint('Error loading tasks from Firebase: $e');
     }
   }
 
   Future<void> _saveTaskToFirebase(Task task) async {
     try {
       await _firebaseService.saveTask(task);
-      print('Task saved to Firebase: ${task.title}');
+      debugPrint('Task saved to Firebase: ${task.title}');
     } catch (e) {
-      print('Error saving task to Firebase: $e');
+      debugPrint('Error saving task to Firebase: $e');
     }
   }
 
   Future<void> _saveProjectToFirebase(Project project) async {
     try {
       await _firebaseService.saveProject(project);
-      print('Project saved to Firebase: ${project.name}');
+      debugPrint('Project saved to Firebase: ${project.name}');
     } catch (e) {
-      print('Error saving project to Firebase: $e');
+      debugPrint('Error saving project to Firebase: $e');
     }
   }
 
@@ -128,11 +129,11 @@ class TaskManager {
       await loadTasksFromFirebase();
       
       if (_tasks.isEmpty) {
-        print('No Firebase tasks found, using sample data for demo');
+        debugPrint('No Firebase tasks found, using sample data for demo');
         initializeSampleData();
       }
     } catch (e) {
-      print('Error initializing tasks from Firebase: $e');
+      debugPrint('Error initializing tasks from Firebase: $e');
       initializeSampleData();
     }
   }

@@ -50,6 +50,9 @@ class _SignupPageState extends State<SignupPage> {
     }
 
     try {
+      // Clear any existing auth state first
+      await _firebaseService.clearAuthState();
+      
       // Test Firestore connection first
       await _firebaseService.testFirestoreConnection();
       await _firebaseService.createUserWithGmailId(
@@ -82,9 +85,8 @@ class _SignupPageState extends State<SignupPage> {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData.dark().copyWith(
+    return Theme(
+      data: ThemeData.dark().copyWith(
         scaffoldBackgroundColor: const Color(0xFF181829),
         inputDecorationTheme: InputDecorationTheme(
           filled: true,
@@ -118,7 +120,7 @@ class _SignupPageState extends State<SignupPage> {
         ),
         colorScheme: ColorScheme.fromSeed(seedColor: Color(0xFFFFA726)).copyWith(secondary: Color(0xFF8F5CF7)),
       ),
-      home: Scaffold(
+      child: Scaffold(
         appBar: AppBar(
           leading: Navigator.canPop(context)
               ? IconButton(

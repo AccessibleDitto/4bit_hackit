@@ -88,9 +88,8 @@ class _LoginPageState extends State<LoginPage> {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData.dark().copyWith(
+    return Theme(
+      data: ThemeData.dark().copyWith(
         scaffoldBackgroundColor: const Color(0xFF181829),
         inputDecorationTheme: InputDecorationTheme(
           filled: true,
@@ -129,7 +128,7 @@ class _LoginPageState extends State<LoginPage> {
           seedColor: Color(0xFF8F5CF7),
         ).copyWith(secondary: Color(0xFFFFA726)),
       ),
-      home: Scaffold(
+      child: Scaffold(
         appBar: AppBar(
           leading: Navigator.canPop(context)
               ? IconButton(

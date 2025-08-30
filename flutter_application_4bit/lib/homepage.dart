@@ -6,7 +6,7 @@ import 'dart:async';
 
 // Import the modular files
 import 'models/timer_models.dart';
-import 'models/user_stats.dart';
+import 'services/user_stats_service.dart';
 import 'utils/timer_utils.dart';
 import 'widgets/app_bar_widgets.dart';
 import 'widgets/task_widgets.dart';
