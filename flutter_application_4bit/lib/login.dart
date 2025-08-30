@@ -40,10 +40,6 @@ class _LoginPageState extends State<LoginPage> {
       List<Map<String, dynamic>> users = await _firebaseService.getAllUsers();
       debugPrint('Found ${users.length} users in Firestore');
       
-      // Get all tasks from Firestore
-      List<Map<String, dynamic>> tasks = await _firebaseService.getAllTasks();
-      debugPrint('Found ${tasks.length} tasks in Firestore');
-      
       // Check if user with this email exists and password matches
       Map<String, dynamic>? matchingUser;
       for (var user in users) {
@@ -56,15 +52,33 @@ class _LoginPageState extends State<LoginPage> {
       if (matchingUser != null) {
         // Check if password matches
         if (matchingUser['password'] == _passwordController.text.trim()) {
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('Login successful! Welcome back.'),
-                backgroundColor: Colors.green,
-              ),
-            );
+          // Load user's specific data
+          try {
+            debugPrint('Loading user data for: ${_emailController.text.trim()}');
+            Map<String, dynamic> userData = await _firebaseService.loadGmailUserData(_emailController.text.trim());
             
-            Navigator.pushReplacementNamed(context, '/home');
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Login successful! Welcome back. Loaded ${userData['tasks'].length} tasks, ${userData['achievements'].length} achievements.'),
+                  backgroundColor: Colors.green,
+                ),
+              );
+              
+              Navigator.pushReplacementNamed(context, '/home');
+            }
+          } catch (e) {
+            debugPrint('Error loading user data: $e');
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Login successful but failed to load user data: ${e.toString()}'),
+                  backgroundColor: Colors.orange,
+                ),
+              );
+              
+              Navigator.pushReplacementNamed(context, '/home');
+            }
           }
         } else {
           setState(() {

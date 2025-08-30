@@ -76,7 +76,6 @@ class FirebaseService {
     }
   }
 
-  // Clear any authentication state to ensure clean signup
   Future<void> clearAuthState() async {
     try {
       // Sign out from Firebase Auth if there's an active session
@@ -86,11 +85,9 @@ class FirebaseService {
       }
     } catch (e) {
       debugPrint('Error clearing auth state: $e');
-      // Don't rethrow - this is a cleanup operation
     }
   }
 
-  // Test Firestore connection
   Future<void> testFirestoreConnection() async {
     const int maxRetries = 3;
     const Duration retryDelay = Duration(seconds: 2);
@@ -123,7 +120,7 @@ class FirebaseService {
     }
   }
   
-  // Get all users from Firestore (including registration data)
+  // Get all users from Firestore, incl registration data
   Future<List<Map<String, dynamic>>> getAllUsers() async {
     try {
       QuerySnapshot snapshot = await _firestore.collection('users').get();
@@ -144,56 +141,9 @@ class FirebaseService {
     }
   }
 
-  // Create a task in Firestore
-  Future<void> createTask(String title, String description, DateTime dueDate) async {
-    try {
-      await _firestore.collection('tasks').add({
-        'title': title,
-        'description': description,
-        'dueDate': Timestamp.fromDate(dueDate),
-        'completed': false,
-        'createdAt': FieldValue.serverTimestamp(),
-        'priority': 'medium',
-      });
-      
-      debugPrint('Task created successfully: $title');
-      
-    } catch (e) {
-      debugPrint('Error creating task: $e');
-      rethrow;
-    }
-  }
-  
-  // Get all tasks from Firestore
-  Future<List<Map<String, dynamic>>> getAllTasks() async {
-    try {
-      QuerySnapshot snapshot = await _firestore
-          .collection('tasks')
-          .orderBy('createdAt', descending: true)
-          .get();
-      
-      List<Map<String, dynamic>> tasks = [];
-      for (var doc in snapshot.docs) {
-        Map<String, dynamic> taskData = doc.data() as Map<String, dynamic>;
-        taskData['id'] = doc.id;
-        tasks.add(taskData);
-      }
-      
-      debugPrint('Retrieved ${tasks.length} tasks from Firestore');
-      return tasks;
-      
-    } catch (e) {
-      debugPrint('Error retrieving tasks: $e');
-      rethrow;
-    }
-  }
-  
-  // Sign up with email and password
   Future<UserCredential?> signUpWithEmailPassword(String email, String password) async {
     try {
       debugPrint('Attempting to create user with email: $email');
-      
-      // Add timeout to handle network issues
       UserCredential userCredential = await _auth.createUserWithEmailAndPassword(
         email: email,
         password: password,
@@ -202,13 +152,12 @@ class FirebaseService {
         onTimeout: () {
           throw FirebaseAuthException(
             code: 'timeout',
-            message: 'Request timed out. Please try again or use a physical device.',
+            message: 'Request timed out. Please try again.',
           );
         },
       );
       
       debugPrint('User created successfully: ${userCredential.user?.uid}');
-      
       // Create initial user data in Firestore
       await _createUserProfile(userCredential.user!, email);
       
@@ -217,7 +166,6 @@ class FirebaseService {
       debugPrint('Sign up error code: ${e.code}');
       debugPrint('Sign up error message: ${e.message}');
       
-      // Handle specific error codes
       switch (e.code) {
         case 'network-request-failed':
           throw FirebaseAuthException(
@@ -253,7 +201,6 @@ class FirebaseService {
     }
   }
 
-  // Sign in with email and password
   Future<UserCredential?> signInWithEmailPassword(String email, String password) async {
     try {
       UserCredential userCredential = await _auth.signInWithEmailAndPassword(
@@ -326,33 +273,26 @@ class FirebaseService {
     }
   }
 
-  // Delete user account
+  // Delete user account 
   Future<void> deleteAccount() async {
     try {
-      // Get current user info before deletion
       final currentUserId = userId;
       final userEmail = currentUserEmail;
       
-      // For Gmail-based authentication, we need to get the current user email differently
-      // since users might not be signed into Firebase Auth
       if (currentUserId == null && userEmail == null) {
-        // Try to delete based on stored user session or throw a more specific error
         throw Exception('No authenticated user found. Please sign in again.');
       }
-      
-      // Delete user data from Firestore (both possible document locations)
+      // For Firebase Auth users
       if (currentUserId != null) {
         debugPrint('Deleting Firebase Auth user data for UID: $currentUserId');
         await _deleteUserData(currentUserId);
-        
         // Delete the Firebase Auth user account
         await _auth.currentUser?.delete();
-      }
-      
-      // Also delete Gmail-based ID document if it exists
-      if (userEmail != null) {
-        debugPrint('Deleting Gmail-based user data for email: $userEmail');
-        await _deleteGmailBasedUserData(userEmail);
+      } 
+      // Fallback 
+      else if (userEmail != null) {
+        debugPrint('Deleting user data for email: $userEmail');
+        await _deleteUserData(userEmail);
       }
       
     } catch (e) {
@@ -361,87 +301,49 @@ class FirebaseService {
     }
   }
 
-  // Delete account for Gmail-based authentication (when no Firebase Auth user exists)
   Future<void> deleteGmailBasedAccount(String email) async {
     try {
       debugPrint('Deleting Gmail-based account for email: $email');
-      await _deleteGmailBasedUserData(email);
+      await _deleteUserData(email);
     } catch (e) {
       debugPrint('Error deleting Gmail-based account: $e');
       rethrow;
     }
   }
 
-  // Delete all user data from Firestore
-  Future<void> _deleteUserData(String uid) async {
+  // Delete all user data 
+  Future<void> _deleteUserData(String documentId) async {
     try {
-      // Delete user document and all subcollections
       WriteBatch batch = _firestore.batch();
       
       // Delete user stats
-      batch.delete(_firestore.collection('users').doc(uid).collection(userStatsCollection).doc('stats'));
+      batch.delete(_firestore.collection('users').doc(documentId).collection(userStatsCollection).doc('stats'));
       
       // Delete tasks
-      QuerySnapshot tasksSnapshot = await _firestore.collection('users').doc(uid).collection(tasksCollection).get();
+      QuerySnapshot tasksSnapshot = await _firestore.collection('users').doc(documentId).collection(tasksCollection).get();
       for (DocumentSnapshot doc in tasksSnapshot.docs) {
         batch.delete(doc.reference);
       }
       
       // Delete achievements
-      QuerySnapshot achievementsSnapshot = await _firestore.collection('users').doc(uid).collection(achievementsCollection).get();
+      QuerySnapshot achievementsSnapshot = await _firestore.collection('users').doc(documentId).collection(achievementsCollection).get();
       for (DocumentSnapshot doc in achievementsSnapshot.docs) {
         batch.delete(doc.reference);
       }
       
       // Delete projects
-      QuerySnapshot projectsSnapshot = await _firestore.collection('users').doc(uid).collection(projectsCollection).get();
+      QuerySnapshot projectsSnapshot = await _firestore.collection('users').doc(documentId).collection(projectsCollection).get();
       for (DocumentSnapshot doc in projectsSnapshot.docs) {
         batch.delete(doc.reference);
       }
       
       // Delete user document
-      batch.delete(_firestore.collection('users').doc(uid));
+      batch.delete(_firestore.collection('users').doc(documentId));
       
       await batch.commit();
+      debugPrint('Successfully deleted all user data for: $documentId');
     } catch (e) {
       debugPrint('Error deleting user data: $e');
-      rethrow;
-    }
-  }
-
-  // Delete Gmail-based user data from Firestore
-  Future<void> _deleteGmailBasedUserData(String email) async {
-    try {
-      // Delete user document with email as ID and all subcollections
-      WriteBatch batch = _firestore.batch();
-      
-      // Delete user stats
-      batch.delete(_firestore.collection('users').doc(email).collection(userStatsCollection).doc('stats'));
-      
-      // Delete tasks
-      QuerySnapshot tasksSnapshot = await _firestore.collection('users').doc(email).collection(tasksCollection).get();
-      for (DocumentSnapshot doc in tasksSnapshot.docs) {
-        batch.delete(doc.reference);
-      }
-      
-      // Delete achievements
-      QuerySnapshot achievementsSnapshot = await _firestore.collection('users').doc(email).collection(achievementsCollection).get();
-      for (DocumentSnapshot doc in achievementsSnapshot.docs) {
-        batch.delete(doc.reference);
-      }
-      
-      // Delete projects
-      QuerySnapshot projectsSnapshot = await _firestore.collection('users').doc(email).collection(projectsCollection).get();
-      for (DocumentSnapshot doc in projectsSnapshot.docs) {
-        batch.delete(doc.reference);
-      }
-      
-      // Delete user document
-      batch.delete(_firestore.collection('users').doc(email));
-      
-      await batch.commit();
-    } catch (e) {
-      debugPrint('Error deleting Gmail-based user data: $e');
       rethrow;
     }
   }
@@ -702,6 +604,84 @@ class FirebaseService {
     } catch (e) {
       debugPrint('Error loading projects: $e');
       return [];
+    }
+  }
+
+  
+  // Load all data for users
+  Future<Map<String, dynamic>> loadGmailUserData(String email) async {
+    try {
+      // Load tasks
+      final tasksSnapshot = await _firestore
+          .collection('users')
+          .doc(email)
+          .collection(tasksCollection)
+          .orderBy('createdAt', descending: false)
+          .get();
+
+      List<Map<String, dynamic>> tasks = tasksSnapshot.docs.map((doc) {
+        final data = doc.data();
+        data['id'] = doc.id;
+        return data;
+      }).toList();
+
+      // Load user stats
+      final statsDoc = await _firestore
+          .collection('users')
+          .doc(email)
+          .collection(userStatsCollection)
+          .doc('stats')
+          .get();
+
+      Map<String, dynamic>? userStats;
+      if (statsDoc.exists) {
+        userStats = statsDoc.data();
+      }
+
+      // Load achievements
+      final achievementsSnapshot = await _firestore
+          .collection('users')
+          .doc(email)
+          .collection(achievementsCollection)
+          .orderBy('timestamp', descending: true)
+          .limit(10)
+          .get();
+
+      List<Map<String, dynamic>> achievements = achievementsSnapshot.docs.map((doc) {
+        final data = doc.data();
+        data['id'] = doc.id;
+        return data;
+      }).toList();
+
+      // Load projects
+      final projectsSnapshot = await _firestore
+          .collection('users')
+          .doc(email)
+          .collection(projectsCollection)
+          .get();
+
+      List<Map<String, dynamic>> projects = projectsSnapshot.docs.map((doc) {
+        final data = doc.data();
+        data['id'] = doc.id;
+        return data;
+      }).toList();
+
+      debugPrint('Successfully loaded data for Gmail user: $email');
+      debugPrint('- Tasks: ${tasks.length}');
+      debugPrint('- Achievements: ${achievements.length}');
+      debugPrint('- Projects: ${projects.length}');
+      debugPrint('- User Stats: ${userStats != null ? "Found" : "Not found"}');
+
+      return {
+        'tasks': tasks,
+        'userStats': userStats,
+        'achievements': achievements,
+        'projects': projects,
+        'email': email,
+      };
+    } catch (e) {
+      debugPrint('Error loading Gmail user data: $e');
+      rethrow;
     }
   }
 }
