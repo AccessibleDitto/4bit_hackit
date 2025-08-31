@@ -1,17 +1,26 @@
+import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_application_4bit/register.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'login.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dart:ui';
 import 'homepage.dart';
 import 'tasks.dart';
-import 'profile.dart';
 import 'settings.dart';
-void main() {
+
+// Initialize Firestore instance
+final db = FirebaseFirestore.instance; 
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
   runApp(const MyApp());
 }
-
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
@@ -24,6 +33,11 @@ class MyApp extends StatelessWidget {
         textTheme: GoogleFonts.interTextTheme(),
       ),
       home: const MyHomePage(title: 'Khronofy'),
+      routes: {
+        '/home': (context) => TimerModePage(),
+        '/login': (context) => LoginPage(),
+        '/register': (context) => SignupPage(),
+      },
       debugShowCheckedModeBanner: false,
     );
   }
@@ -434,7 +448,10 @@ class _MyHomePageState extends State<MyHomePage>
                   'Login',
                   onPressed: _handleLogin,
                 ),
-                _buildSecondaryButton(
+
+                // remove test buttons after integration
+                const SizedBox(height: 16),
+                _buildTestButton(
                   'tasks test button',
                   onPressed: () {
                     Navigator.push(
@@ -443,7 +460,7 @@ class _MyHomePageState extends State<MyHomePage>
                     );
                   },
                 ),
-                _buildSecondaryButton(
+                _buildTestButton(
                   'homepage test',
                   onPressed: () {
                     Navigator.push(
@@ -452,8 +469,7 @@ class _MyHomePageState extends State<MyHomePage>
                     );
                   },
                 ),
-                const SizedBox(height: 16),
-                _buildSecondaryButton(
+                _buildTestButton(
                   'settings test',
                   onPressed: () {
                     Navigator.push(
@@ -536,6 +552,36 @@ class _MyHomePageState extends State<MyHomePage>
           text,
           style: GoogleFonts.inter(
             fontSize: 18,
+            fontWeight: FontWeight.w600,
+            color: Colors.white,
+          ),
+        ),
+      ),
+    );
+  }
+
+  // remove after
+  Widget _buildTestButton(String text, {required VoidCallback onPressed}) {
+    return SizedBox(
+      width: double.infinity,
+      height: 35,
+      child: OutlinedButton(
+        onPressed: onPressed,
+        style: OutlinedButton.styleFrom(
+          backgroundColor: const Color(0xFF27272A).withValues(alpha: 0.8),
+          foregroundColor: Colors.white,
+          side: BorderSide(
+            color: const Color(0xFF9333EA).withValues(alpha: 0.3),
+            width: 2,
+          ),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+        ),
+        child: Text(
+          text,
+          style: GoogleFonts.inter(
+            fontSize: 15,
             fontWeight: FontWeight.w600,
             color: Colors.white,
           ),

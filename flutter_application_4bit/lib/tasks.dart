@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import '../widgets/navigation_widgets.dart';
+import 'services/user_stats_service.dart';
+import 'services/task_manager.dart';
 
 class TasksPage extends StatefulWidget {
   @override
@@ -11,55 +13,19 @@ String _formatTime(int hours) {
 }
 class _TasksPageState extends State<TasksPage> {
   bool _showAddMenu = false;
-  List<Project> projects = []; // Start with empty projects list
-  List<Task> tasks = [
-    // Sample tasks to test functionality
-    Task(
-      id: '1',
-      title: 'Complete Flutter app',
-      estimatedTime: 3,
-      isCompleted: false,
-      isToday: true,
-      isPriority: true,
-      scheduledDate: DateTime.now(),
-    ),
-    Task(
-      id: '2',
-      title: 'Review code',
-      estimatedTime: 1,
-      isCompleted: false,
-      isToday: true,
-      isPriority: false,
-      scheduledDate: null,
-    ),
-    Task(
-      id: '3',
-      title: 'Meeting with team',
-      estimatedTime: 1,
-      isCompleted: false,
-      isToday: false,
-      isPriority: true,
-      scheduledDate: DateTime.now().add(Duration(days: 1)),
-    ),
-    Task(
-      id: '4',
-      title: 'Write documentation',
-      estimatedTime: 2,
-      isCompleted: true,
-      isToday: false,
-      isPriority: false,
-      scheduledDate: DateTime.now().add(Duration(days: 2)),
-    ),
-    Task(
-      id: '5',
-      title: 'Fix bug #123',
-      estimatedTime: 1,
-      isCompleted: false,
-      isToday: false,
-      isPriority: true,
-      scheduledDate: DateTime.now().add(Duration(days: 3)),
-    ),
-  ];
+  final UserStats _userStats = UserStats();
+  final TaskManager _taskManager = TaskManager();
+
+  // Get dynamic data from TaskManager
+  List<Task> get tasks => _taskManager.tasks;
+  List<Project> get projects => _taskManager.projects;
+
+  @override
+  void initState() {
+    super.initState();
+    // Initialize sample data
+    _taskManager.initializeSampleData();
+  }
 
   // Helper methods to calculate dynamic data
   List<Task> get todayTasks => tasks.where((task) => task.isToday && !task.isCompleted).toList();
@@ -93,6 +59,22 @@ class _TasksPageState extends State<TasksPage> {
       context,
       MaterialPageRoute(builder: (context) => AddProjectPage()),
     );
+  }
+
+  void completeTask(String taskId) {
+    setState(() {
+      final task = _taskManager.tasks.firstWhere((t) => t.id == taskId);
+      _taskManager.completeTask(taskId);
+      _userStats.onTaskCompleted(task.title);
+    });
+  }
+
+  void completedPomodoro({int durationMinutes = 25}) {
+    _userStats.completedPomodoro(durationMinutes: durationMinutes);
+  }
+
+  void addFocusTime(int minutes) {
+    _userStats.addFocusTime(minutes);
   }
 
   @override
@@ -157,7 +139,6 @@ class _TasksPageState extends State<TasksPage> {
                 
                 SizedBox(height: 24),
                 
-                // Main Categories Grid
                 // Main Categories Grid
                 GridView.count(
                   crossAxisCount: 2,
@@ -766,7 +747,7 @@ class Task {
   final String id;
   final String title;
   final int estimatedTime; // in hours
-  final bool isCompleted;
+  bool isCompleted;
   final bool isToday;
   final bool isPriority;
   final DateTime? scheduledDate;
@@ -782,6 +763,28 @@ class Task {
     this.scheduledDate,
     this.projectId,
   });
+
+  Task copyWith({
+    String? id,
+    String? title,
+    int? estimatedTime,
+    bool? isCompleted,
+    bool? isToday,
+    bool? isPriority,
+    DateTime? scheduledDate,
+    String? projectId,
+  }) {
+    return Task(
+      id: id ?? this.id,
+      title: title ?? this.title,
+      estimatedTime: estimatedTime ?? this.estimatedTime,
+      isCompleted: isCompleted ?? this.isCompleted,
+      isToday: isToday ?? this.isToday,
+      isPriority: isPriority ?? this.isPriority,
+      scheduledDate: scheduledDate ?? this.scheduledDate,
+      projectId: projectId ?? this.projectId,
+    );
+  }
 }
 
 class Project {

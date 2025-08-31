@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'services/firebase_service.dart';
 import 'profile.dart';
-// app theme 
+import 'pomodoro_preferences.dart';
+import 'login.dart';
+
 // theme mode
 enum AppThemeMode { light, dark, system }
 
@@ -71,6 +75,7 @@ class _SettingsScreenState extends State<SettingsScreen>
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
+  final FirebaseService _firebaseService = FirebaseService();
 
   // Settings states
   bool _notificationsEnabled = true;
@@ -264,6 +269,292 @@ class _SettingsScreenState extends State<SettingsScreen>
     );
   }
 
+  void _showDeleteAccountDialog() {
+    HapticFeedback.mediumImpact();
+    showDialog(
+      context: context,
+      builder: (context) => AnimatedContainer(
+        duration: const Duration(milliseconds: 300),
+        child: AlertDialog(
+          backgroundColor: _colors.surface,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: Text(
+            'Delete Account',
+            style: GoogleFonts.inter(
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+              color: _colors.error,
+            ),
+          ),
+          content: Text(
+            'Are you sure you want to permanently delete your account? This action cannot be undone.\n\nThis will delete:\n• All your tasks and projects\n• Your profile information\n• Your Pomodoro statistics\n• All achievements and progress',
+            style: GoogleFonts.inter(
+              fontSize: 14,
+              color: _colors.onSurfaceVariant,
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text(
+                'Cancel',
+                style: GoogleFonts.inter(
+                  color: _colors.primary,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context);
+                // Call the delete function after closing the dialog
+                _deleteFirebaseAccount();
+              },
+              child: Text(
+                'Delete',
+                style: GoogleFonts.inter(
+                  color: _colors.error,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+          ],
+        ), 
+      ), 
+    ); 
+  }
+
+  void _deleteFirebaseAccount() async {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const AlertDialog(
+        content: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            CircularProgressIndicator(),
+            SizedBox(width: 16),
+            Text('Deleting account...'),
+          ],
+        ),
+      ),
+    );
+    
+    try {
+      final currentUser = _firebaseService.currentUser;
+      if (currentUser?.email != null) {
+        // User is signed into Firebase Auth
+        await _firebaseService.deleteAccount();
+      } else {
+        // User is using Gmail-based authentication without Firebase Auth
+        if (mounted) {
+          Navigator.pop(context); // Close loading dialog
+        }
+        if (mounted) {
+          _showEmailInputDialog();
+        }
+        return;
+      }
+      
+      // Close loading dialog
+      if (mounted) {
+        Navigator.pop(context);
+      }
+      
+      if (mounted) {
+        _showSuccessSnackBar('Account deleted successfully');
+        
+        // Navigate to login page immediately
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (context) => const LoginPage()),
+          (route) => false,
+        );
+      }
+    } on FirebaseAuthException catch (e) {
+      // Close loading dialog
+      if (mounted) {
+        Navigator.pop(context);
+      }
+      
+      if (mounted) {
+        String errorMessage = 'Failed to delete account';
+        
+        switch (e.code) {
+          case 'requires-recent-login':
+            errorMessage = 'For security reasons, please sign out and sign back in, then try deleting your account again.';
+            break;
+          case 'network-request-failed':
+            errorMessage = 'Network error. Please check your connection and try again';
+            break;
+          default:
+            errorMessage = 'Error: ${e.message}';
+        }
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(errorMessage),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      // Close loading dialog
+      if (mounted) {
+        Navigator.pop(context);
+      }
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('An unexpected error occurred'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  void _showEmailInputDialog() {
+    final TextEditingController emailController = TextEditingController();
+    
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: _colors.surface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        title: Text(
+          'Confirm Account Deletion',
+          style: GoogleFonts.inter(
+            fontSize: 18,
+            fontWeight: FontWeight.w600,
+            color: _colors.error,
+          ),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'Please enter your email address to confirm account deletion:',
+              style: GoogleFonts.inter(
+                fontSize: 14,
+                color: _colors.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: emailController,
+              decoration: InputDecoration(
+                labelText: 'Email Address',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              keyboardType: TextInputType.emailAddress,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              emailController.dispose();
+              Navigator.pop(context);
+            },
+            child: Text(
+              'Cancel',
+              style: GoogleFonts.inter(
+                color: _colors.primary,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+          TextButton(
+            onPressed: () {
+              final email = emailController.text.trim();
+              if (email.isEmpty || !email.contains('@')) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Please enter a valid email address'),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+                return;
+              }
+              
+              Navigator.pop(context);
+              emailController.dispose();
+              
+              // Call the delete function after closing the dialog
+              _deleteGmailAccount(email);
+            },
+            child: Text(
+              'Delete Account',
+              style: GoogleFonts.inter(
+                color: _colors.error,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _deleteGmailAccount(String email) async {
+    // Show loading indicator
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const AlertDialog(
+        content: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            CircularProgressIndicator(),
+            SizedBox(width: 16),
+            Text('Deleting account...'),
+          ],
+        ),
+      ),
+    );
+    
+    try {
+      // Delete Gmail-based account
+      await _firebaseService.deleteGmailBasedAccount(email);
+      
+      // Close loading dialog
+      if (mounted) {
+        Navigator.pop(context);
+      }
+      
+      if (mounted) {
+        _showSuccessSnackBar('Account deleted successfully');
+        
+        // Navigate to login page immediately
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (context) => const LoginPage()),
+          (route) => false,
+        );
+      }
+    } catch (e) {
+      // Close loading dialog
+      if (mounted) {
+        Navigator.pop(context);
+      }
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to delete account: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
   Widget _buildAccountSection() {
     return Column(
       children: [
@@ -273,7 +564,7 @@ class _SettingsScreenState extends State<SettingsScreen>
           icon: Icons.person_outline,
           onTap: () => _navigateToProfile(),
           showArrow: true,
-        ),
+        ),        
         const SizedBox(height: 12),
         _buildSettingsItem(
           title: 'Account & Security',
@@ -281,6 +572,14 @@ class _SettingsScreenState extends State<SettingsScreen>
           icon: Icons.security_outlined,
           onTap: () => _handleSettingsTap('Account & Security'),
           showArrow: true,
+        ),
+        const SizedBox(height: 12),
+        _buildSettingsItem(
+          title: 'Delete Account',
+          subtitle: 'Permanently delete your account',
+          icon: Icons.delete_forever,
+          onTap: _showDeleteAccountDialog,
+          isDestructive: true,
         ),
       ],
     );
@@ -293,7 +592,7 @@ class _SettingsScreenState extends State<SettingsScreen>
           title: 'Pomodoro Preferences',
           subtitle: 'Customize your focus and break timers',
           icon: Icons.timer_outlined,
-          onTap: () => _handleSettingsTap('Pomodoro Preferences'),
+          onTap: () => _navigateToPomodoroPreferences(),
           showArrow: true,
         ),
         const SizedBox(height: 12),
@@ -438,8 +737,8 @@ class _SettingsScreenState extends State<SettingsScreen>
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
                     color: isDestructive
-                        ? _colors.error.withOpacity(0.1)
-                        : _colors.primary.withOpacity(0.1),
+                        ? _colors.error.withValues(alpha: 0.1)
+                        : _colors.primary.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Icon(
@@ -532,7 +831,7 @@ class _SettingsScreenState extends State<SettingsScreen>
               duration: const Duration(milliseconds: 200),
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: _colors.primary.withOpacity(0.1),
+                color: _colors.primary.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Icon(
@@ -572,8 +871,8 @@ class _SettingsScreenState extends State<SettingsScreen>
               child: Switch(
                 value: value,
                 onChanged: onChanged,
-                activeColor: _colors.primary,
-                activeTrackColor: _colors.primary.withOpacity(0.3),
+                activeThumbColor: _colors.primary,
+                activeTrackColor: _colors.primary.withValues(alpha: 0.3),
                 inactiveThumbColor: _isDarkMode ? const Color(0xFF666666) : const Color(0xFFBBBBBB),
                 inactiveTrackColor: _isDarkMode ? const Color(0xFF333333) : const Color(0xFFE0E0E0),
               ),
@@ -637,7 +936,7 @@ class _SettingsScreenState extends State<SettingsScreen>
               width: 40,
               height: 4,
               decoration: BoxDecoration(
-                color: _colors.onSurfaceVariant.withOpacity(0.3),
+                color: _colors.onSurfaceVariant.withValues(alpha: 0.3),
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -686,7 +985,7 @@ class _SettingsScreenState extends State<SettingsScreen>
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: isSelected 
-              ? _colors.primary.withOpacity(0.1)
+              ? _colors.primary.withValues(alpha: 0.1)
               : (_isDarkMode ? const Color(0xFF2A2A2A) : const Color(0xFFF5F5F5)),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
@@ -734,8 +1033,127 @@ class _SettingsScreenState extends State<SettingsScreen>
     );
   }
 
+  void _navigateToPomodoroPreferences() {
+    HapticFeedback.mediumImpact();
+    Navigator.push(
+      context,
+      PageRouteBuilder(
+        pageBuilder: (context, animation, secondaryAnimation) => const PomodoroPreferencesScreen(),
+        transitionDuration: const Duration(milliseconds: 300),
+        transitionsBuilder: (context, animation, secondaryAnimation, child) {
+          const begin = Offset(1.0, 0.0);
+          const end = Offset.zero;
+          const curve = Curves.easeInOut;
+          var tween = Tween(begin: begin, end: end).chain(CurveTween(curve: curve));
+          return SlideTransition(
+            position: animation.drive(tween),
+            child: child,
+          );
+        },
+      ),
+    );
+  }
+
   void _handleSettingsTap(String setting) {
-    _showSuccessSnackBar('$setting opened');
+    String title = setting;
+    String content = '';
+    Widget? customContent;
+    switch (setting) {
+      case 'Account & Security':
+        content = 'Manage your password, privacy, and security settings here. (Feature coming soon)';
+        break;
+      case 'Date & Time':
+        content = 'Set your time zone and date/time format preferences. (Feature coming soon)';
+        break;
+      case 'Help & Support':
+        customContent = Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('Frequently Asked Questions',
+              style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.bold, color: _colors.onSurface)),
+            const SizedBox(height: 16),
+            _buildFAQItem('How do I reset my password?',
+                'On the login screen, tap "Forgot Password" and follow the instructions.'),
+            _buildFAQItem('Is my data secure?',
+                'Absolutely. We use industry-standard encryption to protect your data and never share it with third parties.'),
+            _buildFAQItem('How do I delete my account?',
+                'Go to Settings > Account > Delete Account. Note that this action is irreversible.'),
+          ],
+        );
+        break;
+      case 'About':
+        content = '4bit Hackit\nVersion 1.0.0\n\nMade with ❤️.';
+        break;
+      default:
+        content = '$setting opened.';
+    }
+    showDialog(
+      context: context,
+      builder: (context) => AnimatedContainer(
+        duration: const Duration(milliseconds: 300),
+        child: AlertDialog(
+          backgroundColor: _colors.surface,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: Text(
+            title,
+            style: GoogleFonts.inter(
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+              color: _colors.onSurface,
+            ),
+          ),
+          content: customContent ?? Text(
+            content,
+            style: GoogleFonts.inter(
+              fontSize: 14,
+              color: _colors.onSurfaceVariant,
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text(
+                'Close',
+                style: GoogleFonts.inter(
+                  color: _colors.primary,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFAQItem(String question, String answer) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            question,
+            style: GoogleFonts.inter(
+              fontSize: 15,
+              fontWeight: FontWeight.w600,
+              color: _colors.onSurface,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            answer,
+            style: GoogleFonts.inter(
+              fontSize: 13,
+              color: _colors.onSurfaceVariant,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   void _showLogoutDialog() {
@@ -776,10 +1194,27 @@ class _SettingsScreenState extends State<SettingsScreen>
               ),
             ),
             TextButton(
-              onPressed: () {
-                Navigator.pop(context);
-                _showSuccessSnackBar('Logged out successfully');
-              },
+            onPressed: () async {
+              Navigator.pop(context);
+              try {
+                await _firebaseService.signOut();
+                if (mounted) {
+                  Navigator.of(context).pushAndRemoveUntil(
+                    MaterialPageRoute(builder: (context) => const LoginPage()),
+                    (route) => false,
+                  );
+                }
+              } catch (e) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Failed to sign out'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              }
+            },
               child: Text(
                 'Log Out',
                 style: GoogleFonts.inter(

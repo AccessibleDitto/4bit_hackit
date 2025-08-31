@@ -6,6 +6,7 @@ import 'dart:async';
 
 // Import the modular files
 import 'models/timer_models.dart';
+import 'services/user_stats_service.dart';
 import 'utils/timer_utils.dart';
 import 'widgets/app_bar_widgets.dart';
 import 'widgets/task_widgets.dart';
@@ -113,6 +114,8 @@ class _TimerModePageState extends State<TimerModePage> with TickerProviderStateM
   bool _isAmbientMusic = false;
   String _selectedAmbientMusic = 'None';
   String _selectedTask = 'Select Task';
+
+  final UserStats _userStats = UserStats();
 
   final List<Task> _tasks = TimerUtils.getDefaultTasks();
 
@@ -224,7 +227,10 @@ class _TimerModePageState extends State<TimerModePage> with TickerProviderStateM
   void _completeFocusSession() {
     _confettiController.play();
     _timer?.cancel();
-
+    
+    // Track the completed pomodoro
+    _userStats.completedPomodoro(durationMinutes: _focusSeconds ~/ 60);
+    
     if (_currentSession >= _totalSessions) {
       // All sessions completed
       debugPrint('All Pomodoro sessions completed!');
