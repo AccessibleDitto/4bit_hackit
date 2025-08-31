@@ -37,6 +37,8 @@ dependencies:
   cupertino_icons: ^1.0.8
   calendar_view: ^1.4.0
   just_audio: ^0.9.36
+  firebase_core: ^4.0.0
+  cloud_firestore: ^6.0.0
 
 dev_dependencies:
   flutter_test:
@@ -55,7 +57,11 @@ dev_dependencies:
 # The following section is specific to Flutter packages.
 flutter:
   assets:
-    - assets/white_noise.mp3
+  - assets/Amberlight.mp3
+  - assets/Celestia.mp3
+  - assets/Daydreams.mp3
+  - assets/Memories-of-Spring.mp3
+  - assets/Moonlight.mp3
 
   # The following line ensures that the Material Icons font is
   # included with your application, so that you can use the icons in

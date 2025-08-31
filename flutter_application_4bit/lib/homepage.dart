@@ -105,12 +105,13 @@ class _TimerModePageState extends State<TimerModePage> with TickerProviderStateM
   int _currentSeconds = 25 * 60;
   TimerState _timerState = TimerState.idle;
   int _currentSession = 0;
-  int _totalSessions = 1;
+  int _totalSessions = 4;
   bool _isBreakTime = false;
   bool _isStrictMode = false;
   bool _isTimerMode = true;
-  bool _isWhiteNoise = false;
-  String _selectedWhiteNoise = 'None';
+  bool _isCountdownMode = true;
+  bool _isAmbientMusic = false;
+  String _selectedAmbientMusic = 'None';
   String _selectedTask = 'Select Task';
 
   final List<Task> _tasks = TimerUtils.getDefaultTasks();
@@ -142,17 +143,24 @@ class _TimerModePageState extends State<TimerModePage> with TickerProviderStateM
       _timerState = TimerState.focusRunning;
       _isBreakTime = false;
       _currentSession = _currentSession == 0 ? 1 : _currentSession;
-      _currentSeconds = _focusSeconds;
+      _currentSeconds = _isCountdownMode ? _focusSeconds : 0;
     });
     _updateProgressAnimation();
 
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
       setState(() {
-        if (_currentSeconds > 0) {
-          _currentSeconds--;
-          _updateProgressAnimation();
+        if (_isCountdownMode) {
+          // Countdown mode: decrease from focusSeconds to 0
+          if (_currentSeconds > 0) {
+            _currentSeconds--;
+            _updateProgressAnimation();
+          } else {
+            _completeFocusSession();
+          }
         } else {
-          _completeFocusSession();
+          // Count-up mode: increase from 0 indefinitely
+          _currentSeconds++;
+          _updateProgressAnimation();
         }
       });
     });
@@ -195,11 +203,18 @@ class _TimerModePageState extends State<TimerModePage> with TickerProviderStateM
 
       _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
         setState(() {
-          if (_currentSeconds > 0) {
-            _currentSeconds--;
-            _updateProgressAnimation();
+          if (_isCountdownMode) {
+            // Countdown mode: decrease from current to 0
+            if (_currentSeconds > 0) {
+              _currentSeconds--;
+              _updateProgressAnimation();
+            } else {
+              _completeFocusSession();
+            }
           } else {
-            _completeFocusSession();
+            // Count-up mode: increase from current indefinitely
+            _currentSeconds++;
+            _updateProgressAnimation();
           }
         });
       });
@@ -259,7 +274,7 @@ class _TimerModePageState extends State<TimerModePage> with TickerProviderStateM
     setState(() {
       _timerState = TimerState.idle;
       _currentSession = 0;
-      _currentSeconds = _focusSeconds;
+      _currentSeconds = _isCountdownMode ? _focusSeconds : 0;
       _isBreakTime = false;
       _selectedTask = 'Select Task';
     });
@@ -272,7 +287,12 @@ class _TimerModePageState extends State<TimerModePage> with TickerProviderStateM
     if (_isBreakTime) {
       return (_breakSeconds - _currentSeconds) / _breakSeconds;
     } else {
-      return (_focusSeconds - _currentSeconds) / _focusSeconds;
+      if (_isCountdownMode) {
+        return (_focusSeconds - _currentSeconds) / _focusSeconds;
+      } else {
+        // For count-up mode, show a circular progress that doesn't complete
+        return (_currentSeconds % 60) / 60.0; // Creates a spinning effect
+      }
     }
   }
 
@@ -421,8 +441,10 @@ class _TimerModePageState extends State<TimerModePage> with TickerProviderStateM
                     ModeSelectionBar(
                       isStrictMode: _isStrictMode,
                       isTimerMode: _isTimerMode,
-                      isWhiteNoise: _isWhiteNoise,
-                      selectedWhiteNoise: _selectedWhiteNoise,
+                      isCountdownMode: _isCountdownMode,
+                      focusSeconds: _focusSeconds,
+                      isAmbientMusic: _isAmbientMusic,
+                      selectedAmbientMusic: _selectedAmbientMusic,
                       onStrictModePressed: () => _showModeModal(
                         'Strict Mode Settings',
                         'Strict Mode prevents you from navigating away or exiting this page until you disable it. Enable this to avoid distractions during focus sessions.',
@@ -443,11 +465,23 @@ class _TimerModePageState extends State<TimerModePage> with TickerProviderStateM
                           );
                         },
                       ),
-                      onWhiteNoiseChanged: (enabled) {
-                        setState(() => _isWhiteNoise = enabled);
+                      onCountdownModeChanged: (isCountdown) {
+                        setState(() {
+                          _isCountdownMode = isCountdown;
+                          // Reset timer when mode changes
+                          if (_timerState == TimerState.focusRunning || _timerState == TimerState.focusPaused) {
+                            _timer?.cancel();
+                            _currentSeconds = isCountdown ? _focusSeconds : 0;
+                            _timerState = TimerState.idle;
+                            _progressAnimationController.reset();
+                          }
+                        });
                       },
-                      onWhiteNoiseOptionChanged: (sound) {
-                        setState(() => _selectedWhiteNoise = sound);
+                      onAmbientMusicChanged: (enabled) {
+                        setState(() => _isAmbientMusic = enabled);
+                      },
+                      onAmbientMusicOptionChanged: (sound) {
+                        setState(() => _selectedAmbientMusic = sound);
                       },
                     ),
                   ],

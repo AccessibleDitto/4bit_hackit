@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "41737672431",
+    "project_id": "hackit-4bit",
+    "storage_bucket": "hackit-4bit.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:41737672431:android:60f67d57f54598833c6d1a",
+        "android_client_info": {
+          "package_name": "com.example.flutter_application_4bit"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDSeD0VEIwjxZ9vlbceQ7UGk22t93rUBig"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

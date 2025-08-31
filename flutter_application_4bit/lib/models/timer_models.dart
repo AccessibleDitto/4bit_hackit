@@ -20,7 +20,7 @@ class TimerConfiguration {
   final int totalSessions;
   final bool isStrictMode;
   final bool isTimerMode;
-  final bool isWhiteNoise;
+  final bool isAmbientMusic;
 
   const TimerConfiguration({
     this.focusMinutes = 25,
@@ -28,7 +28,7 @@ class TimerConfiguration {
     this.totalSessions = 4,
     this.isStrictMode = false,
     this.isTimerMode = true,
-    this.isWhiteNoise = false,
+    this.isAmbientMusic = false,
   });
 
   TimerConfiguration copyWith({
@@ -37,7 +37,7 @@ class TimerConfiguration {
     int? totalSessions,
     bool? isStrictMode,
     bool? isTimerMode,
-    bool? isWhiteNoise,
+    bool? isAmbientMusic,
   }) {
     return TimerConfiguration(
       focusMinutes: focusMinutes ?? this.focusMinutes,
@@ -45,7 +45,7 @@ class TimerConfiguration {
       totalSessions: totalSessions ?? this.totalSessions,
       isStrictMode: isStrictMode ?? this.isStrictMode,
       isTimerMode: isTimerMode ?? this.isTimerMode,
-      isWhiteNoise: isWhiteNoise ?? this.isWhiteNoise,
+      isAmbientMusic: isAmbientMusic ?? this.isAmbientMusic,
     );
   }
 }
