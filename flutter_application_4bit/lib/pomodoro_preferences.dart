@@ -1,6 +1,65 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+// Singleton for accessing Pomodoro settings globally
+class PomodoroSettings extends ChangeNotifier {
+  // Break logic toggles
+  bool _disableBreak = false;
+  bool _autoStartBreak = false;
+  bool _autoStartNextPomodoro = false;
+
+  bool get disableBreak => _disableBreak;
+  bool get autoStartBreak => _autoStartBreak;
+  bool get autoStartNextPomodoro => _autoStartNextPomodoro;
+
+  void setDisableBreak(bool value) {
+    _disableBreak = value;
+    notifyListeners();
+  }
+  void setAutoStartBreak(bool value) {
+    _autoStartBreak = value;
+    notifyListeners();
+  }
+  void setAutoStartNextPomodoro(bool value) {
+    _autoStartNextPomodoro = value;
+    notifyListeners();
+  }
+  static final PomodoroSettings instance = PomodoroSettings._internal();
+  PomodoroSettings._internal();
+
+  int _pomodoroLength = 25;
+  int _shortBreakLength = 5;
+  int _longBreakLength = 15;
+  int _longBreakAfter = 4;
+
+  int get pomodoroLength => _pomodoroLength;
+  int get shortBreakLength => _shortBreakLength;
+  int get longBreakLength => _longBreakLength;
+  int get longBreakAfter => _longBreakAfter;
+
+  void setPomodoroLength(int value) {
+    _pomodoroLength = value;
+    notifyListeners();
+  }
+
+  void setShortBreakLength(int value) {
+    _shortBreakLength = value;
+    notifyListeners();
+  }
+
+  void setLongBreakLength(int value) {
+    _longBreakLength = value;
+    notifyListeners();
+  }
+
+  void setLongBreakAfter(int value) {
+    _longBreakAfter = value;
+    notifyListeners();
+  }
+}
 
 class PomodoroPreferencesScreen extends StatefulWidget {
   const PomodoroPreferencesScreen({super.key});
@@ -16,7 +75,11 @@ class _PomodoroPreferencesScreenState extends State<PomodoroPreferencesScreen> w
 
   // pomodoro settings
   bool _strictMode = false;
-  String _timerMode = 'Classic';
+  late String _timerMode;
+  List<String> get _timerModeOptions => [
+    '${_pomodoroLength.toString().padLeft(2, '0')}:00 → 00:00',
+    '00:00 → ∞',
+  ];
   bool _whiteNoise = false;
   int _pomodoroLength = 25; // minutes
   int _shortBreakLength = 5; // minutes
@@ -59,12 +122,43 @@ class _PomodoroPreferencesScreenState extends State<PomodoroPreferencesScreen> w
     Future.delayed(const Duration(milliseconds: 100), () {
       if (mounted) _animationController.forward();
     });
+  _loadPomodoroSettings();
   }
 
   @override
   void dispose() {
     _animationController.dispose();
     super.dispose();
+  }
+
+  Future<void> _savePomodoroLength(int value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt('pomodoroLength', value);
+  }
+
+  Future<void> _saveTimerMode(String value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('timerMode', value);
+  }
+
+  Future<void> _loadPomodoroSettings() async {
+    final prefs = await SharedPreferences.getInstance();
+    int loadedLength = prefs.getInt('pomodoroLength') ?? 25;
+    String loadedTimerMode = prefs.getString('timerMode') ?? '${loadedLength.toString().padLeft(2, '0')}:00 → 00:00';
+    bool loadedDisableBreak = prefs.getBool('disableBreak') ?? false;
+    bool loadedAutoStartBreak = prefs.getBool('autoStartBreak') ?? false;
+    bool loadedAutoStartNextPomodoro = prefs.getBool('autoStartNextPomodoro') ?? false;
+    setState(() {
+      _pomodoroLength = loadedLength;
+      // Always sync timer mode value to the new options
+      _timerMode = loadedTimerMode;
+      _disableBreak = loadedDisableBreak;
+      _autoStartBreak = loadedAutoStartBreak;
+      _autoStartNextPomodoro = loadedAutoStartNextPomodoro;
+    });
+    PomodoroSettings.instance.setDisableBreak(loadedDisableBreak);
+    PomodoroSettings.instance.setAutoStartBreak(loadedAutoStartBreak);
+    PomodoroSettings.instance.setAutoStartNextPomodoro(loadedAutoStartNextPomodoro);
   }
 
   @override
@@ -209,8 +303,11 @@ class _PomodoroPreferencesScreenState extends State<PomodoroPreferencesScreen> w
           subtitle: 'Choose your preferred timer style',
           icon: Icons.timer_outlined,
           value: _timerMode,
-          options: ['Classic', 'Modern', 'Minimal'],
-          onChanged: (value) => setState(() => _timerMode = value!),
+          options: _timerModeOptions,
+          onChanged: (value) async {
+            setState(() => _timerMode = value!);
+            await _saveTimerMode(value!);
+          },
         ),
         const SizedBox(height: 12),
         _buildSliderItem(
@@ -221,7 +318,16 @@ class _PomodoroPreferencesScreenState extends State<PomodoroPreferencesScreen> w
           min: 5,
           max: 60,
           divisions: 11,
-          onChanged: (value) => setState(() => _pomodoroLength = value.round()),
+          onChanged: (value) async {
+            int newValue = value.round();
+            setState(() {
+              _pomodoroLength = newValue;
+              // Always sync timer mode value to the new options
+              _timerMode = '${_pomodoroLength.toString().padLeft(2, '0')}:00 → 00:00';
+            });
+            PomodoroSettings.instance.setPomodoroLength(newValue);
+            await _savePomodoroLength(newValue);
+          },
         ),
       ],
     );
@@ -238,7 +344,11 @@ class _PomodoroPreferencesScreenState extends State<PomodoroPreferencesScreen> w
           min: 1,
           max: 15,
           divisions: 14,
-          onChanged: (value) => setState(() => _shortBreakLength = value.round()),
+          onChanged: (value) {
+            int newValue = value.round();
+            setState(() => _shortBreakLength = newValue);
+            PomodoroSettings.instance.setShortBreakLength(newValue);
+          },
         ),
         const SizedBox(height: 12),
         _buildSliderItem(
@@ -249,7 +359,11 @@ class _PomodoroPreferencesScreenState extends State<PomodoroPreferencesScreen> w
           min: 10,
           max: 45,
           divisions: 7,
-          onChanged: (value) => setState(() => _longBreakLength = value.round()),
+          onChanged: (value) {
+            int newValue = value.round();
+            setState(() => _longBreakLength = newValue);
+            PomodoroSettings.instance.setLongBreakLength(newValue);
+          },
         ),
         const SizedBox(height: 12),
         _buildSliderItem(
@@ -260,7 +374,11 @@ class _PomodoroPreferencesScreenState extends State<PomodoroPreferencesScreen> w
           min: 2,
           max: 8,
           divisions: 6,
-          onChanged: (value) => setState(() => _longBreakAfter = value.round()),
+          onChanged: (value) {
+            int newValue = value.round();
+            setState(() => _longBreakAfter = newValue);
+            PomodoroSettings.instance.setLongBreakAfter(newValue);
+          },
         ),
         const SizedBox(height: 12),
         _buildToggleItem(
@@ -268,7 +386,12 @@ class _PomodoroPreferencesScreenState extends State<PomodoroPreferencesScreen> w
           subtitle: 'Skip all break periods',
           icon: Icons.skip_next,
           value: _disableBreak,
-          onChanged: (value) => setState(() => _disableBreak = value),
+          onChanged: (value) async {
+            setState(() => _disableBreak = value);
+            PomodoroSettings.instance.setDisableBreak(value);
+            final prefs = await SharedPreferences.getInstance();
+            await prefs.setBool('disableBreak', value);
+          },
         ),
         const SizedBox(height: 12),
         _buildToggleItem(
@@ -276,7 +399,12 @@ class _PomodoroPreferencesScreenState extends State<PomodoroPreferencesScreen> w
           subtitle: 'Automatically start break when pomodoro ends',
           icon: Icons.play_arrow,
           value: _autoStartBreak,
-          onChanged: (value) => setState(() => _autoStartBreak = value),
+          onChanged: (value) async {
+            setState(() => _autoStartBreak = value);
+            PomodoroSettings.instance.setAutoStartBreak(value);
+            final prefs = await SharedPreferences.getInstance();
+            await prefs.setBool('autoStartBreak', value);
+          },
         ),
         const SizedBox(height: 12),
         _buildToggleItem(
@@ -284,7 +412,12 @@ class _PomodoroPreferencesScreenState extends State<PomodoroPreferencesScreen> w
           subtitle: 'Automatically start next pomodoro after break',
           icon: Icons.fast_forward,
           value: _autoStartNextPomodoro,
-          onChanged: (value) => setState(() => _autoStartNextPomodoro = value),
+          onChanged: (value) async {
+            setState(() => _autoStartNextPomodoro = value);
+            PomodoroSettings.instance.setAutoStartNextPomodoro(value);
+            final prefs = await SharedPreferences.getInstance();
+            await prefs.setBool('autoStartNextPomodoro', value);
+          },
         ),
       ],
     );

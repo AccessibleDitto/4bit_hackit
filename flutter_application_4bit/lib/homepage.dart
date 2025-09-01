@@ -2,6 +2,8 @@ import 'package:just_audio/just_audio.dart';
 import 'package:confetti/confetti.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:async';
 
 // Import the modular files
@@ -15,6 +17,7 @@ import 'widgets/timer_control_widgets.dart';
 import 'widgets/mode_settings_widgets.dart';
 import 'widgets/navigation_widgets.dart';
 import 'widgets/congratulations_widgets.dart';
+import 'pomodoro_preferences.dart';
 
 class TimerModePage extends StatefulWidget {
   const TimerModePage({super.key});
@@ -26,94 +29,31 @@ class TimerModePage extends StatefulWidget {
 class _TimerModePageState extends State<TimerModePage> with TickerProviderStateMixin {
   late AudioPlayer _audioPlayer;
   OverlayEntry? _topNotificationEntry;
-
-  void _showTopNotification(String message, {Color backgroundColor = Colors.black87}) {
-    _topNotificationEntry?.remove();
-    _topNotificationEntry = OverlayEntry(
-      builder: (context) => Positioned(
-        top: MediaQuery.of(context).padding.top + 56,
-        left: 0,
-        right: 0,
-        child: Material(
-          color: Colors.transparent,
-          child: Container(
-            margin: const EdgeInsets.symmetric(horizontal: 24),
-            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 20),
-            decoration: BoxDecoration(
-              color: backgroundColor,
-              borderRadius: BorderRadius.circular(12),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black26,
-                  blurRadius: 8,
-                  offset: Offset(0, 2),
-                ),
-              ],
-            ),
-            child: Center(
-              child: Text(
-                message,
-                style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  Overlay.of(context, rootOverlay: true).insert(_topNotificationEntry!);
-    Future.delayed(const Duration(seconds: 5), () {
-      _topNotificationEntry?.remove();
-      _topNotificationEntry = null;
-    });
-  }
-  int _selectedIndex = 0;
-  
-  late ConfettiController _confettiController;
-  late AnimationController _progressAnimationController;
-  late Animation<double> _progressAnimation;
-  
-  @override
-  void initState() {
-    super.initState();
-    _confettiController = ConfettiController(duration: const Duration(seconds: 2));
-    _progressAnimationController = AnimationController(
-      duration: const Duration(milliseconds: 800),
-      vsync: this,
-    );
-    _progressAnimation = Tween<double>(
-      begin: 0.0,
-      end: 0.0,
-    ).animate(CurvedAnimation(
-      parent: _progressAnimationController,
-      curve: Curves.linear,
-    ));
-
-  _audioPlayer = AudioPlayer();
-  }
-
-  @override
-  void dispose() {
-    _timer?.cancel();
-    _confettiController.dispose();
-    _progressAnimationController.dispose();
-  _audioPlayer.dispose();
-    super.dispose();
-  }
+  late VoidCallback _settingsListener;
 
   Timer? _timer;
-  int _focusSeconds = 25 * 60; // 25 minutes
-  int _breakSeconds = 5 * 60; // 5 minutes
-  int _currentSeconds = 25 * 60;
+  int get _focusSeconds => PomodoroSettings.instance.pomodoroLength * 60;
+  int get _breakSeconds => PomodoroSettings.instance.shortBreakLength * 60;
+  // for testing, set focusSecond and breakSecond to 5sec
+  // int _focusSeconds = 5;
+  // int _breakSeconds = 5;
+  int _currentSeconds = PomodoroSettings.instance.pomodoroLength * 60;
   TimerState _timerState = TimerState.idle;
   int _currentSession = 0;
-  int _totalSessions = 4;
+  int _totalSessions = 2;
   bool _isBreakTime = false;
   bool _isStrictMode = false;
   bool _isTimerMode = true;
   bool _isCountdownMode = true;
+  String _timerModeValue = '${PomodoroSettings.instance.pomodoroLength.toString().padLeft(2, '0')}:00 → 00:00';
   bool _isAmbientMusic = false;
   String _selectedAmbientMusic = 'None';
   String _selectedTask = 'Select Task';
+
+  late ConfettiController _confettiController;
+  late AnimationController _progressAnimationController;
+  late Animation<double> _progressAnimation;
+  int _selectedIndex = 0;
 
   final UserStats _userStats = UserStats();
 
@@ -170,6 +110,11 @@ class _TimerModePageState extends State<TimerModePage> with TickerProviderStateM
   }
 
   void _startBreakTimer() {
+    // If Disable Break is enabled, skip break entirely
+    if (PomodoroSettings.instance.disableBreak == true) {
+      _skipBreak();
+      return;
+    }
     setState(() {
       _timerState = TimerState.breakRunning;
       _isBreakTime = true;
@@ -227,10 +172,9 @@ class _TimerModePageState extends State<TimerModePage> with TickerProviderStateM
   void _completeFocusSession() {
     _confettiController.play();
     _timer?.cancel();
-    
     // Track the completed pomodoro
     _userStats.completedPomodoro(durationMinutes: _focusSeconds ~/ 60);
-    
+
     if (_currentSession >= _totalSessions) {
       // All sessions completed
       debugPrint('All Pomodoro sessions completed!');
@@ -238,24 +182,38 @@ class _TimerModePageState extends State<TimerModePage> with TickerProviderStateM
         _timerState = TimerState.completed;
       });
     } else {
-      // Start break
-      setState(() {
-        _timerState = TimerState.breakIdle;
-        _isBreakTime = true;
-        _currentSeconds = _breakSeconds;
-      });
+      // Handle break logic based on settings
+      if (PomodoroSettings.instance.disableBreak == true) {
+        // If break is disabled, skip break and go to next pomodoro or idle
+        _skipBreak();
+      } else if (PomodoroSettings.instance.autoStartBreak == true) {
+        // Auto start break
+        _startBreakTimer();
+      } else {
+        // Wait for user to start break
+        setState(() {
+          _timerState = TimerState.breakIdle;
+          _isBreakTime = true;
+          _currentSeconds = _breakSeconds;
+        });
+      }
     }
   }
 
   void _completeBreakSession() {
     _timer?.cancel();
     _currentSession++;
-    
-    setState(() {
-      _timerState = TimerState.idle;
-      _isBreakTime = false;
-      _currentSeconds = _focusSeconds;
-    });
+
+    if (PomodoroSettings.instance.autoStartNextPomodoro == true && _currentSession <= _totalSessions) {
+      // Auto start next pomodoro
+      _startFocusTimer();
+    } else {
+      setState(() {
+        _timerState = TimerState.idle;
+        _isBreakTime = false;
+        _currentSeconds = _focusSeconds;
+      });
+    }
   }
 
   void _skipBreak() {
@@ -296,8 +254,8 @@ class _TimerModePageState extends State<TimerModePage> with TickerProviderStateM
       if (_isCountdownMode) {
         return (_focusSeconds - _currentSeconds) / _focusSeconds;
       } else {
-        // For count-up mode, show a circular progress that doesn't complete
-        return (_currentSeconds % 60) / 60.0; // Creates a spinning effect
+        // For count-up mode, show a circular progress that does not complete
+        return (_currentSeconds % 60) / 60.0;
       }
     }
   }
@@ -342,6 +300,111 @@ class _TimerModePageState extends State<TimerModePage> with TickerProviderStateM
         ),
       ),
     );
+  }
+
+  Future<void> _loadTimerModeFromPrefs() async {
+    final prefs = await SharedPreferences.getInstance();
+    int pomodoroLength = prefs.getInt('pomodoroLength') ?? PomodoroSettings.instance.pomodoroLength;
+    String defaultMode = '${pomodoroLength.toString().padLeft(2, '0')}:00 → 00:00';
+    String savedMode = prefs.getString('timerMode') ?? defaultMode;
+    setState(() {
+      _timerModeValue = savedMode;
+      _isCountdownMode = (savedMode == defaultMode);
+    });
+  }
+
+  void _onTimerModeChanged(bool isCountdown) {
+    setState(() {
+      _isCountdownMode = isCountdown;
+      _timerModeValue = isCountdown
+          ? '${PomodoroSettings.instance.pomodoroLength.toString().padLeft(2, '0')}:00 → 00:00'
+          : '00:00 → ∞';
+      SharedPreferences.getInstance().then((prefs) {
+        prefs.setString('timerMode', _timerModeValue);
+      });
+      // Reset timer when mode changes
+      if (_timerState == TimerState.focusRunning || _timerState == TimerState.focusPaused) {
+        _timer?.cancel();
+        _currentSeconds = isCountdown ? _focusSeconds : 0;
+        _timerState = TimerState.idle;
+        _progressAnimationController.reset();
+      }
+    });
+  }
+
+  void _showTopNotification(String message, {Color backgroundColor = Colors.black87}) {
+    _topNotificationEntry?.remove();
+    _topNotificationEntry = OverlayEntry(
+      builder: (context) => Positioned(
+        top: MediaQuery.of(context).padding.top + 56,
+        left: 0,
+        right: 0,
+        child: Material(
+          color: Colors.transparent,
+          child: Container(
+            margin: const EdgeInsets.symmetric(horizontal: 24),
+            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 20),
+            decoration: BoxDecoration(
+              color: backgroundColor,
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black26,
+                  blurRadius: 8,
+                  offset: Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Center(
+              child: Text(
+                message,
+                style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    Overlay.of(context, rootOverlay: true).insert(_topNotificationEntry!);
+    Future.delayed(const Duration(seconds: 5), () {
+      _topNotificationEntry?.remove();
+      _topNotificationEntry = null;
+    });
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _confettiController = ConfettiController(duration: const Duration(seconds: 2));
+    _progressAnimationController = AnimationController(
+      duration: const Duration(milliseconds: 800),
+      vsync: this,
+    );
+    _progressAnimation = Tween<double>(
+      begin: 0.0,
+      end: 0.0,
+    ).animate(CurvedAnimation(
+      parent: _progressAnimationController,
+      curve: Curves.linear,
+    ));
+
+  _audioPlayer = AudioPlayer();
+
+    _settingsListener = () {
+      setState(() {});
+    };
+    PomodoroSettings.instance.addListener(_settingsListener);
+    _loadTimerModeFromPrefs();
+  }
+
+  @override
+  void dispose() {
+    PomodoroSettings.instance.removeListener(_settingsListener);
+    _timer?.cancel();
+    _confettiController.dispose();
+    _progressAnimationController.dispose();
+  _audioPlayer.dispose();
+    super.dispose();
   }
 
   @override
@@ -413,8 +476,8 @@ class _TimerModePageState extends State<TimerModePage> with TickerProviderStateM
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          // Session indicator
-                          if (_timerState != TimerState.idle)
+                          // Always show session indicator when a task is selected
+                          if (_selectedTask != 'Select Task')
                             SessionIndicator(
                               currentSession: _currentSession,
                               totalSessions: _totalSessions,
@@ -459,30 +522,23 @@ class _TimerModePageState extends State<TimerModePage> with TickerProviderStateM
                           setState(() => _isStrictMode = value);
                         },
                       ),
-                      onTimerModePressed: () => _showModeModal(
-                        'Timer Mode Settings',
-                        'Here you can configure timer mode options.',
-                        _isTimerMode,
-                        (value) {
-                          setState(() => _isTimerMode = value);
-                          _showTopNotification(
-                            value ? 'Timer Mode Enabled' : 'Timer Mode Disabled',
-                            backgroundColor: value ? Colors.blueAccent : Colors.green,
-                          );
-                        },
-                      ),
-                      onCountdownModeChanged: (isCountdown) {
-                        setState(() {
-                          _isCountdownMode = isCountdown;
-                          // Reset timer when mode changes
-                          if (_timerState == TimerState.focusRunning || _timerState == TimerState.focusPaused) {
-                            _timer?.cancel();
-                            _currentSeconds = isCountdown ? _focusSeconds : 0;
-                            _timerState = TimerState.idle;
-                            _progressAnimationController.reset();
-                          }
-                        });
+                      onTimerModePressed: () {
+                        showModalBottomSheet(
+                          context: context,
+                          shape: const RoundedRectangleBorder(
+                            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+                          ),
+                          builder: (context) => TimerModeModal(
+                            isCountdownMode: _isCountdownMode,
+                            focusSeconds: _focusSeconds,
+                            onModeChanged: (bool isCountdown) {
+                              _onTimerModeChanged(isCountdown);
+                              Navigator.pop(context);
+                            },
+                          ),
+                        );
                       },
+                      onCountdownModeChanged: _onTimerModeChanged,
                       onAmbientMusicChanged: (enabled) {
                         setState(() => _isAmbientMusic = enabled);
                       },

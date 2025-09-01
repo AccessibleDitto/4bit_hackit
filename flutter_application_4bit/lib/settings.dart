@@ -6,6 +6,8 @@ import 'services/firebase_service.dart';
 import 'profile.dart';
 import 'pomodoro_preferences.dart';
 import 'login.dart';
+import 'homepage.dart';
+import 'widgets/navigation_widgets.dart';
 
 // theme mode
 enum AppThemeMode { light, dark, system }
@@ -159,7 +161,8 @@ class _SettingsScreenState extends State<SettingsScreen>
                             _buildSectionTitle('Preferences'),
                             _buildPreferencesSection(),
                             const SizedBox(height: 30),
-                            _buildSectionTitle('System'),
+                            _buildSectionTitle('System',
+                            ),
                             _buildSystemSection(),
                             const SizedBox(height: 30),
                             _buildSectionTitle('Support'),
@@ -178,6 +181,10 @@ class _SettingsScreenState extends State<SettingsScreen>
             ],
           ),
         ),
+        bottomNavigationBar: const BottomNavigation(
+          selectedIndex: 4,
+          isStrictMode: false,
+        ),
       ),
     );
   }
@@ -195,22 +202,18 @@ class _SettingsScreenState extends State<SettingsScreen>
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 300),
                 child: IconButton(
-                  onPressed: () {
-                    HapticFeedback.lightImpact();
-                    Navigator.pop(context);
-                  },
+                  onPressed: null, // No action for settings icon
                   icon: Icon(
-                    Icons.arrow_back_ios,
+                    Icons.settings,
                     color: _colors.onSurface,
-                    size: 20,
+                    size: 24,
                   ),
                   style: IconButton.styleFrom(
                     backgroundColor: _colors.surface,
                     padding: const EdgeInsets.all(12),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(10),
                     ),
-                    side: BorderSide(color: _colors.border),
                   ),
                 ),
               ),
@@ -227,27 +230,6 @@ class _SettingsScreenState extends State<SettingsScreen>
             child: const Text('Settings'),
           ),
           const Spacer(),
-          AnimatedContainer(
-            duration: const Duration(milliseconds: 300),
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: _colors.surface,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: _colors.border),
-              boxShadow: _isDarkMode ? null : [
-                BoxShadow(
-                  color: _colors.shadow,
-                  blurRadius: 4,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
-            child: Icon(
-              Icons.settings,
-              color: _colors.primary,
-              size: 20,
-            ),
-          ),
         ],
       ),
     );
