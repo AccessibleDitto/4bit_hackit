@@ -41,7 +41,7 @@ class TimerAppBar extends StatelessWidget {
               HapticFeedback.lightImpact();
             },
             child: const Icon(
-              Icons.arrow_back_ios,
+              Icons.timer,
               color: Colors.white,
               size: 24,
             ),
@@ -107,7 +107,7 @@ class TimerAppBar extends StatelessWidget {
               HapticFeedback.lightImpact();
             },
             child: const Icon(
-              Icons.settings_outlined,
+              Icons.notifications_outlined,
               color: Colors.white,
               size: 24,
             ),

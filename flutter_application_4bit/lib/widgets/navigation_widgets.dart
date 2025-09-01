@@ -4,6 +4,7 @@ import '../homepage.dart';
 import '../calendar_page.dart';
 import '../tasks.dart';
 import '../settings.dart';
+import '../report.dart';
 
 class BottomNavigation extends StatelessWidget {
   final int selectedIndex;
@@ -72,7 +73,16 @@ class BottomNavigation extends StatelessWidget {
               icon: Icons.trending_up,
               label: 'Report',
               isSelected: selectedIndex == 3,
-              onTap: null, // Not implemented
+              onTap: isStrictMode
+                  ? null
+                  : () {
+                      if (selectedIndex != 3) {
+                        Navigator.pushReplacement(
+                          context,
+                          MaterialPageRoute(builder: (context) => ReportScreen()),
+                        );
+                      }
+                    },
             ),
             NavigationItem(
               icon: Icons.settings,
