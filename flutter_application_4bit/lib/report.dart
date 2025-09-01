@@ -2,24 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'widgets/navigation_widgets.dart';
 
-void main() {
-  runApp(ProductivityApp());
-}
-
-class ProductivityApp extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Productivity Report',
-      theme: ThemeData.dark().copyWith(
-        scaffoldBackgroundColor: Color(0xFF1A1A1A),
-        primaryColor: Color(0xFFFF4757),
-      ),
-      home: ReportScreen(),
-    );
-  }
-}
-
 class ReportScreen extends StatefulWidget {
   @override
   _ReportScreenState createState() => _ReportScreenState();
@@ -48,7 +30,7 @@ class _ReportScreenState extends State<ReportScreen> {
           children: [
             // Tab Selector
             Container(
-            margin: EdgeInsets.symmetric(horizontal: 16, vertical: 4), // Reduced from 8 to 4
+            margin: EdgeInsets.symmetric(horizontal: 16, vertical: 4),
             decoration: BoxDecoration(
               color: Color(0xFF2D2D2D),
               borderRadius: BorderRadius.circular(8),
@@ -59,7 +41,7 @@ class _ReportScreenState extends State<ReportScreen> {
                   child: GestureDetector(
                     onTap: () => setState(() => isPomodoroTab = true),
                     child: Container(
-                      padding: EdgeInsets.symmetric(vertical: 8), // Reduced from 12 to 8
+                      padding: EdgeInsets.symmetric(vertical: 8),
                       decoration: BoxDecoration(
                         color: isPomodoroTab ? Color(0xFFFF4757) : Colors.transparent,
                         borderRadius: BorderRadius.circular(8),
@@ -79,7 +61,7 @@ class _ReportScreenState extends State<ReportScreen> {
                   child: GestureDetector(
                     onTap: () => setState(() => isPomodoroTab = false),
                     child: Container(
-                      padding: EdgeInsets.symmetric(vertical: 8), // Reduced from 12 to 8
+                      padding: EdgeInsets.symmetric(vertical: 8),
                       decoration: BoxDecoration(
                         color: !isPomodoroTab ? Color(0xFFFF4757) : Colors.transparent,
                         borderRadius: BorderRadius.circular(8),
@@ -226,7 +208,7 @@ class _ReportScreenState extends State<ReportScreen> {
 
   Widget _buildStatCard(String value, String label) {
     return Container(
-      padding: EdgeInsets.all(MediaQuery.of(context).size.width * 0.04), // 4% of screen width
+      padding: EdgeInsets.all(MediaQuery.of(context).size.width * 0.04),
       decoration: BoxDecoration(
         color: Color(0xFF2D2D2D),
         borderRadius: BorderRadius.circular(12),
@@ -269,8 +251,8 @@ class _ReportScreenState extends State<ReportScreen> {
         ),
         Container(
           padding: EdgeInsets.symmetric(
-            horizontal: MediaQuery.of(context).size.width * 0.03, // 3% of screen width
-            vertical: MediaQuery.of(context).size.height * 0.005, // 0.5% of screen height
+            horizontal: MediaQuery.of(context).size.width * 0.03,
+            vertical: MediaQuery.of(context).size.height * 0.005,
           ),
           decoration: BoxDecoration(
             color: Color(0xFF2D2D2D),
@@ -425,8 +407,8 @@ class _ReportScreenState extends State<ReportScreen> {
     bool isToday = dayNumber == 1;
     
     return Container(
-      width: MediaQuery.of(context).size.width * 0.08, // 8% of screen width
-      height: MediaQuery.of(context).size.width * 0.08, // 8% of screen width (square)
+      width: MediaQuery.of(context).size.width * 0.08,
+      height: MediaQuery.of(context).size.width * 0.08,
       decoration: BoxDecoration(
         color: hasActivity ? Color(0xFFFF4757) : Colors.transparent,
         borderRadius: BorderRadius.circular(16),
@@ -448,7 +430,7 @@ class _ReportScreenState extends State<ReportScreen> {
   Widget _buildFocusTimeChart() {
     return Container(
       height: MediaQuery.of(context).size.height * 0.25,
-      padding: EdgeInsets.all(MediaQuery.of(context).size.width * 0.04), // 4% of screen width
+      padding: EdgeInsets.all(MediaQuery.of(context).size.width * 0.04),
       decoration: BoxDecoration(
         color: Color(0xFF2D2D2D),
         borderRadius: BorderRadius.circular(12),
