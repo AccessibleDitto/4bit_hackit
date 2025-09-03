@@ -8,19 +8,18 @@ import 'login.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dart:ui';
 import 'homepage.dart';
-import 'tasks.dart';
+import 'tasks_updated.dart';
 import 'settings.dart';
 
 // Initialize Firestore instance
-final db = FirebaseFirestore.instance; 
+final db = FirebaseFirestore.instance;
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   runApp(const MyApp());
 }
+
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
@@ -52,12 +51,11 @@ class MyHomePage extends StatefulWidget {
   State<MyHomePage> createState() => _MyHomePageState();
 }
 
-class _MyHomePageState extends State<MyHomePage>
-    with TickerProviderStateMixin {
+class _MyHomePageState extends State<MyHomePage> with TickerProviderStateMixin {
   late AnimationController _logoController;
   late AnimationController _cardController;
   late AnimationController _particleController;
-  
+
   late Animation<double> _logoAnimation;
   late Animation<Offset> _logoSlideAnimation;
   late Animation<double> _cardAnimation;
@@ -66,18 +64,18 @@ class _MyHomePageState extends State<MyHomePage>
   @override
   void initState() {
     super.initState();
-    
+
     // Initialize animation controllers
     _logoController = AnimationController(
       duration: const Duration(milliseconds: 1000),
       vsync: this,
     );
-    
+
     _cardController = AnimationController(
       duration: const Duration(milliseconds: 1200),
       vsync: this,
     );
-    
+
     _particleController = AnimationController(
       duration: const Duration(seconds: 20),
       vsync: this,
@@ -88,27 +86,21 @@ class _MyHomePageState extends State<MyHomePage>
       parent: _logoController,
       curve: Curves.easeOutBack,
     );
-    
-    _logoSlideAnimation = Tween<Offset>(
-      begin: const Offset(0, -0.5),
-      end: Offset.zero,
-    ).animate(CurvedAnimation(
-      parent: _logoController,
-      curve: Curves.easeOutQuart,
-    ));
+
+    _logoSlideAnimation =
+        Tween<Offset>(begin: const Offset(0, -0.5), end: Offset.zero).animate(
+          CurvedAnimation(parent: _logoController, curve: Curves.easeOutQuart),
+        );
 
     _cardAnimation = CurvedAnimation(
       parent: _cardController,
       curve: Curves.easeOutBack,
     );
-    
-    _cardSlideAnimation = Tween<Offset>(
-      begin: const Offset(0, 0.5),
-      end: Offset.zero,
-    ).animate(CurvedAnimation(
-      parent: _cardController,
-      curve: Curves.easeOutQuart,
-    ));
+
+    _cardSlideAnimation =
+        Tween<Offset>(begin: const Offset(0, 0.5), end: Offset.zero).animate(
+          CurvedAnimation(parent: _cardController, curve: Curves.easeOutQuart),
+        );
 
     // Start animations
     _logoController.forward();
@@ -134,58 +126,66 @@ class _MyHomePageState extends State<MyHomePage>
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [
-              Color(0xFF0F0F0F),
-              Color(0xFF1A1A1A),
-              Color(0xFF0A0A0A),
-            ],
+            colors: [Color(0xFF0F0F0F), Color(0xFF1A1A1A), Color(0xFF0A0A0A)],
           ),
         ),
         child: Stack(
           children: [
             // Animated background particles
             _buildAnimatedBackground(),
-            
+
             // Main content
             SafeArea(
               child: Padding(
                 padding: const EdgeInsets.all(24.0),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Spacer(),
-                    
-                    // Logo section
-                    SlideTransition(
-                      position: _logoSlideAnimation,
-                      child: FadeTransition(
-                        opacity: _logoAnimation,
-                        child: ScaleTransition(
-                          scale: _logoAnimation,
-                          child: _buildLogoSection(),
-                        ),
+                child: SingleChildScrollView(
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(
+                      minHeight:
+                          MediaQuery.of(context).size.height -
+                          MediaQuery.of(context).padding.top -
+                          MediaQuery.of(context).padding.bottom,
+                    ),
+                    child: IntrinsicHeight(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Spacer(),
+
+                          // Logo section
+                          SlideTransition(
+                            position: _logoSlideAnimation,
+                            child: FadeTransition(
+                              opacity: _logoAnimation,
+                              child: ScaleTransition(
+                                scale: _logoAnimation,
+                                child: _buildLogoSection(),
+                              ),
+                            ),
+                          ),
+
+                          const SizedBox(height: 60),
+
+                          // Onboarding card
+                          SlideTransition(
+                            position: _cardSlideAnimation,
+                            child: FadeTransition(
+                              opacity: _cardAnimation,
+                              child: ScaleTransition(
+                                scale: _cardAnimation,
+                                child: _buildOnboardingCard(),
+                              ),
+                            ),
+                          ),
+
+                          const Spacer(),
+
+                          // Footer
+                          _buildFooter(),
+                        ],
                       ),
                     ),
-                    
-                    const SizedBox(height: 60),
-                    
-                    // Onboarding card
-                    SlideTransition(
-                      position: _cardSlideAnimation,
-                      child: FadeTransition(
-                        opacity: _cardAnimation,
-                        child: ScaleTransition(
-                          scale: _cardAnimation,
-                          child: _buildOnboardingCard(),
-                        ),
-                      ),
-                    ),
-                    
-                    const Spacer(),
-                    
-                    // Footer
-                    _buildFooter(),
-                  ],
+                  ),
                 ),
               ),
             ),
@@ -204,13 +204,16 @@ class _MyHomePageState extends State<MyHomePage>
             final progress = (_particleController.value + (index * 0.1)) % 1.0;
             final screenHeight = MediaQuery.of(context).size.height;
             final screenWidth = MediaQuery.of(context).size.width;
-            
+
             return Positioned(
               left: (index * screenWidth / 12) % screenWidth,
               top: screenHeight - (progress * (screenHeight + 100)),
               child: Opacity(
-                opacity: progress < 0.1 ? progress * 10 : 
-                        progress > 0.9 ? (1 - progress) * 10 : 1.0,
+                opacity: progress < 0.1
+                    ? progress * 10
+                    : progress > 0.9
+                    ? (1 - progress) * 10
+                    : 1.0,
                 child: Container(
                   width: 4 + (index % 3) * 2,
                   height: 4 + (index % 3) * 2,
@@ -268,9 +271,9 @@ class _MyHomePageState extends State<MyHomePage>
             ),
           ),
         ),
-        
+
         const SizedBox(height: 24),
-        
+
         // Welcome text
         Text(
           'Welcome to',
@@ -280,17 +283,13 @@ class _MyHomePageState extends State<MyHomePage>
             fontWeight: FontWeight.w400,
           ),
         ),
-        
+
         const SizedBox(height: 8),
-        
+
         // App name with shader
         ShaderMask(
           shaderCallback: (bounds) => const LinearGradient(
-            colors: [
-              Color(0xFF9333EA),
-              Color(0xFFC084FC),
-              Color(0xFF8B5CF6),
-            ],
+            colors: [Color(0xFF9333EA), Color(0xFFC084FC), Color(0xFF8B5CF6)],
           ).createShader(bounds),
           child: Text(
             'Khronofy',
@@ -303,9 +302,9 @@ class _MyHomePageState extends State<MyHomePage>
             ),
           ),
         ),
-        
+
         const SizedBox(height: 8),
-        
+
         // Gradient underline
         Container(
           width: 80,
@@ -321,9 +320,9 @@ class _MyHomePageState extends State<MyHomePage>
             ),
           ),
         ),
-        
+
         const SizedBox(height: 16),
-        
+
         // Tagline
         Text(
           'Your time, beautifully managed.',
@@ -386,17 +385,14 @@ class _MyHomePageState extends State<MyHomePage>
                     color: Colors.white,
                   ),
                 ),
-                
+
                 const SizedBox(height: 32),
-                
+
                 // Sign Up Button
-                _buildPrimaryButton(
-                  'Sign Up',
-                  onPressed: _handleSignUp,
-                ),
-                
+                _buildPrimaryButton('Sign Up', onPressed: _handleSignUp),
+
                 const SizedBox(height: 16),
-                
+
                 // Divider
                 Row(
                   children: [
@@ -440,14 +436,11 @@ class _MyHomePageState extends State<MyHomePage>
                     ),
                   ],
                 ),
-                
+
                 const SizedBox(height: 16),
-                
+
                 // Login Button
-                _buildSecondaryButton(
-                  'Login',
-                  onPressed: _handleLogin,
-                ),
+                _buildSecondaryButton('Login', onPressed: _handleLogin),
 
                 // remove test buttons after integration
                 const SizedBox(height: 16),
@@ -647,7 +640,7 @@ class _MyHomePageState extends State<MyHomePage>
 
   void _handleSignUp() async {
     HapticFeedback.lightImpact();
-    
+
     // Navigate to your existing SignupPage
     Navigator.push(
       context,
@@ -657,7 +650,7 @@ class _MyHomePageState extends State<MyHomePage>
 
   void _handleLogin() async {
     HapticFeedback.lightImpact();
-    
+
     // Navigate to your existing LoginPage
     Navigator.push(
       context,
@@ -695,7 +688,7 @@ class _MyHomePageState extends State<MyHomePage>
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
-              
+
               // Title
               Padding(
                 padding: const EdgeInsets.all(24),
@@ -708,7 +701,7 @@ class _MyHomePageState extends State<MyHomePage>
                   ),
                 ),
               ),
-              
+
               // Content
               Expanded(
                 child: SingleChildScrollView(
@@ -717,7 +710,7 @@ class _MyHomePageState extends State<MyHomePage>
                   child: _getContentForTitle(title),
                 ),
               ),
-              
+
               // Close button
               Padding(
                 padding: const EdgeInsets.all(24),
@@ -769,36 +762,36 @@ class _MyHomePageState extends State<MyHomePage>
       children: [
         _buildSectionTitle('Acceptance of Terms'),
         _buildSectionText(
-          'By downloading, accessing, or using the Khronofy mobile application, you agree to be bound by these Terms of Service and all applicable laws and regulations.'
+          'By downloading, accessing, or using the Khronofy mobile application, you agree to be bound by these Terms of Service and all applicable laws and regulations.',
         ),
-        
+
         _buildSectionTitle('Use License'),
         _buildSectionText(
-          'Permission is granted to temporarily use Khronofy for personal, non-commercial transitory viewing only. This license shall automatically terminate if you violate any of these restrictions.'
+          'Permission is granted to temporarily use Khronofy for personal, non-commercial transitory viewing only. This license shall automatically terminate if you violate any of these restrictions.',
         ),
-        
+
         _buildSectionTitle('User Accounts'),
         _buildSectionText(
-          'You are responsible for maintaining the confidentiality of your account credentials and for all activities that occur under your account. You must notify us immediately of any unauthorized use.'
+          'You are responsible for maintaining the confidentiality of your account credentials and for all activities that occur under your account. You must notify us immediately of any unauthorized use.',
         ),
-        
+
         _buildSectionTitle('Privacy'),
         _buildSectionText(
-          'Your privacy is important to us. Please review our Privacy Policy, which also governs your use of the Service, to understand our practices.'
+          'Your privacy is important to us. Please review our Privacy Policy, which also governs your use of the Service, to understand our practices.',
         ),
-        
+
         _buildSectionTitle('Prohibited Uses'),
         _buildSectionText(
-          'You may not use Khronofy for any unlawful purpose or to solicit others to perform unlawful acts. You may not violate any international, federal, provincial, or state regulations, rules, or laws.'
+          'You may not use Khronofy for any unlawful purpose or to solicit others to perform unlawful acts. You may not violate any international, federal, provincial, or state regulations, rules, or laws.',
         ),
-        
+
         _buildSectionTitle('Modifications'),
         _buildSectionText(
-          'Khronofy reserves the right to revise these terms of service at any time without notice. By using this app, you are agreeing to be bound by the current version of these terms.'
+          'Khronofy reserves the right to revise these terms of service at any time without notice. By using this app, you are agreeing to be bound by the current version of these terms.',
         ),
-        
+
         const SizedBox(height: 24),
-        
+
         Text(
           'Last updated: ${DateTime.now().toString().split(' ')[0]}',
           style: GoogleFonts.inter(
@@ -807,7 +800,7 @@ class _MyHomePageState extends State<MyHomePage>
             fontStyle: FontStyle.italic,
           ),
         ),
-        
+
         const SizedBox(height: 32),
       ],
     );
@@ -819,41 +812,41 @@ class _MyHomePageState extends State<MyHomePage>
       children: [
         _buildSectionTitle('Information We Collect'),
         _buildSectionText(
-          'We collect information you provide directly to us, such as when you create an account, use our time management features, or contact us for support.'
+          'We collect information you provide directly to us, such as when you create an account, use our time management features, or contact us for support.',
         ),
-        
+
         _buildSectionTitle('How We Use Your Information'),
         _buildSectionText(
-          'We use the information we collect to:\n\n• Provide, maintain, and improve our services\n• Process transactions and send related information\n• Send technical notices and support messages\n• Respond to your comments and questions'
+          'We use the information we collect to:\n\n• Provide, maintain, and improve our services\n• Process transactions and send related information\n• Send technical notices and support messages\n• Respond to your comments and questions',
         ),
-        
+
         _buildSectionTitle('Information Sharing'),
         _buildSectionText(
-          'We do not sell, trade, or otherwise transfer your personal information to third parties without your consent, except as described in this policy.'
+          'We do not sell, trade, or otherwise transfer your personal information to third parties without your consent, except as described in this policy.',
         ),
-        
+
         _buildSectionTitle('Data Security'),
         _buildSectionText(
-          'We implement appropriate technical and organizational measures to protect your personal information against unauthorized access, alteration, disclosure, or destruction.'
+          'We implement appropriate technical and organizational measures to protect your personal information against unauthorized access, alteration, disclosure, or destruction.',
         ),
-        
+
         _buildSectionTitle('Data Retention'),
         _buildSectionText(
-          'We retain your personal information only for as long as necessary to provide you with our services and as described in this Privacy Policy.'
+          'We retain your personal information only for as long as necessary to provide you with our services and as described in this Privacy Policy.',
         ),
-        
+
         _buildSectionTitle('Your Rights'),
         _buildSectionText(
-          'You have the right to access, update, or delete your personal information. You may also object to or restrict certain processing of your data.'
+          'You have the right to access, update, or delete your personal information. You may also object to or restrict certain processing of your data.',
         ),
-        
+
         _buildSectionTitle('Contact Us'),
         _buildSectionText(
-          'If you have any questions about this Privacy Policy, please contact us at privacy@khronofy.com'
+          'If you have any questions about this Privacy Policy, please contact us at privacy@khronofy.com',
         ),
-        
+
         const SizedBox(height: 24),
-        
+
         Text(
           'Last updated: ${DateTime.now().toString().split(' ')[0]}',
           style: GoogleFonts.inter(
@@ -862,7 +855,7 @@ class _MyHomePageState extends State<MyHomePage>
             fontStyle: FontStyle.italic,
           ),
         ),
-        
+
         const SizedBox(height: 32),
       ],
     );
@@ -873,22 +866,22 @@ class _MyHomePageState extends State<MyHomePage>
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _buildSectionTitle('Frequently Asked Questions'),
-        
+
         _buildFAQItem(
           'How do I reset my password?',
           'On the login screen, tap "Forgot Password" and follow the instructions.',
         ),
-        
+
         _buildFAQItem(
           'Is my data secure?',
           'Absolutely. We use industry-standard encryption to protect your data and never share it with third parties.',
         ),
-        
+
         _buildFAQItem(
           'How do I delete my account?',
           'Go to Settings > Account > Delete Account. Note that this action is irreversible.',
         ),
-        
+
         const SizedBox(height: 24),
       ],
     );

@@ -272,8 +272,8 @@ class CalendarPageState extends State<CalendarPage> {
     return Scaffold(
       appBar: AppBar(
         title: Text(_getAppBarTitle()),
-        backgroundColor: Colors.blue,
-        foregroundColor: Colors.white,
+        // backgroundColor: Colors.blue,
+        // foregroundColor: Colors.white,
         automaticallyImplyLeading: false,
         // leading: _isInDayView
         //     ? IconButton(
