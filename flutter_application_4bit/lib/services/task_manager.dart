@@ -1,6 +1,6 @@
 // Task and Project Management
 import 'package:flutter/material.dart';
-import '../tasks.dart';
+import '../models/task_models.dart';
 import 'firebase_service.dart';
 import 'user_stats_service.dart';
 
@@ -16,23 +16,23 @@ class TaskManager {
   // Getters
   List<Task> get tasks => List.unmodifiable(_tasks);
   List<Project> get projects => List.unmodifiable(_projects);
-  List<Task> get completedTasks => _tasks.where((task) => task.isCompleted).toList();
-  List<Task> get incompleteTasks => _tasks.where((task) => !task.isCompleted).toList();
-  List<Task> get todayTasks => _tasks.where((task) => task.isToday && !task.isCompleted).toList();
-  List<Task> get priorityTasks => _tasks.where((task) => task.isPriority && !task.isCompleted).toList();
+  List<Task> get completedTasks => _tasks.where((task) => task.status == TaskStatus.completed).toList();
+  List<Task> get incompleteTasks => _tasks.where((task) => task.status != TaskStatus.completed).toList();
+  List<Task> get todayTasks => _tasks.where((task) => task.shouldScheduleToday && task.status != TaskStatus.completed).toList();
+  List<Task> get priorityTasks => _tasks.where((task) => (task.priority == Priority.high || task.priority == Priority.urgent) && task.status != TaskStatus.completed).toList();
 
   // Task statistics
   int get totalTasksCompleted => completedTasks.length;
   int get totalFocusTimeFromTasks {
-    return completedTasks.fold(0, (sum, task) => sum + task.estimatedTime * 60); // Convert hours to minutes
+    return completedTasks.fold(0, (sum, task) => sum + (task.timeSpent * 60).round()); // Convert hours to minutes
   }
   int get todayCompletedTasks {
     final today = DateTime.now();
     return completedTasks.where((task) {
-      return task.scheduledDate != null &&
-             task.scheduledDate!.year == today.year &&
-             task.scheduledDate!.month == today.month &&
-             task.scheduledDate!.day == today.day;
+      return task.scheduledFor != null &&
+             task.scheduledFor!.year == today.year &&
+             task.scheduledFor!.month == today.month &&
+             task.scheduledFor!.day == today.day;
     }).length;
   }
 
@@ -59,13 +59,14 @@ class TaskManager {
     final taskIndex = _tasks.indexWhere((task) => task.id == taskId);
     if (taskIndex != -1) {
       final task = _tasks[taskIndex];
-      task.isCompleted = true;
+      final updatedTask = task.copyWith(status: TaskStatus.completed);
+      _tasks[taskIndex] = updatedTask;
       
       // Notify UserStats about task completion for achievements
       final userStats = UserStats();
       userStats.onTaskCompleted(task.title);
       
-      _saveTaskToFirebase(task);
+      _saveTaskToFirebase(updatedTask);
     }
   }
 
@@ -140,51 +141,56 @@ class TaskManager {
 
   // Sample data for development
   void initializeSampleData() {
+    final now = DateTime.now();
     _tasks = [
       Task(
         id: '1',
         title: 'Complete Flutter app',
         estimatedTime: 3,
-        isCompleted: false,
-        isToday: true,
-        isPriority: true,
-        scheduledDate: DateTime.now(),
+        status: TaskStatus.notStarted,
+        priority: Priority.urgent,
+        scheduledFor: now,
+        createdAt: now,
+        updatedAt: now,
       ),
       Task(
         id: '2',
         title: 'Review code',
         estimatedTime: 1,
-        isCompleted: false,
-        isToday: true,
-        isPriority: false,
-        scheduledDate: null,
+        status: TaskStatus.notStarted,
+        priority: Priority.medium,
+        createdAt: now,
+        updatedAt: now,
       ),
       Task(
         id: '3',
         title: 'Meeting with team',
         estimatedTime: 1,
-        isCompleted: false,
-        isToday: false,
-        isPriority: true,
-        scheduledDate: DateTime.now().add(const Duration(days: 1)),
+        status: TaskStatus.notStarted,
+        priority: Priority.high,
+        scheduledFor: now.add(const Duration(days: 1)),
+        createdAt: now,
+        updatedAt: now,
       ),
       Task(
         id: '4',
         title: 'Write documentation',
         estimatedTime: 2,
-        isCompleted: true,
-        isToday: false,
-        isPriority: false,
-        scheduledDate: DateTime.now().add(const Duration(days: 2)),
+        status: TaskStatus.completed,
+        priority: Priority.low,
+        scheduledFor: now.add(const Duration(days: 2)),
+        createdAt: now,
+        updatedAt: now,
       ),
       Task(
         id: '5',
         title: 'Fix bug #123',
         estimatedTime: 1,
-        isCompleted: false,
-        isToday: false,
-        isPriority: true,
-        scheduledDate: DateTime.now().add(const Duration(days: 3)),
+        status: TaskStatus.notStarted,
+        priority: Priority.high,
+        scheduledFor: now.add(const Duration(days: 3)),
+        createdAt: now,
+        updatedAt: now,
       ),
     ];
   }

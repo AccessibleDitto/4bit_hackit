@@ -1226,9 +1226,9 @@ class _ProfileScreenState extends State<ProfileScreen>
       crossAxisCount: 2,
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
-      mainAxisSpacing: 16,
-      crossAxisSpacing: 16,
-      childAspectRatio: 1.2,
+      mainAxisSpacing: 20,
+      crossAxisSpacing: 20,
+      childAspectRatio: 1.0,
       children: [
         _buildStatCard('Pomodoros\nCompleted', '${_userStats.pomodorosCompleted}', Icons.timer, const Color(0xFFFF8C42)),
         _buildStatCard('Total Focus\nTime', _userStats.totalFocusTime, Icons.access_time, const Color(0xFF10B981)),
@@ -1240,44 +1240,56 @@ class _ProfileScreenState extends State<ProfileScreen>
 
   Widget _buildStatCard(String title, String value, IconData icon, Color color) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
         color: const Color(0xFF1E1E1E),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(20),
         border: Border.all(color: const Color(0xFF333333)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.1),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Container(
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(12),
+              color: color.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: color.withValues(alpha: 0.3),
+                width: 1,
+              ),
             ),
             child: Icon(
               icon,
               color: color,
-              size: 16,
+              size: 28,
             ),
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 16),
           Text(
             value,
             style: GoogleFonts.inter(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
+              fontSize: 24,
+              fontWeight: FontWeight.w800,
               color: Colors.white,
             ),
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 8),
           Text(
             title,
             textAlign: TextAlign.center,
             style: GoogleFonts.inter(
-              fontSize: 12,
+              fontSize: 14,
               color: const Color(0xFF888888),
-              fontWeight: FontWeight.w500,
+              fontWeight: FontWeight.w600,
+              height: 1.2,
             ),
           ),
         ],

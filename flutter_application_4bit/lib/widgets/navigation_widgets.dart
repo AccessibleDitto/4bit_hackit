@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../homepage.dart';
 import '../calendar_page.dart';
-import '../tasks.dart';
+import '../tasks_updated.dart';
 import '../settings.dart';
 import '../report.dart';
 

@@ -1,55 +1,7 @@
-// ANALYSIS: Current Task Class Issues & Improvements
+// COMPREHENSIVE TASK MODEL FOR 4BIT PRODUCTIVITY APP
 // ===================================================
 
-// 🔍 CURRENT TASK CLASS ANALYSIS
-class CurrentTask {
-  final String id;
-  final String title;
-  final double estimatedTime; // ✅ Good - supports 30min increments
-  final double timeSpent;     // ✅ Good - progress tracking
-  final bool isCompleted;     // ✅ Good - completion status
-  final bool isToday;         // ❌ PROBLEMATIC - see issues below
-  final Priority priority;    // ✅ Good - priority system
-  final DateTime? scheduledDate; // ❌ CONFUSING - overlaps with isToday
-  final String? projectId;    // ✅ Good - project grouping
-  CurrentTask({
-    required this.id,
-    required this.title,
-    required this.estimatedTime,
-    this.timeSpent = 0.0,
-    this.isCompleted = false,
-    this.isToday = false,
-    required this.priority,
-    this.scheduledDate,
-    this.projectId,
-  });
-}
-
-// 🚨 ISSUES WITH CURRENT DESIGN:
-
-// 1. isToday Problems:
-//    - What happens tomorrow? Does isToday become false automatically?
-//    - Requires manual updates daily
-//    - Doesn't handle "due today" vs "prefer today" scenarios
-//    - Creates confusion with scheduledDate
-
-// 2. Missing Critical Properties:
-//    - No deadline/due date (scheduledDate is unclear)
-//    - No creation/modification timestamps
-//    - No task dependencies
-//    - No subtasks support
-//    - No notes/description field
-//    - No energy level requirement
-//    - No location constraints
-
-// 3. Scheduling Logic Issues:
-//    - How do you handle overdue tasks?
-//    - What about flexible vs fixed deadlines?
-//    - No way to express "sometime this week" vs "must be today"
-
-// ===================================================
-// 🎯 IMPROVED TASK CLASS DESIGN
-// ===================================================
+import 'package:flutter/material.dart';
 
 enum Priority { low, medium, high, urgent }
 
@@ -72,6 +24,67 @@ enum TimePreference {
   morning,     // Prefer AM hours
   afternoon,   // Prefer PM hours
   specific     // Must be at specific time (use scheduledFor)
+}
+
+// Extension for Priority display
+extension PriorityExtension on Priority {
+  String get displayName {
+    switch (this) {
+      case Priority.low:
+        return 'Low';
+      case Priority.medium:
+        return 'Medium';
+      case Priority.high:
+        return 'High';
+      case Priority.urgent:
+        return 'Urgent';
+    }
+  }
+  
+  Color get color {
+    switch (this) {
+      case Priority.low:
+        return const Color(0xFF71717A); // Grey
+      case Priority.medium:
+        return const Color(0xFF3B82F6); // Blue
+      case Priority.high:
+        return const Color(0xFFF97316); // Orange
+      case Priority.urgent:
+        return const Color(0xFFEF4444); // Red
+    }
+  }
+}
+
+// Extension for TaskStatus display
+extension TaskStatusExtension on TaskStatus {
+  String get displayName {
+    switch (this) {
+      case TaskStatus.notStarted:
+        return 'Not Started';
+      case TaskStatus.inProgress:
+        return 'In Progress';
+      case TaskStatus.completed:
+        return 'Completed';
+      case TaskStatus.cancelled:
+        return 'Cancelled';
+      case TaskStatus.blocked:
+        return 'Blocked';
+    }
+  }
+}
+
+// Extension for EnergyLevel display
+extension EnergyLevelExtension on EnergyLevel {
+  String get displayName {
+    switch (this) {
+      case EnergyLevel.low:
+        return 'Low Energy';
+      case EnergyLevel.medium:
+        return 'Medium Energy';
+      case EnergyLevel.high:
+        return 'High Energy';
+    }
+  }
 }
 
 class Task {
@@ -424,32 +437,43 @@ void demonstrateImprovedTaskClass() {
 }
 
 // ===================================================
-// 🔄 MIGRATION STRATEGY FROM OLD TO NEW
+// 🎯 PROJECT MODEL
 // ===================================================
 
-// Extension to convert your old Task to new Task
-extension OldTaskMigration on CurrentTask {
-  Task toNewTask() {
-    return Task(
-      id: id,
-      title: title,
-      estimatedTime: estimatedTime,
-      timeSpent: timeSpent,
-      // Convert isToday + scheduledDate logic
-      dueDate: isToday ? DateTime.now() : scheduledDate,
-      scheduledFor: isToday ? DateTime.now().add(Duration(hours: 9)) : null,
-      status: isCompleted ? TaskStatus.completed : TaskStatus.notStarted,
-      priority: priority,
-      projectId: projectId,
-      energyRequired: priority == Priority.high || priority == Priority.urgent 
-          ? EnergyLevel.high 
-          : EnergyLevel.medium,
-      createdAt: DateTime.now().subtract(Duration(days: 1)), // Placeholder
-      updatedAt: DateTime.now(),
+class Project {
+  final String id;
+  final String name;
+  final Color color;
+  final String? description;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+
+  Project({
+    required this.id,
+    required this.name,
+    required this.color,
+    this.description,
+    required this.createdAt,
+    required this.updatedAt,
+  });
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'name': name,
+    'color': color.value,
+    'description': description,
+    'createdAt': createdAt.toIso8601String(),
+    'updatedAt': updatedAt.toIso8601String(),
+  };
+
+  factory Project.fromJson(Map<String, dynamic> json) {
+    return Project(
+      id: json['id'],
+      name: json['name'],
+      color: Color(json['color']),
+      description: json['description'],
+      createdAt: DateTime.parse(json['createdAt']),
+      updatedAt: DateTime.parse(json['updatedAt']),
     );
   }
-}
-
-void main() {
-  demonstrateImprovedTaskClass();
 }

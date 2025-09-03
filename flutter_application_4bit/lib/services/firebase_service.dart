@@ -2,7 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'user_stats_service.dart';
-import '../tasks.dart';
+import '../models/task_models.dart';
 
 class FirebaseService {
   static final FirebaseService _instance = FirebaseService._internal();
@@ -363,20 +363,98 @@ class FirebaseService {
           .set({
         'id': task.id,
         'title': task.title,
+        'description': task.description,
         'estimatedTime': task.estimatedTime,
-        'isCompleted': task.isCompleted,
-        'isToday': task.isToday,
-        'isPriority': task.isPriority,
-        'scheduledDate': task.scheduledDate?.millisecondsSinceEpoch,
+        'timeSpent': task.timeSpent,
+        'dueDate': task.dueDate?.toIso8601String(),
+        'scheduledFor': task.scheduledFor?.toIso8601String(),
+        'timePreference': task.timePreference.name,
+        'status': task.status.name,
+        'priority': task.priority.name,
+        'progressPercentage': task.progressPercentage,
         'projectId': task.projectId,
+        'tags': task.tags,
+        'energyRequired': task.energyRequired.name,
+        'dependencies': task.dependencies,
+        'location': task.location,
+        'isRecurring': task.isRecurring,
+        'recurrencePattern': task.recurrencePattern,
+        'createdBy': task.createdBy,
         'createdAt': FieldValue.serverTimestamp(),
         'updatedAt': FieldValue.serverTimestamp(),
       });
       
       debugPrint('Task saved to Firebase: ${task.title}');
+      
+      // Update user task statistics
+      await _updateUserTaskStats();
     } catch (e) {
       debugPrint('Error saving task to Firebase: $e');
       rethrow;
+    }
+  }
+
+  // Update user task statistics
+  Future<void> _updateUserTaskStats() async {
+    try {
+      if (userId == null) return;
+      
+      // Get all tasks for the user
+      final tasksSnapshot = await _firestore
+          .collection('users')
+          .doc(userId)
+          .collection(tasksCollection)
+          .get();
+
+      // Calculate statistics
+      int totalTasks = tasksSnapshot.docs.length;
+      int completedTasks = 0;
+      int inProgressTasks = 0;
+      int notStartedTasks = 0;
+      double totalTimeSpent = 0.0;
+      double totalEstimatedTime = 0.0;
+      
+      for (var doc in tasksSnapshot.docs) {
+        final data = doc.data();
+        final status = data['status'] ?? 'notStarted';
+        final timeSpent = (data['timeSpent'] ?? 0.0).toDouble();
+        final estimatedTime = (data['estimatedTime'] ?? 0.0).toDouble();
+        
+        totalTimeSpent += timeSpent;
+        totalEstimatedTime += estimatedTime;
+        
+        switch (status) {
+          case 'completed':
+            completedTasks++;
+            break;
+          case 'inProgress':
+            inProgressTasks++;
+            break;
+          default:
+            notStartedTasks++;
+            break;
+        }
+      }
+
+      // Update user stats
+      await _firestore
+          .collection('users')
+          .doc(userId)
+          .collection(userStatsCollection)
+          .doc('stats')
+          .update({
+        'totalTasks': totalTasks,
+        'completedTasks': completedTasks,
+        'inProgressTasks': inProgressTasks,
+        'notStartedTasks': notStartedTasks,
+        'totalTimeSpent': totalTimeSpent,
+        'totalEstimatedTime': totalEstimatedTime,
+        'lastUpdated': FieldValue.serverTimestamp(),
+      });
+      
+      debugPrint('Updated user task statistics: $totalTasks total, $completedTasks completed');
+    } catch (e) {
+      debugPrint('Error updating user task stats: $e');
     }
   }
 
@@ -397,14 +475,41 @@ class FirebaseService {
         return Task(
           id: data['id'] ?? doc.id,
           title: data['title'] ?? '',
-          estimatedTime: data['estimatedTime'] ?? 1,
-          isCompleted: data['isCompleted'] ?? false,
-          isToday: data['isToday'] ?? false,
-          isPriority: data['isPriority'] ?? false,
-          scheduledDate: data['scheduledDate'] != null 
-              ? DateTime.fromMillisecondsSinceEpoch(data['scheduledDate'])
-              : null,
+          description: data['description'],
+          estimatedTime: (data['estimatedTime'] ?? 1.0).toDouble(),
+          timeSpent: (data['timeSpent'] ?? 0.0).toDouble(),
+          dueDate: data['dueDate'] != null ? DateTime.parse(data['dueDate']) : null,
+          scheduledFor: data['scheduledFor'] != null ? DateTime.parse(data['scheduledFor']) : null,
+          timePreference: TimePreference.values.firstWhere(
+            (e) => e.name == data['timePreference'],
+            orElse: () => TimePreference.flexible,
+          ),
+          status: TaskStatus.values.firstWhere(
+            (e) => e.name == data['status'],
+            orElse: () => TaskStatus.notStarted,
+          ),
+          priority: Priority.values.firstWhere(
+            (e) => e.name == data['priority'],
+            orElse: () => Priority.medium,
+          ),
+          progressPercentage: data['progressPercentage']?.toDouble(),
           projectId: data['projectId'],
+          tags: List<String>.from(data['tags'] ?? []),
+          energyRequired: EnergyLevel.values.firstWhere(
+            (e) => e.name == data['energyRequired'],
+            orElse: () => EnergyLevel.medium,
+          ),
+          dependencies: List<String>.from(data['dependencies'] ?? []),
+          location: data['location'],
+          isRecurring: data['isRecurring'] ?? false,
+          recurrencePattern: data['recurrencePattern'],
+          createdBy: data['createdBy'],
+          createdAt: data['createdAt'] is Timestamp 
+              ? (data['createdAt'] as Timestamp).toDate()
+              : DateTime.now(),
+          updatedAt: data['updatedAt'] is Timestamp 
+              ? (data['updatedAt'] as Timestamp).toDate()
+              : DateTime.now(),
         );
       }).toList();
     } catch (e) {
@@ -414,7 +519,7 @@ class FirebaseService {
   }
 
   // Update task completion status
-  Future<void> updateTaskCompletion(String taskId, bool isCompleted) async {
+  Future<void> updateTaskCompletion(String taskId, TaskStatus newStatus) async {
     try {
       if (userId == null) throw Exception('User not authenticated');
       
@@ -424,12 +529,44 @@ class FirebaseService {
           .collection(tasksCollection)
           .doc(taskId)
           .update({
-        'isCompleted': isCompleted,
+        'status': newStatus.name,
         'updatedAt': FieldValue.serverTimestamp(),
-        'completedAt': isCompleted ? FieldValue.serverTimestamp() : null,
+        'completedAt': newStatus == TaskStatus.completed ? FieldValue.serverTimestamp() : null,
       });
+      
+      // Update user task statistics
+      await _updateUserTaskStats();
     } catch (e) {
-      debugPrint('Error updating task completion: $e');
+      debugPrint('Error updating task status: $e');
+      rethrow;
+    }
+  }
+
+  // Update task progress
+  Future<void> updateTaskProgress(String taskId, double timeSpent, {double? progressPercentage}) async {
+    try {
+      if (userId == null) throw Exception('User not authenticated');
+      
+      Map<String, dynamic> updates = {
+        'timeSpent': timeSpent,
+        'updatedAt': FieldValue.serverTimestamp(),
+      };
+      
+      if (progressPercentage != null) {
+        updates['progressPercentage'] = progressPercentage;
+      }
+      
+      await _firestore
+          .collection('users')
+          .doc(userId)
+          .collection(tasksCollection)
+          .doc(taskId)
+          .update(updates);
+      
+      // Update user task statistics
+      await _updateUserTaskStats();
+    } catch (e) {
+      debugPrint('Error updating task progress: $e');
       rethrow;
     }
   }
@@ -445,6 +582,9 @@ class FirebaseService {
           .collection(tasksCollection)
           .doc(taskId)
           .delete();
+      
+      // Update user task statistics
+      await _updateUserTaskStats();
     } catch (e) {
       debugPrint('Error deleting task: $e');
       rethrow;
@@ -566,12 +706,12 @@ class FirebaseService {
           .collection('users')
           .doc(userId)
           .collection(projectsCollection)
-          .doc(project.name)
+          .doc(project.id)
           .set({
+        'id': project.id,
         'name': project.name,
-        'timeSpent': project.timeSpent,
-        'taskCount': project.taskCount,
         'color': project.color.value,
+        'description': project.description,
         'createdAt': FieldValue.serverTimestamp(),
         'updatedAt': FieldValue.serverTimestamp(),
       });
@@ -595,10 +735,16 @@ class FirebaseService {
       return querySnapshot.docs.map((doc) {
         final data = doc.data();
         return Project(
+          id: data['id'] ?? doc.id,
           name: data['name'] ?? '',
-          timeSpent: data['timeSpent'] ?? '0h',
-          taskCount: data['taskCount'] ?? 0,
           color: Color(data['color'] ?? Colors.blue.value),
+          description: data['description'],
+          createdAt: data['createdAt'] is Timestamp 
+              ? (data['createdAt'] as Timestamp).toDate()
+              : DateTime.now(),
+          updatedAt: data['updatedAt'] is Timestamp 
+              ? (data['updatedAt'] as Timestamp).toDate()
+              : DateTime.now(),
         );
       }).toList();
     } catch (e) {
