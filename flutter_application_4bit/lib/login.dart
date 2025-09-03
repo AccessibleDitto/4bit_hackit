@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'services/firebase_service.dart';
 import 'register.dart';
 // import 'calendar_page.dart';
@@ -57,6 +58,11 @@ class _LoginPageState extends State<LoginPage> {
             debugPrint('Loading user data for: ${_emailController.text.trim()}');
             Map<String, dynamic> userData = await _firebaseService.loadGmailUserData(_emailController.text.trim());
             
+            // Save user email to SharedPreferences for profile access
+            final prefs = await SharedPreferences.getInstance();
+            await prefs.setString('current_user_email', _emailController.text.trim());
+            debugPrint('Saved user email to SharedPreferences: ${_emailController.text.trim()}');
+            
             if (mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
@@ -69,6 +75,16 @@ class _LoginPageState extends State<LoginPage> {
             }
           } catch (e) {
             debugPrint('Error loading user data: $e');
+            
+            // Still save user email even if data loading fails
+            try {
+              final prefs = await SharedPreferences.getInstance();
+              await prefs.setString('current_user_email', _emailController.text.trim());
+              debugPrint('Saved user email to SharedPreferences despite data loading error');
+            } catch (prefsError) {
+              debugPrint('Error saving to SharedPreferences: $prefsError');
+            }
+            
             if (mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(

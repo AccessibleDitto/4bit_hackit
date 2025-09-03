@@ -3,7 +3,10 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:qr_flutter/qr_flutter.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'services/user_stats_service.dart';
+import 'services/firebase_service.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -33,11 +36,13 @@ class _ProfileScreenState extends State<ProfileScreen>
 
   // User stats instance
   final UserStats _userStats = UserStats();
+  final FirebaseService _firebaseService = FirebaseService();
 
-  // Sample data
-  String _currentFullName = 'Albert Einstein';
-  String _currentUsername = 'alberteinstein';
-  String _currentGender = 'Male';
+  String _currentFullName = 'User';
+  String _currentUsername = 'user';
+  String _currentGender = 'Prefer not to say';
+  String _joinedDate = 'Recently';
+  String? _currentUserEmail;
 
   final List<String> _genderOptions = [
     'Male',
@@ -54,16 +59,15 @@ class _ProfileScreenState extends State<ProfileScreen>
   @override
   void initState() {
     super.initState();
-    
-    // Initialize user stats with sample data
     _userStats.initializeSampleData();
+    // from firebase
+    _loadUserData();
     
     // Initialize form with current data
     _fullNameController.text = _currentFullName;
     _usernameController.text = _currentUsername;
     _selectedGender = _currentGender;
 
-    // Animation setup
     _animationController = AnimationController(
       duration: const Duration(milliseconds: 800),
       vsync: this,
@@ -700,51 +704,234 @@ class _ProfileScreenState extends State<ProfileScreen>
     }
   }
 
+  Future<void> _loadUserData() async {
+    try {
+      // get current user email 
+      final prefs = await SharedPreferences.getInstance();
+      _currentUserEmail = prefs.getString('current_user_email');
+      
+      if (_currentUserEmail != null) {
+        debugPrint('Loading user data for: $_currentUserEmail');
+        
+        // load user data frm firebase
+        final userData = await _firebaseService.loadGmailUserData(_currentUserEmail!);
+        
+        // Extract user information
+        final userInfo = userData['userData'] as Map<String, dynamic>?;
+        
+        setState(() {
+          // Set name and username based on email if user info exists
+          if (userInfo != null) {
+            _currentFullName = userInfo['name'] ?? _extractNameFromEmail(_currentUserEmail!);
+            _currentUsername = userInfo['username'] ?? _extractUsernameFromEmail(_currentUserEmail!);
+            final loadedGender = userInfo['gender'] ?? 'Prefer not to say';
+            _currentGender = loadedGender;
+            _selectedGender = loadedGender;
+            
+            // Format the joined date
+            if (userInfo['createdAt'] != null) {
+              final timestamp = userInfo['createdAt'];
+              DateTime? dateTime;
+              
+              if (timestamp is Timestamp) {
+                // Handle Firestore Timestamp object
+                dateTime = timestamp.toDate();
+              } else if (timestamp is Map) {
+                // Handle Firestore Timestamp as Map
+                if (timestamp.containsKey('_seconds')) {
+                  final seconds = timestamp['_seconds'] as int;
+                  dateTime = DateTime.fromMillisecondsSinceEpoch(seconds * 1000);
+                } else if (timestamp.containsKey('seconds')) {
+                  final seconds = timestamp['seconds'] as int;
+                  dateTime = DateTime.fromMillisecondsSinceEpoch(seconds * 1000);
+                }
+              } else if (timestamp is int) {
+                // Handle Unix timestamp in seconds
+                dateTime = DateTime.fromMillisecondsSinceEpoch(timestamp * 1000);
+              } else if (timestamp is double) {
+                // Handle Unix timestamp as double
+                dateTime = DateTime.fromMillisecondsSinceEpoch((timestamp * 1000).round());
+              }
+              
+              if (dateTime != null) {
+                _joinedDate = _formatDate(dateTime);
+                debugPrint('Parsed join date: $_joinedDate from timestamp: $timestamp');
+              } else {
+                _joinedDate = 'Unknown';
+                debugPrint('Could not parse timestamp: $timestamp (type: ${timestamp.runtimeType})');
+              }
+            } else {
+              _joinedDate = 'Unknown';
+              debugPrint('No createdAt field found in user data');
+            }
+          } else {
+            // Fallback to email-based data
+            _currentFullName = _extractNameFromEmail(_currentUserEmail!);
+            _currentUsername = _extractUsernameFromEmail(_currentUserEmail!);
+            _currentGender = 'Prefer not to say';
+            _selectedGender = 'Prefer not to say';
+            _joinedDate = 'Recently';
+          }
+          
+          // update form 
+          _fullNameController.text = _currentFullName;
+          _usernameController.text = _currentUsername;
+        });
+        
+        debugPrint('Loaded user data: Name=$_currentFullName, Username=$_currentUsername, Gender=$_currentGender, Joined=$_joinedDate');
+      } else {
+        debugPrint('No current user email found in SharedPreferences');
+        // dropdown
+        setState(() {
+          _currentFullName = 'User';
+          _currentUsername = 'user';
+          _currentGender = 'Prefer not to say';
+          _selectedGender = 'Prefer not to say';
+          _joinedDate = 'Recently';
+          
+          // update form 
+          _fullNameController.text = _currentFullName;
+          _usernameController.text = _currentUsername;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading user data: $e');
+      // default values in case of error
+      setState(() {
+        _currentFullName = 'User';
+        _currentUsername = 'user';
+        _currentGender = 'Prefer not to say';
+        _selectedGender = 'Prefer not to say';
+        _joinedDate = 'Recently';
+        
+        // update form 
+        _fullNameController.text = _currentFullName;
+        _usernameController.text = _currentUsername;
+      });
+    }
+  }
+
+  String _extractNameFromEmail(String email) {
+    final namePart = email.split('@')[0];
+    return namePart.split('.').map((part) => 
+      part.isEmpty ? '' : part[0].toUpperCase() + part.substring(1).toLowerCase()
+    ).join(' ');
+  }
+
+  String _extractUsernameFromEmail(String email) {
+    return email.split('@')[0].replaceAll('.', '');
+  }
+
+  String _formatDate(DateTime date) {
+    final months = [
+      'January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December'
+    ];
+    return '${months[date.month - 1]} ${date.year}';
+  }
+
   Future<void> _saveChanges() async {
     setState(() {
       _isSaving = true;
     });
 
-    // Simulate API call
-    await Future.delayed(const Duration(milliseconds: 1500));
+    try {
+      // Validate form data
+      if (_fullNameController.text.trim().isEmpty) {
+        throw Exception('Full name cannot be empty');
+      }
+      
+      if (_usernameController.text.trim().isEmpty) {
+        throw Exception('Username cannot be empty');
+      }
 
-    // Update current data with form data
-    _currentFullName = _fullNameController.text.trim();
-    _currentUsername = _usernameController.text.trim();
-    _currentGender = _selectedGender;
+      // Check if we have the user email
+      if (_currentUserEmail == null) {
+        throw Exception('User email not found');
+      }
 
-    setState(() {
-      _isSaving = false;
-    });
+      // Save to Firebase
+      await _firebaseService.updateUserProfile(
+        _currentUserEmail!,
+        name: _fullNameController.text.trim(),
+        username: _usernameController.text.trim(),
+        gender: _selectedGender,
+      );
 
-    // Show success message
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-        content: Row(
-          children: [
-            const Icon(
-              Icons.check_circle,
-              color: Colors.white,
-              size: 20,
+      // Update local state after successful Firebase update
+      _currentFullName = _fullNameController.text.trim();
+      _currentUsername = _usernameController.text.trim();
+      _currentGender = _selectedGender;
+
+      setState(() {
+        _isSaving = false;
+      });
+
+      // Show success message
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(
+                  Icons.check_circle,
+                  color: Colors.white,
+                  size: 20,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  'Profile updated successfully!',
+                  style: GoogleFonts.inter(
+                    fontWeight: FontWeight.w500,
+                    color: Colors.white,
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(width: 8),
-            Text(
-              'Profile updated successfully!',
-              style: GoogleFonts.inter(
-                fontWeight: FontWeight.w500,
-                color: Colors.white,
-              ),
+            backgroundColor: const Color(0xFFFF8C42),
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
             ),
-          ],
-        ),
-        backgroundColor: const Color(0xFFFF8C42),
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
-      ),
-    );
+          ),
+        );
+      }
+    } catch (e) {
+      setState(() {
+        _isSaving = false;
+      });
+
+      // Show error message
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(
+                  Icons.error,
+                  color: Colors.white,
+                  size: 20,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Failed to update profile: ${e.toString().replaceAll('Exception: ', '')}',
+                    style: GoogleFonts.inter(
+                      fontWeight: FontWeight.w500,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+        );
+      }
     }
   }
 
@@ -984,7 +1171,7 @@ class _ProfileScreenState extends State<ProfileScreen>
           const SizedBox(height: 16),
           _buildInfoRow('Gender', _currentGender, Icons.wc),
           const SizedBox(height: 16),
-          _buildInfoRow('Joined', 'December 2024', Icons.calendar_today),
+          _buildInfoRow('Joined', _joinedDate, Icons.calendar_today),
         ],
       ),
     );

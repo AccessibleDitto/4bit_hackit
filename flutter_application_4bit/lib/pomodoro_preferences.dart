@@ -80,7 +80,7 @@ class _PomodoroPreferencesScreenState extends State<PomodoroPreferencesScreen> w
     '${_pomodoroLength.toString().padLeft(2, '0')}:00 → 00:00',
     '00:00 → ∞',
   ];
-  bool _whiteNoise = false;
+  bool _whiteNoise = true;
   int _pomodoroLength = 25; // minutes
   int _shortBreakLength = 5; // minutes
   int _longBreakLength = 15; // minutes

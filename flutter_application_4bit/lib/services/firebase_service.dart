@@ -611,6 +611,17 @@ class FirebaseService {
   // Load all data for users
   Future<Map<String, dynamic>> loadGmailUserData(String email) async {
     try {
+      // Load user document
+      final userDoc = await _firestore
+          .collection('users')
+          .doc(email)
+          .get();
+
+      Map<String, dynamic>? userData;
+      if (userDoc.exists) {
+        userData = userDoc.data();
+      }
+
       // Load tasks
       final tasksSnapshot = await _firestore
           .collection('users')
@@ -671,16 +682,57 @@ class FirebaseService {
       debugPrint('- Achievements: ${achievements.length}');
       debugPrint('- Projects: ${projects.length}');
       debugPrint('- User Stats: ${userStats != null ? "Found" : "Not found"}');
+      debugPrint('- User Data: ${userData != null ? "Found" : "Not found"}');
 
       return {
         'tasks': tasks,
         'userStats': userStats,
         'achievements': achievements,
         'projects': projects,
+        'userData': userData,
         'email': email,
       };
     } catch (e) {
       debugPrint('Error loading Gmail user data: $e');
+      rethrow;
+    }
+  }
+
+  // Update user profile information
+  Future<void> updateUserProfile(String email, {
+    String? name,
+    String? username,
+    String? gender,
+  }) async {
+    try {
+      debugPrint('Updating user profile for: $email');
+      
+      final userDoc = _firestore.collection('users').doc(email);
+      
+      // Build update data map
+      Map<String, dynamic> updateData = {
+        'lastUpdatedAt': FieldValue.serverTimestamp(),
+      };
+      
+      if (name != null) {
+        updateData['name'] = name;
+      }
+      
+      if (username != null) {
+        updateData['username'] = username;
+      }
+      
+      if (gender != null) {
+        updateData['gender'] = gender;
+      }
+      
+      // Update the user document
+      await userDoc.update(updateData);
+      
+      debugPrint('Successfully updated user profile for: $email');
+      debugPrint('Updated fields: ${updateData.keys.join(', ')}');
+    } catch (e) {
+      debugPrint('Error updating user profile: $e');
       rethrow;
     }
   }
