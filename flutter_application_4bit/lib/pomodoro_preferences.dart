@@ -75,16 +75,16 @@ class _PomodoroPreferencesScreenState extends State<PomodoroPreferencesScreen> w
 
   // pomodoro settings
   bool _strictMode = false;
+  int _pomodoroLength = 25; // minutes
+  int _shortBreakLength = 5; // minutes
+  int _longBreakLength = 15; // minutes
+  int _longBreakAfter = 4; // pomodoros
   late String _timerMode;
   List<String> get _timerModeOptions => [
     '${_pomodoroLength.toString().padLeft(2, '0')}:00 → 00:00',
     '00:00 → ∞',
   ];
   bool _whiteNoise = true;
-  int _pomodoroLength = 25; // minutes
-  int _shortBreakLength = 5; // minutes
-  int _longBreakLength = 15; // minutes
-  int _longBreakAfter = 4; // pomodoros
   bool _disableBreak = false;
   bool _autoStartBreak = false;
   bool _autoStartNextPomodoro = false;
@@ -104,6 +104,7 @@ class _PomodoroPreferencesScreenState extends State<PomodoroPreferencesScreen> w
   @override
   void initState() {
     super.initState();
+    _timerMode = '${_pomodoroLength.toString().padLeft(2, '0')}:00 → 00:00';
     _animationController = AnimationController(
       duration: const Duration(milliseconds: 800),
       vsync: this,
@@ -122,7 +123,7 @@ class _PomodoroPreferencesScreenState extends State<PomodoroPreferencesScreen> w
     Future.delayed(const Duration(milliseconds: 100), () {
       if (mounted) _animationController.forward();
     });
-  _loadPomodoroSettings();
+    _loadPomodoroSettings();
   }
 
   @override
@@ -144,13 +145,17 @@ class _PomodoroPreferencesScreenState extends State<PomodoroPreferencesScreen> w
   Future<void> _loadPomodoroSettings() async {
     final prefs = await SharedPreferences.getInstance();
     int loadedLength = prefs.getInt('pomodoroLength') ?? 25;
-    String loadedTimerMode = prefs.getString('timerMode') ?? '${loadedLength.toString().padLeft(2, '0')}:00 → 00:00';
+    String defaultMode = '${loadedLength.toString().padLeft(2, '0')}:00 → 00:00';
+    List<String> options = [defaultMode, '00:00 → ∞'];
+    String loadedTimerMode = prefs.getString('timerMode') ?? defaultMode;
+    if (!options.contains(loadedTimerMode)) {
+      loadedTimerMode = defaultMode;
+    }
     bool loadedDisableBreak = prefs.getBool('disableBreak') ?? false;
     bool loadedAutoStartBreak = prefs.getBool('autoStartBreak') ?? false;
     bool loadedAutoStartNextPomodoro = prefs.getBool('autoStartNextPomodoro') ?? false;
     setState(() {
       _pomodoroLength = loadedLength;
-      // Always sync timer mode value to the new options
       _timerMode = loadedTimerMode;
       _disableBreak = loadedDisableBreak;
       _autoStartBreak = loadedAutoStartBreak;
@@ -302,11 +307,12 @@ class _PomodoroPreferencesScreenState extends State<PomodoroPreferencesScreen> w
           title: 'Timer Mode',
           subtitle: 'Choose your preferred timer style',
           icon: Icons.timer_outlined,
-          value: _timerMode,
+          value: _timerModeOptions.contains(_timerMode) ? _timerMode : _timerModeOptions.first,
           options: _timerModeOptions,
           onChanged: (value) async {
-            setState(() => _timerMode = value!);
-            await _saveTimerMode(value!);
+            if (value == null) return;
+            setState(() => _timerMode = value);
+            await _saveTimerMode(value);
           },
         ),
         const SizedBox(height: 12),

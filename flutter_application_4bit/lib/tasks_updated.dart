@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_application_4bit/widgets/date_selection_task.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_application_4bit/widgets/filtered_tasks_page.dart';
+import 'package:flutter_application_4bit/widgets/navigation_widgets.dart';
 
 enum Priority { low, medium, high, urgent }
 
@@ -73,96 +74,100 @@ String _formatTime(double hours) {
   }
 }
 
+// Top-level task data for access from other files
+List<Project> projects = [
+  Project(
+    id: '1',
+    name: 'Mobile App Development',
+    color: const Color(0xFF9333EA),
+  ),
+  Project(
+    id: '2',
+    name: 'Website Redesign',
+    color: const Color(0xFF10B981),
+  ),
+  Project(
+    id: '3',
+    name: 'Marketing Campaign',
+    color: const Color(0xFF7C3AED),
+  ),
+];
+
+List<Task> tasks = [
+  Task(
+    id: '1',
+    title: 'Complete Flutter app',
+    description: 'Finish implementing the remaining features for the mobile application',
+    estimatedTime: 3.0,
+    timeSpent: 2.5,
+    dueDate: DateTime.now(),
+    status: TaskStatus.inProgress,
+    priority: Priority.high,
+    projectId: '1',
+    createdAt: DateTime.now().subtract(Duration(days: 2)),
+    updatedAt: DateTime.now().subtract(Duration(hours: 1)),
+  ),
+  Task(
+    id: '2',
+    title: 'Review code',
+    description: 'Code review for the new authentication module',
+    estimatedTime: 1.0,
+    timeSpent: 0.5,
+    scheduledFor: DateTime.now().add(Duration(hours: 2)),
+    status: TaskStatus.notStarted,
+    priority: Priority.medium,
+    projectId: '1',
+    createdAt: DateTime.now().subtract(Duration(days: 1)),
+    updatedAt: DateTime.now().subtract(Duration(minutes: 30)),
+  ),
+  Task(
+    id: '3',
+    title: 'Meeting with team',
+    description: 'Weekly standup meeting to discuss project progress',
+    estimatedTime: 1.5,
+    timeSpent: 1.5,
+    dueDate: DateTime.now().add(Duration(days: 1)),
+    status: TaskStatus.completed,
+    priority: Priority.high,
+    projectId: '2',
+    createdAt: DateTime.now().subtract(Duration(days: 3)),
+    updatedAt: DateTime.now().subtract(Duration(hours: 2)),
+  ),
+  Task(
+    id: '4',
+    title: 'Write documentation',
+    description: 'Create user documentation for the new features',
+    estimatedTime: 2.0,
+    timeSpent: 2.0,
+    dueDate: DateTime.now().add(Duration(days: 2)),
+    status: TaskStatus.completed,
+    priority: Priority.low,
+    projectId: '2',
+    createdAt: DateTime.now().subtract(Duration(days: 4)),
+    updatedAt: DateTime.now().subtract(Duration(hours: 3)),
+  ),
+  Task(
+    id: '5',
+    title: 'Fix bug #123',
+    description: 'Critical bug affecting user login functionality',
+    estimatedTime: 1.0,
+    timeSpent: 0.0,
+    dueDate: DateTime.now().add(Duration(days: 3)),
+    status: TaskStatus.notStarted,
+    priority: Priority.urgent,
+    projectId: '3',
+    createdAt: DateTime.now().subtract(Duration(days: 1)),
+    updatedAt: DateTime.now().subtract(Duration(minutes: 15)),
+  ),
+];
+
+// Getter function to expose tasks for other files
+List<Task> getTasksList() => tasks;
+
 class _TasksPageState extends State<TasksPage> {
   bool _showAddMenu = false;
   String _searchQuery = '';
   final TextEditingController _searchController = TextEditingController();
-
-  List<Project> projects = [
-    Project(
-      id: '1',
-      name: 'Mobile App Development',
-      color: const Color(0xFF9333EA),
-    ),
-    Project(
-      id: '2',
-      name: 'Website Redesign',
-      color: const Color(0xFF10B981),
-    ),
-    Project(
-      id: '3',
-      name: 'Marketing Campaign',
-      color: const Color(0xFF7C3AED),
-    ),
-  ];
-
-  List<Task> tasks = [
-    Task(
-      id: '1',
-      title: 'Complete Flutter app',
-      description: 'Finish implementing the remaining features for the mobile application',
-      estimatedTime: 3.0,
-      timeSpent: 2.5,
-      dueDate: DateTime.now(),
-      status: TaskStatus.inProgress,
-      priority: Priority.high,
-      projectId: '1',
-      createdAt: DateTime.now().subtract(Duration(days: 2)),
-      updatedAt: DateTime.now().subtract(Duration(hours: 1)),
-    ),
-    Task(
-      id: '2',
-      title: 'Review code',
-      description: 'Code review for the new authentication module',
-      estimatedTime: 1.0,
-      timeSpent: 0.5,
-      scheduledFor: DateTime.now().add(Duration(hours: 2)),
-      status: TaskStatus.notStarted,
-      priority: Priority.medium,
-      projectId: '1',
-      createdAt: DateTime.now().subtract(Duration(days: 1)),
-      updatedAt: DateTime.now().subtract(Duration(minutes: 30)),
-    ),
-    Task(
-      id: '3',
-      title: 'Meeting with team',
-      description: 'Weekly standup meeting to discuss project progress',
-      estimatedTime: 1.5,
-      timeSpent: 1.5,
-      dueDate: DateTime.now().add(Duration(days: 1)),
-      status: TaskStatus.completed,
-      priority: Priority.high,
-      projectId: '2',
-      createdAt: DateTime.now().subtract(Duration(days: 3)),
-      updatedAt: DateTime.now().subtract(Duration(hours: 2)),
-    ),
-    Task(
-      id: '4',
-      title: 'Write documentation',
-      description: 'Create user documentation for the new features',
-      estimatedTime: 2.0,
-      timeSpent: 2.0,
-      dueDate: DateTime.now().add(Duration(days: 2)),
-      status: TaskStatus.completed,
-      priority: Priority.low,
-      projectId: '2',
-      createdAt: DateTime.now().subtract(Duration(days: 4)),
-      updatedAt: DateTime.now().subtract(Duration(hours: 3)),
-    ),
-    Task(
-      id: '5',
-      title: 'Fix bug #123',
-      description: 'Critical bug affecting user login functionality',
-      estimatedTime: 1.0,
-      timeSpent: 0.0,
-      dueDate: DateTime.now().add(Duration(days: 3)),
-      status: TaskStatus.notStarted,
-      priority: Priority.urgent,
-      projectId: '3',
-      createdAt: DateTime.now().subtract(Duration(days: 1)),
-      updatedAt: DateTime.now().subtract(Duration(minutes: 15)),
-    ),
-  ];
 
   ProjectStats _getProjectStats(String projectId) {
     final projectTasks = tasks.where((task) => task.projectId == projectId).toList();
@@ -659,6 +664,7 @@ class _TasksPageState extends State<TasksPage> {
               backgroundColor: const Color(0xFF9333EA),
               child: const Icon(Icons.add, color: Colors.white),
             ),
+      bottomNavigationBar: const BottomNavigation(selectedIndex: 1),
     );
   }
 

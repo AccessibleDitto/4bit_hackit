@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/timer_models.dart';
+import '../tasks_updated.dart' as tasks_data;
 
 class TimerUtils {
   static String formatTime(int seconds) {
@@ -36,33 +37,27 @@ class TimerUtils {
   }
 
   static List<Task> getDefaultTasks() {
-    return [
-      const Task(
-        title: 'Design User Experience (UX)',
-        sessions: 7,
-        color: Color(0xFF9333EA),
-      ),
-      const Task(
-        title: 'Design User Interface (UI)',
-        sessions: 6,
-        color: Color(0xFF10B981),
-      ),
-      const Task(
-        title: 'Create a Design Wireframe',
-        sessions: 4,
-        color: Color(0xFF3B82F6),
-      ),
-      const Task(
-        title: 'Write Documentation',
-        sessions: 3,
-        color: Color(0xFFEF4444),
-      ),
-      const Task(
-        title: 'Code Review Session',
-        sessions: 2,
-        color: Color(0xFFF59E0B),
-      ),
+    const colorOrder = [
+      Color(0xFF9333EA),
+      Color(0xFF10B981),
+      Color(0xFF3B82F6),
+      Color(0xFFEF4444),
+      Color(0xFFF59E0B), 
     ];
+
+    final mainTasks = tasks_data.getTasksList();
+    List<Task> defaultTasks = [];
+    for (int i = 0; i < mainTasks.length; i++) {
+      final t = mainTasks[i];
+      // Use estimatedTime as sessions if available, otherwise default to 1
+      int sessions = (t.estimatedTime > 0) ? t.estimatedTime.round() : 1;
+      defaultTasks.add(Task(
+        title: t.title,
+        sessions: sessions,
+        color: colorOrder[i % colorOrder.length],
+      ));
+    }
+    return defaultTasks;
   }
 
   static SessionStats calculateSessionStats(int totalSessions, int completedSessions, int focusMinutes) {
