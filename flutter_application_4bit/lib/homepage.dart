@@ -386,14 +386,15 @@ class _TimerModePageState extends State<TimerModePage> with TickerProviderStateM
 
   Future<void> _loadTimerModeFromPrefs() async {
     final prefs = await SharedPreferences.getInstance();
-    int pomodoroLength = PomodoroSettings.instance.pomodoroLength;
-    String defaultMode = '${pomodoroLength.toString().padLeft(2, '0')}:00 → 00:00';
+    String defaultMode = '${PomodoroSettings.instance.pomodoroLength.toString().padLeft(2, '0')}:00 → 00:00';
     String savedMode = prefs.getString('timerMode') ?? defaultMode;
     
     setState(() {
-      // Default to countdown mode if it's a fresh installation
+      // Default to countdown mode
       _isCountdownMode = savedMode == defaultMode;
-      _timerModeValue = _isCountdownMode ? defaultMode : '00:00 → ∞';
+      _timerModeValue = _isCountdownMode ? 
+          '${PomodoroSettings.instance.pomodoroLength.toString().padLeft(2, '0')}:00 → 00:00' : 
+          '00:00 → ∞';
       _currentSeconds = _isCountdownMode ? _focusSeconds : 0;
     });
   }
@@ -414,6 +415,7 @@ class _TimerModePageState extends State<TimerModePage> with TickerProviderStateM
       _timerModeValue = isCountdown
           ? '${PomodoroSettings.instance.pomodoroLength.toString().padLeft(2, '0')}:00 → 00:00'
           : '00:00 → ∞';
+      // Save to both SharedPreferences and PomodoroSettings
       SharedPreferences.getInstance().then((prefs) {
         prefs.setString('timerMode', _timerModeValue);
       });
@@ -508,7 +510,7 @@ class _TimerModePageState extends State<TimerModePage> with TickerProviderStateM
     _timer?.cancel();
     _confettiController.dispose();
     _progressAnimationController.dispose();
-  _audioPlayer.dispose();
+    _audioPlayer.dispose();
     super.dispose();
   }
 
