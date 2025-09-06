@@ -4,14 +4,23 @@ enum TimerState { idle, focusRunning, focusPaused, breakIdle, breakRunning, comp
 
 class Task {
   final String title;
-  final int sessions;
   final Color color;
+  final double estimatedTime; // in hours
+  final int focusMinutes;
 
   const Task({
     required this.title,
-    required this.sessions,
     required this.color,
-  });
+    double? estimatedTime,  // Make it nullable
+    this.focusMinutes = 25,
+  }) : this.estimatedTime = estimatedTime ?? 1.0;  // Default to 1 hour if null
+
+  int get sessions {
+    // Calculate number of sessions based on estimated time
+    // If estimatedTime is 0 or negative, return 1 session as minimum
+    if (estimatedTime <= 0) return 1;
+    return (estimatedTime * 60 / focusMinutes).ceil();
+  }
 }
 
 class TimerConfiguration {

@@ -1,12 +1,19 @@
 import 'package:flutter/material.dart';
 import '../models/timer_models.dart';
 import '../tasks_updated.dart' as tasks_data;
+import '../pomodoro_preferences.dart';
 
 class TimerUtils {
   static String formatTime(int seconds) {
-    int minutes = seconds ~/ 60;
+    int hours = seconds ~/ 3600;
+    int minutes = (seconds % 3600) ~/ 60;
     int remainingSeconds = seconds % 60;
-    return '${minutes.toString().padLeft(2, '0')}:${remainingSeconds.toString().padLeft(2, '0')}';
+    
+    if (hours > 0) {
+      return '${hours}:${minutes.toString().padLeft(2, '0')}:${remainingSeconds.toString().padLeft(2, '0')}';
+    } else {
+      return '${minutes.toString().padLeft(2, '0')}:${remainingSeconds.toString().padLeft(2, '0')}';
+    }
   }
 
   static double calculateProgress({
@@ -42,22 +49,29 @@ class TimerUtils {
       Color(0xFF10B981),
       Color(0xFF3B82F6),
       Color(0xFFEF4444),
-      Color(0xFFF59E0B), 
+      Color(0xFFF59E0B),
     ];
-
+    
     final mainTasks = tasks_data.getTasksList();
-    List<Task> defaultTasks = [];
-    for (int i = 0; i < mainTasks.length; i++) {
-      final t = mainTasks[i];
-      // Use estimatedTime as sessions if available, otherwise default to 1
-      int sessions = (t.estimatedTime > 0) ? t.estimatedTime.round() : 1;
-      defaultTasks.add(Task(
-        title: t.title,
-        sessions: sessions,
-        color: colorOrder[i % colorOrder.length],
-      ));
-    }
-    return defaultTasks;
+    
+    return mainTasks.asMap().map((index, taskData) {
+      try {
+        return MapEntry(index, Task(
+          title: taskData.title,
+          color: colorOrder[index % colorOrder.length],
+          estimatedTime: taskData.estimatedTime,
+          focusMinutes: PomodoroSettings.instance.pomodoroLength,
+        ));
+      } catch (e) {
+        // If error, create a default task with 1 hour estimate
+        return MapEntry(index, Task(
+          title: taskData.title,
+          color: colorOrder[index % colorOrder.length],
+          estimatedTime: 1.0,
+          focusMinutes: PomodoroSettings.instance.pomodoroLength,
+        ));
+      }
+    }).values.toList();
   }
 
   static SessionStats calculateSessionStats(int totalSessions, int completedSessions, int focusMinutes) {
