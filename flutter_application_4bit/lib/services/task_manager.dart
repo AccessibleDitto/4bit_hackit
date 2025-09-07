@@ -26,6 +26,17 @@ class TaskManager {
   int get totalFocusTimeFromTasks {
     return completedTasks.fold(0, (sum, task) => sum + (task.timeSpent * 60).round()); // Convert hours to minutes
   }
+
+  int get todayFocusTimeFromTasks {
+    final today = DateTime.now();
+    return completedTasks.where((task) {
+      if (task.scheduledFor == null) return false;
+      return task.scheduledFor!.year == today.year &&
+              task.scheduledFor!.month == today.month &&
+              task.scheduledFor!.day == today.day;
+    }).fold(0, (sum, task) => sum + (task.timeSpent * 60).round());
+  }
+  
   int get todayCompletedTasks {
     final today = DateTime.now();
     return completedTasks.where((task) {
