@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:calendar_view/calendar_view.dart';
 import '../models/calendar_models.dart';
+import '../models/task_models.dart';
 import '../utils/date_utils.dart';
 import 'event_dialogs.dart';
 // import 'package:flutter_application_4bit/calendar_page.dart';
@@ -256,8 +257,9 @@ class EventFormDialog {
                     Navigator.pop(context);
                     print(event);
                     
+                    // FIXED: Check if event is ExtendedCalendarEventData before accessing recurring
                     if (event is ExtendedCalendarEventData && event.recurring != RecurringType.none) {
-                      _showDeleteOptionsDialog(context, event as ExtendedCalendarEventData, onDeleteEvent, onDeleteSeries);
+                      _showDeleteOptionsDialog(context, event, onDeleteEvent, onDeleteSeries);
                     } else {
                       onDeleteEvent(event!);
                     }
@@ -338,7 +340,7 @@ class EventFormDialog {
           ElevatedButton(
             onPressed: () {
               Navigator.pop(context);
-              onDeleteSeries(event.seriesId!); // Call callback for entire series
+              onDeleteSeries(event.seriesId); // FIXED: Removed null assertion since seriesId is non-null
             },
             child: const Text('Entire series'),
           ),

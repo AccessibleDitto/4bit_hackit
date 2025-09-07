@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:calendar_view/calendar_view.dart';
+import 'task_models.dart';
 
 // Priority options storage
-enum Priority { low, medium, high, urgent }
+// enum Priority { low, medium, high, urgent }
 
 class PriorityHelper {
   static const Map<Priority, String> priorityLabels = {
@@ -33,26 +34,35 @@ class RecurringHelper {
   };
 }
 
-// Extended CalendarEventData to include custom fields
+
+// === EXTENDED CALENDAR EVENT DATA ===
 class ExtendedCalendarEventData extends CalendarEventData {
+  final String title;
+  final String? description;
+  final DateTime date;
+  final DateTime startTime;
+  final DateTime endTime;
+  final Color color;
+  // --- Custom fields ---
   final Priority priority;
   final String? project;
   final RecurringType recurring;
-  final String seriesId; 
+  final String seriesId;
+  final Task? task; // Direct reference to Task
 
   ExtendedCalendarEventData({
-    required String title,
-    String? description,
-    required DateTime date,
-    required DateTime startTime,
-    required DateTime endTime,
-    required Color color,
+    required this.title,
+    this.description,
+    required this.date,
+    required this.startTime,
+    required this.endTime,
+    required this.color,
     required this.priority,
     this.project,
     this.recurring = RecurringType.none,
     String? seriesId,
-  }) : seriesId =
-           seriesId ?? UniqueKey().toString(), // Auto-generate if not provided
+    this.task,
+  }) : seriesId = seriesId ?? UniqueKey().toString(),
        super(
          title: title,
          description: description,
@@ -61,4 +71,24 @@ class ExtendedCalendarEventData extends CalendarEventData {
          endTime: endTime,
          color: color,
        );
+
+  /// Convenience getter for whether this event is linked to a task
+  bool get hasTask => task != null;
+
+  /// If linked to a task, check if overdue
+  bool get isTaskOverdue => task?.isOverdue ?? false;
+
+  /// If linked to a task, get completion percentage
+  double? get taskCompletion => task?.completionPercentage;
+
+  /// Duration of the event
+  Duration get duration => endTime.difference(startTime);
+
+  /// Check if event is ongoing at a specific time
+  bool isOngoingAt(DateTime time) {
+    return time.isAfter(startTime) && time.isBefore(endTime);
+  }
+
+  /// Convenience property for recurring check
+  bool get isRecurringEvent => recurring != RecurringType.none;
 }

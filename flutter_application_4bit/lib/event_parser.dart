@@ -2,6 +2,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'models/calendar_models.dart'; // your ExtendedCalendarEventData, Priority, RecurringType, PriorityHelper
+import 'models/task_models.dart'; // Import Task model
 
 List<ExtendedCalendarEventData> parseEventsFromJson(String jsonString) {
   final jsonList = jsonDecode(jsonString) as List<dynamic>;
