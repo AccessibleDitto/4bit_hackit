@@ -2,517 +2,19 @@ import 'package:flutter/material.dart';
 import 'package:calendar_view/calendar_view.dart';
 import 'package:flutter_application_4bit/event_parser.dart';
 import '../models/calendar_models.dart';
+import '../models/task_models.dart';
+import '../models/scheduling_models.dart';
+import '../services/task_manager_local.dart';
+import '../services/scheduling_service.dart';
+import '../widgets/task_form_widget.dart';
+import '../widgets/chat_interface.dart';
 import '../utils/date_utils.dart';
 import '../widgets/event_tile_builder.dart';
 import '../widgets/custom_timeline.dart';
 import '../dialogs/event_dialogs.dart';
 import '../dialogs/event_form_dialog.dart';
 import '../widgets/navigation_widgets.dart';
-import 'package:flutter/foundation.dart';
-import 'package:http/http.dart' as http;
-import 'dart:convert';
-import 'package:shared_preferences/shared_preferences.dart';
-import '../models/task_models.dart';
-
-// TASK MANAGEMENT CLASSES
-class TaskManager {
-  static const String _tasksKey = 'app_tasks';
-  final List<Task> _tasks = [];
-  
-  List<Task> get tasks => List.unmodifiable(_tasks);
-  
-  Future<void> initialize() async {
-    await _loadTasks();
-  }
-  
-  void addTask(Task task) {
-    _tasks.add(task);
-    _saveTasks();
-  }
-  
-  void updateTask(Task updatedTask) {
-    final index = _tasks.indexWhere((t) => t.id == updatedTask.id);
-    if (index != -1) {
-      _tasks[index] = updatedTask;
-      _saveTasks();
-    }
-  }
-  
-  void removeTask(String taskId) {
-    _tasks.removeWhere((t) => t.id == taskId);
-    _saveTasks();
-  }
-  
-  List<Task> getUnscheduledTasks() {
-    return _tasks.where((task) => 
-      task.scheduledFor == null && 
-      task.status != TaskStatus.completed &&
-      task.status != TaskStatus.cancelled
-    ).toList();
-  }
-  
-  List<Task> getTasksForDate(DateTime date) {
-    final targetDate = DateTime(date.year, date.month, date.day);
-    return _tasks.where((task) {
-      if (task.scheduledFor == null) return false;
-      final scheduledDate = DateTime(
-        task.scheduledFor!.year,
-        task.scheduledFor!.month,
-        task.scheduledFor!.day
-      );
-      return scheduledDate.isAtSameMomentAs(targetDate);
-    }).toList();
-  }
-  
-  Future<void> _saveTasks() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final tasksJson = _tasks.map((task) => task.toJson()).toList();
-      await prefs.setString(_tasksKey, jsonEncode(tasksJson));
-    } catch (e) {
-      print('Error saving tasks: $e');
-    }
-  }
-  
-  Future<void> _loadTasks() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final tasksString = prefs.getString(_tasksKey);
-      if (tasksString != null) {
-        final List<dynamic> tasksJson = jsonDecode(tasksString);
-        _tasks.clear();
-        _tasks.addAll(tasksJson.map((json) => Task.fromJson(json)));
-      }
-    } catch (e) {
-      print('Error loading tasks: $e');
-    }
-  }
-}
-
-class SchedulingService {
-  static const String _groqApiKey = String.fromEnvironment('groqApiKey');
-  static const String _groqApiUrl = 'https://api.groq.com/openai/v1/chat/completions';
-  static const String _model = 'llama-3.3-70b-versatile';
-  
-  Future<SchedulingResult> scheduleUnscheduledTasks({
-    required List<Task> unscheduledTasks,
-    required List<ExtendedCalendarEventData> existingEvents,
-    required SchedulingConstraints constraints,
-    Map<String, String>? changes,
-  }) async {
-    if (unscheduledTasks.isEmpty) {
-      return SchedulingResult(
-        reasoning: "No unscheduled tasks to process.",
-        schedule: [],
-      );
-    }
-    
-    final prompt = _buildSchedulingPrompt(
-      unscheduledTasks,
-      existingEvents,
-      constraints,
-      changes,
-    );
-    
-    try {
-      final response = await _makeGroqApiCall(prompt);
-      return _parseSchedulingResponse(response);
-    } catch (e) {
-      throw Exception('Scheduling failed: $e');
-    }
-  }
-  
-  String _buildSchedulingPrompt(
-    List<Task> tasks,
-    List<ExtendedCalendarEventData> events,
-    SchedulingConstraints constraints,
-    Map<String, String>? changes,
-  ) {
-    final tasksJson = tasks.map((t) => {
-      'id': t.id,
-      'title': t.title,
-      'description': t.description,
-      'estimatedTime': t.estimatedTime,
-      'priority': t.priority.name,
-      'energyRequired': t.energyRequired.name,
-      'dueDate': t.dueDate?.toIso8601String(),
-      'dependencies': t.dependencies,
-      'timePreference': t.timePreference.name,
-    }).toList();
-    
-    final eventsJson = events.map((e) => {
-      'title': e.title,
-      'startTime': e.startTime?.toIso8601String(),
-      'endTime': e.endTime?.toIso8601String(),
-      'date': e.date.toIso8601String(),
-    }).toList();
-    
-    return '''
-You are an expert scheduling assistant. Your job is to create an optimized calendar schedule using these principles:
-
-1. Time blocking: Allocate focused blocks for tasks
-2. Task batching: Group similar tasks together  
-3. Day theming: Assign related tasks to the same day if possible
-4. Prioritization: Urgent and high-priority tasks go first
-5. Respect constraints: Working hours, breaks, energy peaks, and existing calendar events
-6. Energy matching: High-energy tasks during energy peaks, low-energy tasks otherwise
-7. Dependencies: Schedule dependent tasks after their dependencies
-8. Time preferences: Respect morning/afternoon preferences
-
-Current date: ${DateTime.now().toIso8601String()}
-
-EXISTING CALENDAR EVENTS:
-${jsonEncode(eventsJson)}
-
-UNSCHEDULED TASKS:
-${jsonEncode(tasksJson)}
-
-CONSTRAINTS:
-${jsonEncode(constraints.toJson())}
-
-${changes != null ? 'REQUESTED CHANGES:\n${jsonEncode(changes)}' : ''}
-
-OUTPUT REQUIREMENTS:
-- Valid JSON only, no extra text
-- Two fields: "reasoning" and "schedule"
-- reasoning: Explain scheduling decisions
-- schedule: Array of tasks with updated scheduledFor times
-- Ensure no conflicts with existing events
-- Respect task dependencies and constraints
-- Schedule within next 30 days unless specified otherwise
-
-Task Schema for schedule array:
-{
-  "id": "string",
-  "title": "string", 
-  "scheduledFor": "ISO 8601 datetime",
-  "estimatedTime": "number (hours)",
-  "priority": "low|medium|high|urgent",
-  "energyRequired": "low|medium|high"
-}
-''';
-  }
-  
-  Future<String> _makeGroqApiCall(String prompt) async {
-    final headers = {
-      'Authorization': 'Bearer $_groqApiKey',
-      'Content-Type': 'application/json',
-    };
-    
-    final body = {
-      'model': _model,
-      'messages': [
-        {'role': 'user', 'content': prompt}
-      ],
-      'temperature': 0.3,
-      'max_tokens': 2000,
-    };
-    
-    final response = await http.post(
-      Uri.parse(_groqApiUrl),
-      headers: headers,
-      body: jsonEncode(body),
-    );
-    
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      return data['choices'][0]['message']['content'];
-    } else {
-      throw Exception('API Error: ${response.statusCode}');
-    }
-  }
-  
-  SchedulingResult _parseSchedulingResponse(String response) {
-    try {
-      final data = jsonDecode(response);
-      return SchedulingResult.fromJson(data);
-    } catch (e) {
-      throw Exception('Failed to parse scheduling response: $e');
-    }
-  }
-}
-
-// SCHEDULING MODELS
-class SchedulingConstraints {
-  final WorkingHours workingHours;
-  final List<String> energyPeaks;
-  final List<BreakPeriod> breaks;
-  final List<String> preferredDays;
-  
-  SchedulingConstraints({
-    required this.workingHours,
-    this.energyPeaks = const [],
-    this.breaks = const [],
-    this.preferredDays = const [],
-  });
-  
-  Map<String, dynamic> toJson() => {
-    'workingHours': workingHours.toJson(),
-    'energyPeaks': energyPeaks,
-    'breaks': breaks.map((b) => b.toJson()).toList(),
-    'preferredDays': preferredDays,
-  };
-}
-
-class WorkingHours {
-  final String start;
-  final String end;
-  
-  WorkingHours({required this.start, required this.end});
-  
-  Map<String, dynamic> toJson() => {
-    'start': start,
-    'end': end,
-  };
-}
-
-class BreakPeriod {
-  final String start;
-  final String end;
-  final String? name;
-  
-  BreakPeriod({required this.start, required this.end, this.name});
-  
-  Map<String, dynamic> toJson() => {
-    'start': start,
-    'end': end,
-    if (name != null) 'name': name,
-  };
-}
-
-class SchedulingResult {
-  final String reasoning;
-  final List<ScheduledTask> schedule;
-  
-  SchedulingResult({required this.reasoning, required this.schedule});
-  
-  factory SchedulingResult.fromJson(Map<String, dynamic> json) {
-    return SchedulingResult(
-      reasoning: json['reasoning'] ?? '',
-      schedule: (json['schedule'] as List?)
-          ?.map((item) => ScheduledTask.fromJson(item))
-          .toList() ?? [],
-    );
-  }
-}
-
-class ScheduledTask {
-  final String id;
-  final String title;
-  final DateTime scheduledFor;
-  final double estimatedTime;
-  final Priority priority;
-  final EnergyLevel energyRequired;
-  
-  ScheduledTask({
-    required this.id,
-    required this.title,
-    required this.scheduledFor,
-    required this.estimatedTime,
-    required this.priority,
-    required this.energyRequired,
-  });
-  
-  factory ScheduledTask.fromJson(Map<String, dynamic> json) {
-    return ScheduledTask(
-      id: json['id'],
-      title: json['title'],
-      scheduledFor: DateTime.parse(json['scheduledFor']),
-      estimatedTime: json['estimatedTime'].toDouble(),
-      priority: Priority.values.firstWhere(
-        (p) => p.name == json['priority'],
-        orElse: () => Priority.medium,
-      ),
-      energyRequired: EnergyLevel.values.firstWhere(
-        (e) => e.name == json['energyRequired'],
-        orElse: () => EnergyLevel.medium,
-      ),
-    );
-  }
-}
-
-// TASK FORM DIALOG
-class TaskFormDialog {
-  static void showTaskDialog(
-    BuildContext context, {
-    Task? existingTask,
-    required Function(Task) onSaveTask,
-  }) {
-    showDialog(
-      context: context,
-      builder: (context) => TaskFormWidget(
-        existingTask: existingTask,
-        onSaveTask: onSaveTask,
-      ),
-    );
-  }
-}
-
-class TaskFormWidget extends StatefulWidget {
-  final Task? existingTask;
-  final Function(Task) onSaveTask;
-  
-  const TaskFormWidget({
-    Key? key,
-    this.existingTask,
-    required this.onSaveTask,
-  }) : super(key: key);
-  
-  @override
-  _TaskFormWidgetState createState() => _TaskFormWidgetState();
-}
-
-class _TaskFormWidgetState extends State<TaskFormWidget> {
-  late TextEditingController _titleController;
-  late TextEditingController _descriptionController;
-  late TextEditingController _estimatedTimeController;
-  Priority _priority = Priority.medium;
-  EnergyLevel _energyRequired = EnergyLevel.medium;
-  TimePreference _timePreference = TimePreference.flexible;
-  DateTime? _dueDate;
-  
-  @override
-  void initState() {
-    super.initState();
-    _titleController = TextEditingController(
-      text: widget.existingTask?.title ?? '',
-    );
-    _descriptionController = TextEditingController(
-      text: widget.existingTask?.description ?? '',
-    );
-    _estimatedTimeController = TextEditingController(
-      text: widget.existingTask?.estimatedTime.toString() ?? '1.0',
-    );
-    
-    if (widget.existingTask != null) {
-      _priority = widget.existingTask!.priority;
-      _energyRequired = widget.existingTask!.energyRequired;
-      _timePreference = widget.existingTask!.timePreference;
-      _dueDate = widget.existingTask!.dueDate;
-    }
-  }
-  
-  @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      title: Text(widget.existingTask == null ? 'Add Task' : 'Edit Task'),
-      content: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: _titleController,
-              decoration: const InputDecoration(labelText: 'Task Title'),
-            ),
-            const SizedBox(height: 8),
-            TextField(
-              controller: _descriptionController,
-              decoration: const InputDecoration(labelText: 'Description'),
-              maxLines: 3,
-            ),
-            const SizedBox(height: 8),
-            TextField(
-              controller: _estimatedTimeController,
-              decoration: const InputDecoration(labelText: 'Estimated Time (hours)'),
-              keyboardType: TextInputType.number,
-            ),
-            const SizedBox(height: 16),
-            DropdownButtonFormField<Priority>(
-              value: _priority,
-              decoration: const InputDecoration(labelText: 'Priority'),
-              items: Priority.values.map((priority) {
-                return DropdownMenuItem(
-                  value: priority,
-                  child: Text(priority.displayName),
-                );
-              }).toList(),
-              onChanged: (value) => setState(() => _priority = value!),
-            ),
-            const SizedBox(height: 16),
-            DropdownButtonFormField<EnergyLevel>(
-              value: _energyRequired,
-              decoration: const InputDecoration(labelText: 'Energy Required'),
-              items: EnergyLevel.values.map((energy) {
-                return DropdownMenuItem(
-                  value: energy,
-                  child: Text(energy.displayName),
-                );
-              }).toList(),
-              onChanged: (value) => setState(() => _energyRequired = value!),
-            ),
-            const SizedBox(height: 16),
-            DropdownButtonFormField<TimePreference>(
-              value: _timePreference,
-              decoration: const InputDecoration(labelText: 'Time Preference'),
-              items: TimePreference.values.map((pref) {
-                return DropdownMenuItem(
-                  value: pref,
-                  child: Text(pref.name.toLowerCase()),
-                );
-              }).toList(),
-              onChanged: (value) => setState(() => _timePreference = value!),
-            ),
-            const SizedBox(height: 16),
-            ListTile(
-              title: const Text('Due Date'),
-              subtitle: Text(_dueDate?.toString().split(' ')[0] ?? 'No due date'),
-              trailing: const Icon(Icons.calendar_today),
-              onTap: () async {
-                final date = await showDatePicker(
-                  context: context,
-                  initialDate: _dueDate ?? DateTime.now(),
-                  firstDate: DateTime.now(),
-                  lastDate: DateTime.now().add(const Duration(days: 365)),
-                );
-                if (date != null) {
-                  setState(() => _dueDate = date);
-                }
-              },
-            ),
-          ],
-        ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('Cancel'),
-        ),
-        TextButton(
-          onPressed: () {
-            if (_titleController.text.trim().isEmpty) return;
-            
-            final task = Task(
-              id: widget.existingTask?.id ?? 'task_${DateTime.now().millisecondsSinceEpoch}',
-              title: _titleController.text.trim(),
-              description: _descriptionController.text.trim().isEmpty 
-                  ? null 
-                  : _descriptionController.text.trim(),
-              estimatedTime: double.tryParse(_estimatedTimeController.text) ?? 1.0,
-              priority: _priority,
-              energyRequired: _energyRequired,
-              timePreference: _timePreference,
-              dueDate: _dueDate,
-              createdAt: widget.existingTask?.createdAt ?? DateTime.now(),
-              updatedAt: DateTime.now(),
-            );
-            
-            widget.onSaveTask(task);
-            Navigator.pop(context);
-          },
-          child: const Text('Save'),
-        ),
-      ],
-    );
-  }
-  
-  @override
-  void dispose() {
-    _titleController.dispose();
-    _descriptionController.dispose();
-    _estimatedTimeController.dispose();
-    super.dispose();
-  }
-}
+import '../utils/constants.dart';
 
 class CalendarPage extends StatefulWidget {
   const CalendarPage({Key? key}) : super(key: key);
@@ -527,7 +29,7 @@ class CalendarPageState extends State<CalendarPage> {
   DateTime? _selectedDayViewDate;
   bool _isInDayView = false;
   int _previousViewIndex = 0;
-  final bool _condensed = true; // Condensed vertical density
+  final bool _condensed = true;
   
   // Task Management
   late TaskManager _taskManager;
@@ -536,17 +38,6 @@ class CalendarPageState extends State<CalendarPage> {
   // Chat-related variables
   bool _isChatOpen = false;
   bool _isLoading = false;
-  final TextEditingController _textController = TextEditingController();
-  final List<ChatMessage> _messages = <ChatMessage>[];
-  final ScrollController _scrollController = ScrollController();
-  
-  // API configuration
-  static const String _groqApiKey = String.fromEnvironment('groqApiKey');
-  static const String _groqApiUrl = 'https://api.groq.com/openai/v1/chat/completions';
-  static const String _model = 'llama-3.3-70b-versatile';
-  
-  // Store conversation history for context
-  final List<Map<String, String>> _conversationHistory = [];
 
   // Projects storage & color mapping
   final List<String> _projects = [
@@ -558,7 +49,7 @@ class CalendarPageState extends State<CalendarPage> {
     'Hobbies',
   ];
 
-  final Map<String, Color> _projectColors = {}; // assigned at init
+  final Map<String, Color> _projectColors = {};
   final List<Color> _projectPalette = const [
     Color(0xFF1E88E5), // Blue
     Color(0xFF43A047), // Green
@@ -591,7 +82,7 @@ class CalendarPageState extends State<CalendarPage> {
     _taskManager = TaskManager();
     _schedulingService = SchedulingService();
     await _taskManager.initialize();
-    setState(() {}); // Refresh UI after loading tasks
+    setState(() {});
   }
 
   void _assignProjectColorIfNeeded(String project) {
@@ -693,7 +184,7 @@ class CalendarPageState extends State<CalendarPage> {
       startTime: scheduledTime,
       endTime: scheduledTime.add(estimatedDuration),
       color: _resolveTaskColor(task),
-      priority: task.priority, // Direct assignment since they're the same enum
+      priority: task.priority,
       project: task.projectId ?? 'Tasks',
       recurring: RecurringType.none,
     );
@@ -811,167 +302,98 @@ class CalendarPageState extends State<CalendarPage> {
       ),
     );
   }
+void _addSampleEvents() {
+  final now = DateTime.now();
+  
+  try {
+    // weekly Team Meeting
+    final teamMeetingStart = DateTime(now.year, now.month, now.day, 10, 0);
+    final teamMeetingEnd = teamMeetingStart.add(const Duration(hours: 1));
+    
+    final teamMeetingEvent = ExtendedCalendarEventData(
+      title: "Team Meeting",
+      date: DateTime(now.year, now.month, now.day),
+      startTime: teamMeetingStart,
+      endTime: teamMeetingEnd,
+      description: "weekly team sync",
+      priority: Priority.high,
+      project: 'Work',
+      recurring: RecurringType.weekly,
+      color: _resolveEventColor(project: 'Work', priority: Priority.high),
+      seriesId: 'team-meeting-${DateTime.now().millisecondsSinceEpoch}',
+    );
+    
+    print("Adding weekly team meeting...");
+    _addEventWithRecurring(teamMeetingEvent);
 
-  void _addSampleEvents() {
-    final now = DateTime.now();
+    // daily Standup (shorter meeting)
+    final standupStart = DateTime(now.year, now.month, now.day, 9, 0);
+    final standupEnd = standupStart.add(const Duration(minutes: 30));
     
-    print('Adding sample events...');
+    final standupEvent = ExtendedCalendarEventData(
+      title: "daily Standup",
+      date: DateTime(now.year, now.month, now.day),
+      startTime: standupStart,
+      endTime: standupEnd,
+      description: "daily team standup",
+      priority: Priority.medium,
+      project: 'Work',
+      recurring: RecurringType.daily,
+      color: _resolveEventColor(project: 'Work', priority: Priority.medium),
+      seriesId: 'standup-${DateTime.now().millisecondsSinceEpoch}',
+    );
     
-    try {
-      final teamMeetingStart = DateTime(now.year, now.month, now.day, 10, 0);
-      final teamMeetingEnd = teamMeetingStart.add(const Duration(hours: 1));
-      
-      final teamMeetingEvent = ExtendedCalendarEventData(
-        title: "Team Meeting",
-        date: DateTime(now.year, now.month, now.day),
-        startTime: teamMeetingStart,
-        endTime: teamMeetingEnd,
-        description: "Weekly team sync",
-        priority: Priority.high,
-        project: 'Work',
-        recurring: RecurringType.weekly,
-        color: _resolveEventColor(project: 'Work', priority: Priority.high),
-      );
-      
-      print('Created team meeting event: ${teamMeetingEvent.title}');
-      _addEventWithRecurring(teamMeetingEvent);
-      
-    } catch (e, stackTrace) {
-      print('Error creating sample events: $e');
-      print('Stack trace: $stackTrace');
-    }
+    print("Adding daily standup...");
+    _addEventWithRecurring(standupEvent);
+
+    // monthly Review
+    final reviewStart = DateTime(now.year, now.month, now.day, 14, 0);
+    final reviewEnd = reviewStart.add(const Duration(hours: 2));
+    
+    final reviewEvent = ExtendedCalendarEventData(
+      title: "monthly Review",
+      date: DateTime(now.year, now.month, now.day),
+      startTime: reviewStart,
+      endTime: reviewEnd,
+      description: "monthly performance review",
+      priority: Priority.high,
+      project: 'Work',
+      recurring: RecurringType.monthly,
+      color: _resolveEventColor(project: 'Work', priority: Priority.high),
+      seriesId: 'review-${DateTime.now().millisecondsSinceEpoch}',
+    );
+    
+    print("Adding monthly review...");
+    _addEventWithRecurring(reviewEvent);
+
+    // Non-recurring event for comparison
+    final meetingStart = DateTime(now.year, now.month, now.day, 16, 0);
+    final meetingEnd = meetingStart.add(const Duration(hours: 1));
+    
+    final oneTimeEvent = ExtendedCalendarEventData(
+      title: "Client Presentation",
+      date: DateTime(now.year, now.month, now.day),
+      startTime: meetingStart,
+      endTime: meetingEnd,
+      description: "One-time client presentation",
+      priority: Priority.high,
+      project: 'Work',
+      recurring: RecurringType.none,
+      color: _resolveEventColor(project: 'Work', priority: Priority.high),
+      seriesId: 'client-${DateTime.now().millisecondsSinceEpoch}',
+    );
+    
+    print("Adding one-time client presentation...");
+    _addEventWithRecurring(oneTimeEvent);
+    
+  } catch (e, stackTrace) {
+    print('Error creating sample events: $e');
+    print('Stack trace: $stackTrace');
   }
-
-  // Chat methods
+}  // Chat methods
   void _toggleChat() {
     setState(() {
       _isChatOpen = !_isChatOpen;
-    });
-  }
-
-  void _handleChatSubmitted(String text) async {
-    if (text.trim().isEmpty) return;
-    
-    _textController.clear();
-    ChatMessage message = ChatMessage(
-      text: text,
-      isUserMessage: true,
-    );
-    setState(() {
-      _messages.add(message);
-    });
-
-    _scrollToBottomWithDelay(
-      const Duration(milliseconds: 200),
-    );
-
-    await _sendMessage(text);
-  }
-
-  _scrollToBottomWithDelay(Duration delay) async {
-    await Future.delayed(delay);
-    if (_scrollController.hasClients) {
-      _scrollController.animateTo(
-        _scrollController.position.maxScrollExtent,
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeInOut,
-      );
-    }
-  }
-
-  Future<void> _sendMessage(String text) async {
-    setState(() {
-      _isLoading = true;
-    });
-
-    try {
-      // Add user message to conversation history
-      _conversationHistory.add({
-        'role': 'user',
-        'content': text,
-      });
-
-      final response = await _makeGroqApiCall();
-      
-      if (response != null) {
-        // Add assistant response to conversation history
-        _conversationHistory.add({
-          'role': 'assistant',
-          'content': response,
-        });
-
-        ChatMessage responseMessage = ChatMessage(
-          text: response,
-          isUserMessage: false,
-        );
-
-        setState(() {
-          _messages.add(responseMessage);
-        });
-      }
-    } catch (error) {
-      ErrorMessage errorMessage = ErrorMessage(
-        text: 'Failed to get response: ${error.toString()}',
-      );
-
-      setState(() {
-        _messages.add(errorMessage);
-      });
-    } finally {
-      setState(() {
-        _isLoading = false;
-      });
-      _scrollToBottomWithDelay(
-        const Duration(milliseconds: 300),
-      );
-    }
-  }
-
-  Future<String?> _makeGroqApiCall() async {
-    try {
-      final headers = {
-        'Authorization': 'Bearer $_groqApiKey',
-        'Content-Type': 'application/json',
-      };
-
-      final body = {
-        'model': _model,
-        'messages': _conversationHistory,
-        'temperature': 0.7,
-        'max_tokens': 1000,
-        'stream': false,
-      };
-
-      final response = await http.post(
-        Uri.parse(_groqApiUrl),
-        headers: headers,
-        body: jsonEncode(body),
-      );
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        
-        if (data['choices'] != null && data['choices'].isNotEmpty) {
-          return data['choices'][0]['message']['content'] as String?;
-        } else {
-          throw Exception('No response from API');
-        }
-      } else {
-        final errorData = jsonDecode(response.body);
-        throw Exception('API Error (${response.statusCode}): ${errorData['error']?.toString() ?? 'Unknown error'}');
-      }
-    } catch (e) {
-      if (kDebugMode) {
-        print('Error making API call: $e');
-      }
-      rethrow;
-    }
-  }
-
-  void _clearChat() {
-    setState(() {
-      _messages.clear();
-      _conversationHistory.clear();
     });
   }
 
@@ -1044,11 +466,60 @@ class CalendarPageState extends State<CalendarPage> {
     );
   }
 
-  void _deleteAllOccurrences(String seriesId) {
-    _eventController.removeWhere(
-      (e) => e is ExtendedCalendarEventData && e.seriesId == seriesId,
-    );
+  // void _deleteAllOccurrences(String seriesId) {
+  //   _eventController.removeWhere(
+  //     (e) => e is ExtendedCalendarEventData && e.seriesId == seriesId,
+  //   );
+  // }
+  // Also make sure your _deleteAllOccurrences method shows confirmation:
+void _deleteAllOccurrences(String seriesId) {
+  // Count how many events will be deleted
+  final eventsToDelete = _eventController.allEvents
+      .whereType<ExtendedCalendarEventData>()
+      .where((e) => e.seriesId == seriesId)
+      .toList();
+  
+  if (eventsToDelete.isEmpty) {
+    _showMessage('No events found with this series ID.');
+    return;
   }
+
+  // Show confirmation dialog
+  showDialog(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: const Text('Delete Recurring Series'),
+      content: Text('Are you sure you want to delete all ${eventsToDelete.length} occurrences of this recurring event?'),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        ElevatedButton(
+          onPressed: () {
+            Navigator.pop(context);
+            
+            // Remove all events with this seriesId
+            _eventController.removeWhere(
+              (e) => e is ExtendedCalendarEventData && e.seriesId == seriesId,
+            );
+            
+            setState(() {}); // Refresh the UI
+            
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Deleted ${eventsToDelete.length} recurring events'),
+                duration: const Duration(seconds: 3),
+              ),
+            );
+          },
+          style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+          child: const Text('Delete All', style: TextStyle(color: Colors.white)),
+        ),
+      ],
+    ),
+  );
+}
 
   void _addProject(String projectName) {
     setState(() {
@@ -1057,13 +528,24 @@ class CalendarPageState extends State<CalendarPage> {
     });
   }
 
+  // void _deleteEvent(BuildContext context, CalendarEventData event) {
+  //   EventDialogs.showDeleteConfirmation(
+  //     context,
+  //     event,
+  //     () => _eventController.remove(event),
+  //   );
+  // }
+
   void _deleteEvent(BuildContext context, CalendarEventData event) {
-    EventDialogs.showDeleteConfirmation(
-      context,
-      event,
-      () => _eventController.remove(event),
-    );
-  }
+  EventDialogs.showDeleteConfirmation(
+    context,
+    event,
+    () {
+      _eventController.remove(event);
+      setState(() {}); // Refresh the UI
+    },
+  );
+}
 
   Widget _buildViewToggleButton(String label, bool selected) {
     return Container(
@@ -1092,8 +574,8 @@ class CalendarPageState extends State<CalendarPage> {
         style: TextButton.styleFrom(
           backgroundColor: Colors.transparent,
           foregroundColor: selected 
-            ? Colors.blue.shade800  // Dark text on light background
-            : Colors.white,         // White text on dark background
+            ? Colors.blue.shade800
+            : Colors.white,
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
           minimumSize: const Size(60, 32),
         ),
@@ -1108,127 +590,11 @@ class CalendarPageState extends State<CalendarPage> {
     );
   }
 
-  Widget _buildChatInterface() {
-    return Container(
-      height: MediaQuery.of(context).size.height * 0.5,
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.only(
-          topLeft: Radius.circular(20),
-          topRight: Radius.circular(20),
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black26,
-            blurRadius: 10,
-            offset: Offset(0, -5),
-          ),
-        ],
-      ),
-      child: Column(
-        children: [
-          // Chat header
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.blue.shade50,
-              borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(20),
-                topRight: Radius.circular(20),
-              ),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  'AI Assistant',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.blue.shade800,
-                  ),
-                ),
-                Row(
-                  children: [
-                    IconButton(
-                      onPressed: _clearChat,
-                      icon: Icon(Icons.delete, color: Colors.blue.shade800),
-                    ),
-                    IconButton(
-                      onPressed: _toggleChat,
-                      icon: Icon(Icons.close, color: Colors.blue.shade800),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          // Chat messages
-          Expanded(
-            child: ListView.builder(
-              controller: _scrollController,
-              padding: const EdgeInsets.symmetric(horizontal: 8),
-              itemCount: _messages.length + (_isLoading ? 1 : 0),
-              itemBuilder: (_, int index) {
-                if (index == _messages.length && _isLoading) {
-                  // Loading indicator
-                  return Container(
-                    margin: const EdgeInsets.symmetric(vertical: 10.0, horizontal: 16.0),
-                    child: Row(
-                      children: [
-                        const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        ),
-                        const SizedBox(width: 12),
-                        Text(
-                          'AI is thinking...',
-                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: Colors.grey[600],
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
-                }
-                return _messages[index];
-              },
-            ),
-          ),
-          // Chat input
-          const Divider(height: 1.0),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8.0),
-            child: Row(
-              children: <Widget>[
-                Expanded(
-                  child: TextField(
-                    controller: _textController,
-                    decoration: const InputDecoration(
-                      hintText: 'Ask about your calendar or anything else...',
-                      contentPadding: EdgeInsets.symmetric(horizontal: 16.0),
-                      border: InputBorder.none,
-                    ),
-                    onSubmitted: _handleChatSubmitted,
-                    enabled: !_isLoading,
-                  ),
-                ),
-                IconButton(
-                  icon: Icon(_isLoading ? Icons.hourglass_empty : Icons.send),
-                  onPressed: _isLoading ? null : () => _handleChatSubmitted(_textController.text),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
-    final double heightPerMinute = _condensed ? 0.6 : 1.2;
+    final double heightPerMinute = _condensed 
+        ? AppConstants.condensedHeightPerMinute 
+        : AppConstants.normalHeightPerMinute;
 
     return Scaffold(
       appBar: AppBar(
@@ -1252,7 +618,7 @@ class CalendarPageState extends State<CalendarPage> {
             ),
           ),
           
-          // View toggle buttons with better spacing
+          // View toggle buttons
           Container(
             margin: const EdgeInsets.symmetric(horizontal: 4),
             child: Row(
@@ -1270,126 +636,13 @@ class CalendarPageState extends State<CalendarPage> {
       body: Stack(
         children: [
           // Calendar interface
-          _isInDayView
-              ? DayView(
-                  controller: _eventController,
-                  eventTileBuilder:
-                      (date, events, boundary, startDuration, endDuration) =>
-                          MyEventTileBuilder.buildEventTile(
-                            date,
-                            events,
-                            boundary,
-                            startDuration,
-                            endDuration,
-                            _showEventDetails,
-                            _showEventOptions,
-                            context,
-                          ),
-                  initialDay: _selectedDayViewDate ?? DateTime.now(),
-                  onEventTap: (events, date) =>
-                      _showEventDetails(context, events.first),
-                  timeLineBuilder: (date) =>
-                      CustomTimeline.buildTimeLineBuilder(date),
-                  dayTitleBuilder: (date) => Container(
-                    color: Colors.blue.shade50,
-                    padding: const EdgeInsets.all(16),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          "${CalendarDateUtils.getMonthName(date.month)} ${date.day}, ${date.year}",
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.blue.shade800,
-                          ),
-                        ),
-                        if (_previousViewIndex == 0)
-                          TextButton.icon(
-                            onPressed: () {
-                              setState(() {
-                                _selectedIndex = 1;
-                                _isInDayView = false;
-                                _selectedDayViewDate = null;
-                              });
-                            },
-                            icon: const Icon(Icons.view_week, size: 16),
-                            label: const Text('Week View'),
-                            style: TextButton.styleFrom(
-                              foregroundColor: Colors.blue.shade800,
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-                  heightPerMinute: heightPerMinute,
-                )
-              : IndexedStack(
-                  index: _selectedIndex,
-                  children: [
-                    LayoutBuilder(
-                      builder: (context, constraints) {
-                        return MonthView(
-                          controller: _eventController,
-                          cellAspectRatio: 0.7,
-                          onCellTap: (events, date) => _showDayView(date),
-                          onDateLongPress: (date) => EventDialogs.showDayEvents(
-                            context,
-                            _eventController.getEventsOnDay(date),
-                            date,
-                            _showEventDetails,
-                            _showEventOptions,
-                            _showAddEventDialog,
-                          ),
-                          onEventTap: (event, date) =>
-                              _showEventDetails(context, event),
-                          headerBuilder: (date) => Container(
-                            color: Colors.blue.shade50,
-                            padding: const EdgeInsets.all(16),
-                            child: Text(
-                              "${CalendarDateUtils.getMonthName(date.month)} ${date.year}",
-                              style: TextStyle(
-                                fontSize: 20,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.blue.shade800,
-                              ),
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                    WeekView(
-                      controller: _eventController,
-                      eventTileBuilder:
-                          (date, events, boundary, startDuration, endDuration) =>
-                              MyEventTileBuilder.buildEventTile(
-                                date,
-                                events,
-                                boundary,
-                                startDuration,
-                                endDuration,
-                                _showEventDetails,
-                                _showEventOptions,
-                                context,
-                              ),
-                      onDateTap: (date) => _showDayView(date),
-                      onEventTap: (events, date) =>
-                          _showEventDetails(context, events.first),
-                      timeLineBuilder: (date) =>
-                          CustomTimeline.buildTimeLineBuilder(date),
-                      heightPerMinute: heightPerMinute,
-                    ),
-                  ],
-                ),
+          _buildCalendarView(heightPerMinute),
           
           // Chat interface overlay
-          if (_isChatOpen)
-            Positioned(
-              bottom: 0,
-              left: 0,
-              right: 0,
-              child: _buildChatInterface(),
-            ),
+          ChatInterface(
+            isVisible: _isChatOpen,
+            onClose: _toggleChat,
+          ),
         ],
       ),
       floatingActionButton: Column(
@@ -1443,6 +696,111 @@ class CalendarPageState extends State<CalendarPage> {
     );
   }
 
+  Widget _buildCalendarView(double heightPerMinute) {
+    if (_isInDayView) {
+      return DayView(
+        controller: _eventController,
+        eventTileBuilder: (date, events, boundary, startDuration, endDuration) =>
+            MyEventTileBuilder.buildEventTile(
+              date,
+              events,
+              boundary,
+              startDuration,
+              endDuration,
+              _showEventDetails,
+              _showEventOptions,
+              context,
+            ),
+        initialDay: _selectedDayViewDate ?? DateTime.now(),
+        onEventTap: (events, date) => _showEventDetails(context, events.first),
+        timeLineBuilder: (date) => CustomTimeline.buildTimeLineBuilder(date),
+        dayTitleBuilder: (date) => Container(
+          color: Colors.blue.shade50,
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                "${CalendarDateUtils.getMonthName(date.month)} ${date.day}, ${date.year}",
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.blue.shade800,
+                ),
+              ),
+              if (_previousViewIndex == 0)
+                TextButton.icon(
+                  onPressed: () {
+                    setState(() {
+                      _selectedIndex = 1;
+                      _isInDayView = false;
+                      _selectedDayViewDate = null;
+                    });
+                  },
+                  icon: const Icon(Icons.view_week, size: 16),
+                  label: const Text('Week View'),
+                  style: TextButton.styleFrom(
+                    foregroundColor: Colors.blue.shade800,
+                  ),
+                ),
+            ],
+          ),
+        ),
+        heightPerMinute: heightPerMinute,
+      );
+    } else {
+      return IndexedStack(
+        index: _selectedIndex,
+        children: [
+          MonthView(
+            controller: _eventController,
+            cellAspectRatio: 0.7,
+            onCellTap: (events, date) => _showDayView(date),
+            onDateLongPress: (date) => EventDialogs.showDayEvents(
+              context,
+              _eventController.getEventsOnDay(date),
+              date,
+              _showEventDetails,
+              _showEventOptions,
+              _showAddEventDialog,
+            ),
+            onEventTap: (event, date) => _showEventDetails(context, event),
+            headerBuilder: (date) => Container(
+              color: Colors.blue.shade50,
+              padding: const EdgeInsets.all(16),
+              child: Text(
+                "${CalendarDateUtils.getMonthName(date.month)} ${date.year}",
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.blue.shade800,
+                ),
+              ),
+            ),
+          ),
+          WeekView(
+            controller: _eventController,
+            eventTileBuilder: (date, events, boundary, startDuration, endDuration) =>
+                MyEventTileBuilder.buildEventTile(
+                  date,
+                  events,
+                  boundary,
+                  startDuration,
+                  endDuration,
+                  _showEventDetails,
+                  _showEventOptions,
+                  context,
+                ),
+            onDateTap: (date) => _showDayView(date),
+            onEventTap: (events, date) => _showEventDetails(context, events.first),
+            timeLineBuilder: (date) => CustomTimeline.buildTimeLineBuilder(date),
+            heightPerMinute: heightPerMinute,
+          ),
+        ],
+      );
+    }
+  }
+
   String _getAppBarTitle() {
     if (_isInDayView) {
       return 'Day View';
@@ -1457,83 +815,216 @@ class CalendarPageState extends State<CalendarPage> {
     }
   }
 
-  void _addEventWithRecurring(
-    ExtendedCalendarEventData event, {
-    RecurringType? overrideRecurring,
-  }) {
-    print('=== _addEventWithRecurring called ===');
-    print('Event title: ${event.title}');
-    print('Event date: ${event.date}');
-    print('Event startTime: ${event.startTime}');
-    print('Event endTime: ${event.endTime}');
-    print('Event recurring: ${event.recurring}');
-    
+  // void _addEventWithRecurring(
+  //   ExtendedCalendarEventData event, {
+  //   RecurringType? overrideRecurring,
+  // }) {
+  //   final recurrence = overrideRecurring ?? event.recurring;
+  //   final color = _resolveEventColor(
+  //     project: event.project,
+  //     priority: event.priority,
+  //   );
+
+  //   final seriesId = event.seriesId;
+
+  //   _eventController.add(
+  //     ExtendedCalendarEventData(
+  //       title: event.title,
+  //       description: event.description,
+  //       date: _normalizeDate(event.date),
+  //       startTime: event.startTime ?? DateTime.now(),
+  //       endTime: event.endTime ?? DateTime.now().add(const Duration(hours: 1)),
+  //       color: color,
+  //       priority: event.priority,
+  //       project: event.project,
+  //       recurring: recurrence,
+  //       seriesId: seriesId,
+  //     ),
+  //   );
+
+  //   if (recurrence == RecurringType.none) return;
+
+  //   final baseDate = _normalizeDate(event.date);
+  //   final baseStart = event.startTime ?? baseDate;
+  //   final baseEnd = event.endTime ?? baseDate.add(Duration(hours: 1));
+
+  //   const maxDaysAhead = AppConstants.maxSchedulingDaysAhead;
+  //   int i = 1;
+  //   int addedCount = 0;
+
+  //   while (true) {
+  //     DateTime nextDate = baseDate;
+  //     DateTime nextStart = baseStart;
+  //     DateTime nextEnd = baseEnd;
+
+  //     switch (recurrence) {
+  //       case RecurringType.daily:
+  //         nextDate = _normalizeDate(baseDate.add(Duration(days: i)));
+  //         nextStart = baseStart.add(Duration(days: i));
+  //         nextEnd = baseEnd.add(Duration(days: i));
+  //         break;
+  //       case RecurringType.weekly:
+  //         nextDate = _normalizeDate(baseDate.add(Duration(days: i * 7)));
+  //         nextStart = baseStart.add(Duration(days: i * 7));
+  //         nextEnd = baseEnd.add(Duration(days: i * 7));
+  //         break;
+  //       case RecurringType.monthly:
+  //         nextDate = _normalizeDate(CalendarDateUtils.addMonths(baseDate, i));
+  //         nextStart = CalendarDateUtils.addMonths(baseStart, i);
+  //         nextEnd = CalendarDateUtils.addMonths(baseEnd, i);
+  //         break;
+  //       case RecurringType.yearly:
+  //         nextDate = _normalizeDate(
+  //           DateTime(baseDate.year + i, baseDate.month, baseDate.day),
+  //         );
+  //         nextStart = DateTime(
+  //           baseStart.year + i,
+  //           baseStart.month,
+  //           baseStart.day,
+  //           baseStart.hour,
+  //           baseStart.minute,
+  //         );
+  //         nextEnd = DateTime(
+  //           baseEnd.year + i,
+  //           baseEnd.month,
+  //           baseEnd.day,
+  //           baseEnd.hour,
+  //           baseEnd.minute,
+  //         );
+  //         break;
+  //       case RecurringType.none:
+  //         break;
+  //     }
+
+  //     if (nextDate.difference(baseDate).inDays > maxDaysAhead) break;
+
+  //     _eventController.add(
+  //       ExtendedCalendarEventData(
+  //         title: event.title,
+  //         description: event.description,
+  //         date: nextDate,
+  //         startTime: nextStart,
+  //         endTime: nextEnd,
+  //         color: color,
+  //         priority: event.priority,
+  //         project: event.project,
+  //         recurring: recurrence,
+  //         seriesId: seriesId,
+  //       ),
+  //     );
+
+  //     addedCount++;
+  //     i++;
+  //     if (i > AppConstants.maxRecurringEvents) break;
+  //   }
+  // }
+
+void _addEventWithRecurring(
+  ExtendedCalendarEventData event, {
+  RecurringType? overrideRecurring,
+}) {
+  try {
     final recurrence = overrideRecurring ?? event.recurring;
     final color = _resolveEventColor(
       project: event.project,
       priority: event.priority,
     );
 
-    final seriesId = event.seriesId;
-
     print("---- Adding Event ----");
-    print(
-      "Base event: ${event.title}, Date: ${event.date}, Recurring: $recurrence",
-    );
+    print("Title: ${event.title}");
+    print("Date: ${event.date}");
+    print("StartTime: ${event.startTime}");
+    print("EndTime: ${event.endTime}");
+    print("Recurring: $recurrence");
+    print("SeriesId: ${event.seriesId}");
 
-    _eventController.add(
-      ExtendedCalendarEventData(
-        title: event.title,
-        description: event.description,
-        date: _normalizeDate(event.date),
-        startTime: event.startTime ?? DateTime.now(),
-        endTime: event.endTime ?? DateTime.now().add(const Duration(hours: 1)),
-        color: color,
-        priority: event.priority,
-        project: event.project,
-        recurring: recurrence,
-        seriesId: seriesId,
-      ),
-    );
-
-    if (recurrence == RecurringType.none) {
-      print("No recurrence. Only base event added.");
+    // Validate the event data before adding
+    if (event.startTime == null || event.endTime == null) {
+      print("ERROR: Event has null startTime or endTime");
       return;
     }
 
-    final baseDate = _normalizeDate(event.date);
-    final baseStart = event.startTime ?? baseDate;
-    final baseEnd = event.endTime ?? baseDate.add(Duration(hours: 1));
+    if (event.startTime!.isAfter(event.endTime!)) {
+      print("ERROR: Event startTime is after endTime");
+      return;
+    }
 
-    const maxDaysAhead = 365;
+    // Create all events as NON-RECURRING to avoid library bugs
+    // We'll manually create the recurring instances
+    final baseEvent = ExtendedCalendarEventData(
+      title: event.title,
+      description: event.description ?? '',
+      date: event.date,
+      startTime: event.startTime!,
+      endTime: event.endTime!,
+      color: color,
+      priority: event.priority,
+      project: event.project,
+      recurring: RecurringType.none, // Always set to none to avoid library bugs
+      seriesId: event.seriesId,
+      task: event.task,
+      event: event.event,
+    );
+
+    // Add the base event
+    _eventController.add(baseEvent);
+    print("Base event added successfully");
+
+    // For non-recurring events, we're done
+    if (recurrence == RecurringType.none) {
+      print("No recurrence. Done.");
+      return;
+    }
+
+    // Generate recurring instances manually
+    print("Generating recurring instances manually...");
+    _generateManualRecurringEvents(baseEvent, recurrence);
+    
+  } catch (e, stackTrace) {
+    print("ERROR in _addEventWithRecurring: $e");
+    print("StackTrace: $stackTrace");
+  }
+}
+
+void _generateManualRecurringEvents(ExtendedCalendarEventData baseEvent, RecurringType recurrence) {
+  try {
+    const maxDaysAhead = 365; // AppConstants.maxSchedulingDaysAhead
+    const maxRecurringEvents = 50; // AppConstants.maxRecurringEvents
+    
+    final baseDate = baseEvent.date;
+    final baseStart = baseEvent.startTime!;
+    final baseEnd = baseEvent.endTime!;
+    final seriesId = baseEvent.seriesId;
+    
     int i = 1;
     int addedCount = 0;
 
-    while (true) {
-      DateTime nextDate = baseDate;
-      DateTime nextStart = baseStart;
-      DateTime nextEnd = baseEnd;
+    while (addedCount < maxRecurringEvents) {
+      DateTime nextDate;
+      DateTime nextStart;
+      DateTime nextEnd;
 
       switch (recurrence) {
         case RecurringType.daily:
-          nextDate = _normalizeDate(baseDate.add(Duration(days: i)));
+          nextDate = baseDate.add(Duration(days: i));
           nextStart = baseStart.add(Duration(days: i));
           nextEnd = baseEnd.add(Duration(days: i));
           break;
+          
         case RecurringType.weekly:
-          nextDate = _normalizeDate(baseDate.add(Duration(days: i * 7)));
+          nextDate = baseDate.add(Duration(days: i * 7));
           nextStart = baseStart.add(Duration(days: i * 7));
           nextEnd = baseEnd.add(Duration(days: i * 7));
           break;
+          
         case RecurringType.monthly:
-          nextDate = _normalizeDate(CalendarDateUtils.addMonths(baseDate, i));
-          nextStart = CalendarDateUtils.addMonths(baseStart, i);
-          nextEnd = CalendarDateUtils.addMonths(baseEnd, i);
+          nextDate = _addMonths(baseDate, i);
+          nextStart = _addMonths(baseStart, i);
+          nextEnd = _addMonths(baseEnd, i);
           break;
+          
         case RecurringType.yearly:
-          nextDate = _normalizeDate(
-            DateTime(baseDate.year + i, baseDate.month, baseDate.day),
-          );
+          nextDate = DateTime(baseDate.year + i, baseDate.month, baseDate.day);
           nextStart = DateTime(
             baseStart.year + i,
             baseStart.month,
@@ -1549,137 +1040,81 @@ class CalendarPageState extends State<CalendarPage> {
             baseEnd.minute,
           );
           break;
+          
         case RecurringType.none:
-          break;
+          return; // Should not reach here
       }
 
+      // Check if we've gone too far ahead
       if (nextDate.difference(baseDate).inDays > maxDaysAhead) {
-        print("Reached max recurrence range. Breaking loop.");
         break;
       }
 
-      _eventController.add(
-        ExtendedCalendarEventData(
-          title: event.title,
-          description: event.description,
-          date: nextDate,
-          startTime: nextStart,
-          endTime: nextEnd,
-          color: color,
-          priority: event.priority,
-          project: event.project,
-          recurring: recurrence,
-          seriesId: seriesId,
-        ),
+      // Create recurring event instance - IMPORTANT: Set recurring to NONE
+      final recurringEvent = ExtendedCalendarEventData(
+        title: "${baseEvent.title}", // Keep original title
+        description: baseEvent.description,
+        date: nextDate,
+        startTime: nextStart,
+        endTime: nextEnd,
+        color: baseEvent.color,
+        priority: baseEvent.priority,
+        project: baseEvent.project,
+        recurring: RecurringType.none, // CRITICAL: Set to none to avoid library bug
+        seriesId: seriesId, // Same series ID for all instances
+        task: baseEvent.task,
+        event: baseEvent.event,
       );
 
+      _eventController.add(recurringEvent);
       addedCount++;
       i++;
-      if (i > 400) break;
     }
 
-    print("Total recurring events added: $addedCount");
-  }
-
-  DateTime _normalizeDate(DateTime date) {
-    return DateTime(date.year, date.month, date.day);
-  }
-}
-
-// Chat message widgets
-class ChatMessage extends StatelessWidget {
-  final String text;
-  final bool isUserMessage;
-
-  const ChatMessage({
-    super.key,
-    required this.text,
-    this.isUserMessage = false,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final ThemeData theme = Theme.of(context);
-    final CrossAxisAlignment crossAxisAlignment =
-        isUserMessage ? CrossAxisAlignment.end : CrossAxisAlignment.start;
-
-    return Column(
-      crossAxisAlignment: crossAxisAlignment,
-      children: [
-        Container(
-          margin: const EdgeInsets.symmetric(vertical: 10.0, horizontal: 16.0),
-          padding: const EdgeInsets.all(10.0),
-          decoration: BoxDecoration(
-            color: isUserMessage
-                ? theme.colorScheme.primaryContainer
-                : theme.colorScheme.tertiaryContainer,
-            borderRadius: isUserMessage
-                ? const BorderRadius.only(
-                    topLeft: Radius.circular(8.0),
-                    topRight: Radius.circular(8.0),
-                    bottomLeft: Radius.circular(8.0),
-                    bottomRight: Radius.circular(0.0),
-                  )
-                : const BorderRadius.only(
-                    topLeft: Radius.circular(0.0),
-                    topRight: Radius.circular(8.0),
-                    bottomLeft: Radius.circular(8.0),
-                    bottomRight: Radius.circular(8.0),
-                  ),
-          ),
-          child: Text(
-            text,
-            style: theme.textTheme.titleMedium,
-          ),
-        ),
-      ],
-    );
+    print("Added $addedCount recurring instances");
+    
+  } catch (e, stackTrace) {
+    print("ERROR in _generateManualRecurringEvents: $e");
+    print("StackTrace: $stackTrace");
   }
 }
 
-class ErrorMessage extends ChatMessage {
-  const ErrorMessage({super.key, required super.text});
-
-  @override
-  Widget build(BuildContext context) {
-    final ThemeData theme = Theme.of(context);
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Container(
-          margin: const EdgeInsets.symmetric(vertical: 10.0, horizontal: 16.0),
-          padding: const EdgeInsets.all(10.0),
-          decoration: BoxDecoration(
-            color: theme.colorScheme.errorContainer,
-            borderRadius: const BorderRadius.only(
-              topLeft: Radius.circular(0.0),
-              topRight: Radius.circular(8.0),
-              bottomLeft: Radius.circular(8.0),
-              bottomRight: Radius.circular(8.0),
-            ),
-          ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Icon(
-                Icons.error_outline,
-                color: theme.colorScheme.onErrorContainer,
-                size: 20,
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  text,
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    color: theme.colorScheme.onErrorContainer,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
+// Helper method to add months safely
+DateTime _addMonths(DateTime date, int months) {
+  try {
+    int newYear = date.year;
+    int newMonth = date.month + months;
+    
+    while (newMonth > 12) {
+      newYear++;
+      newMonth -= 12;
+    }
+    
+    while (newMonth < 1) {
+      newYear--;
+      newMonth += 12;
+    }
+    
+    // Handle day overflow (e.g., Jan 31 + 1 month should be Feb 28/29)
+    int newDay = date.day;
+    int daysInNewMonth = DateTime(newYear, newMonth + 1, 0).day;
+    if (newDay > daysInNewMonth) {
+      newDay = daysInNewMonth;
+    }
+    
+    return DateTime(
+      newYear,
+      newMonth,
+      newDay,
+      date.hour,
+      date.minute,
+      date.second,
+      date.millisecond,
+      date.microsecond,
     );
+  } catch (e) {
+    print("Error in _addMonths: $e");
+    return date; // Return original date if calculation fails
   }
+}
 }

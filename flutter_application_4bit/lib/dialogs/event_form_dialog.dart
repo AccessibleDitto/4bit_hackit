@@ -4,7 +4,6 @@ import '../models/calendar_models.dart';
 import '../models/task_models.dart';
 import '../utils/date_utils.dart';
 import 'event_dialogs.dart';
-// import 'package:flutter_application_4bit/calendar_page.dart';
 
 class EventFormDialog {
   static void showEventDialog(
@@ -251,27 +250,30 @@ class EventFormDialog {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                // if (isEdit)
-                EventDialogs.buildActionButton(
-                  onPressed: () {
-                    Navigator.pop(context);
-                    print(event);
-                    
-                    // FIXED: Check if event is ExtendedCalendarEventData before accessing recurring
-                    if (event is ExtendedCalendarEventData && event.recurring != RecurringType.none) {
-                      _showDeleteOptionsDialog(context, event, onDeleteEvent, onDeleteSeries);
-                    } else {
-                      onDeleteEvent(event!);
-                    }
-                  },
-                  text: "Delete",
-                  icon: Icons.delete,
-                  color: Colors.red,
-                ),
+                // Delete button (only show when editing)
+                if (isEdit)
+                  EventDialogs.buildActionButton(
+                    onPressed: () {
+                      Navigator.pop(context);
+                      print("Delete pressed for event: ${event?.title}");
+                      
+                      // Check if event is ExtendedCalendarEventData with seriesId before accessing recurring
+                      if (event is ExtendedCalendarEventData && 
+                          event.seriesId != null && 
+                          event.seriesId!.isNotEmpty) {
+                        _showDeleteOptionsDialog(context, event, onDeleteEvent, onDeleteSeries);
+                      } else {
+                        onDeleteEvent(event!);
+                      }
+                    },
+                    text: "Delete",
+                    icon: Icons.delete,
+                    color: Colors.red,
+                  )
+                else
+                  const SizedBox(), // Empty spacer when not editing
 
-                // else
-                //   const SizedBox(width: 100), // Spacer when not editing
-
+                // Save/Update button
                 EventDialogs.buildActionButton(
                   onPressed: () {
                     if (titleController.text.isEmpty) return;
@@ -317,32 +319,36 @@ class EventFormDialog {
     );
   }
 
-  
   static void _showDeleteOptionsDialog(
     BuildContext context,
     ExtendedCalendarEventData event,
     Function(CalendarEventData) onDeleteEvent,
-    Function(String) onDeleteSeries, // add here
+    Function(String) onDeleteSeries,
   ) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Delete Event'),
-        content: const Text('Do you want to delete only this event or the entire series?'),
+        title: const Text('Delete Recurring Event'),
+        content: const Text('Do you want to delete only this event or the entire recurring series?'),
         actions: [
           TextButton(
             onPressed: () {
               Navigator.pop(context);
-              onDeleteEvent(event); // Delete only this one
+              onDeleteEvent(event); // Delete only this instance
             },
             child: const Text('Only this event'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
           ),
           ElevatedButton(
             onPressed: () {
               Navigator.pop(context);
-              onDeleteSeries(event.seriesId); // FIXED: Removed null assertion since seriesId is non-null
+              onDeleteSeries(event.seriesId!); // Delete entire series
             },
-            child: const Text('Entire series'),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('Entire series', style: TextStyle(color: Colors.white)),
           ),
         ],
       ),

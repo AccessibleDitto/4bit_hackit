@@ -32,8 +32,12 @@ class SchedulingService {
     try {
       final response = await _makeGroqApiCall(prompt);
       return _parseSchedulingResponse(response);
-    } catch (e) {
-      throw Exception('Scheduling failed: $e');
+    } catch (e, stackTrace) {
+      // Log the error and stack trace for debugging
+      print('⚠️ Scheduling failed: $e');
+      print('📜 Stack trace: $stackTrace');
+      print('📝 Prompt that caused error:\n$prompt');
+      rethrow; // keep throwing so caller knows it failed
     }
   }
   
@@ -133,16 +137,29 @@ Task Schema for schedule array:
       final data = jsonDecode(response.body);
       return data['choices'][0]['message']['content'];
     } else {
+      // Log the raw response for debugging
+      print('❌ API Error: ${response.statusCode}');
+      print('📩 Response body: ${response.body}');
       throw Exception('API Error: ${response.statusCode}');
     }
   }
   
-  SchedulingResult _parseSchedulingResponse(String response) {
-    try {
-      final data = jsonDecode(response);
-      return SchedulingResult.fromJson(data);
-    } catch (e) {
-      throw Exception('Failed to parse scheduling response: $e');
+ SchedulingResult _parseSchedulingResponse(String response) {
+  try {
+    // Clean up response: remove markdown fences if present
+    String cleaned = response.trim();
+    if (cleaned.startsWith('```')) {
+      // Remove ```json or ``` at the start and ending ```
+      cleaned = cleaned.replaceAll(RegExp(r'^```[a-zA-Z]*\n?'), '');
+      cleaned = cleaned.replaceAll(RegExp(r'```$'), '');
     }
+
+    final data = jsonDecode(cleaned);
+    return SchedulingResult.fromJson(data);
+  } catch (e) {
+    print('❌ Failed to parse response. Raw response:\n$response');
+    throw Exception('Failed to parse scheduling response: $e');
   }
+}
+
 }
