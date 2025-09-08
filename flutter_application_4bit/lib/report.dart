@@ -326,47 +326,78 @@ class _ReportScreenState extends State<ReportScreen> {
   }
 
   Widget _buildPomodoroChart() {
-    return Container(
-      height: MediaQuery.of(context).size.height * 0.25,
-      padding: EdgeInsets.all(MediaQuery.of(context).size.width * 0.04),
-      decoration: BoxDecoration(
-        color: Color(0xFF2D2D2D),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        children: [
-          // Time labels
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              for (int i = 8; i <= 20; i += 2)
-                Text(
-                  '${i.toString().padLeft(2, '0')}:00',
-                  style: TextStyle(color: Colors.grey[600], fontSize: MediaQuery.of(context).size.width * 0.025),
-                ),
-            ],
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          height: MediaQuery.of(context).size.height * 0.25,
+          padding: EdgeInsets.all(MediaQuery.of(context).size.width * 0.04),
+          decoration: BoxDecoration(
+            color: Color(0xFF2D2D2D),
+            borderRadius: BorderRadius.circular(12),
           ),
-          SizedBox(height: MediaQuery.of(context).size.height * 0.02),
-          Expanded(
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: List.generate(7, (i) {
-                final date = DateTime.now().subtract(Duration(days: 6 - i));
-                final label = i == 6
-                  ? 'Today'
-                  : i == 5
-                    ? 'Yester'
-                    : '${date.month}/${date.day}';
-                // TODO: Replace 0.3 + i*0.1 with actual focus time value for that day
-                final value = 0.3 + i * 0.1;
-                final colorList = [Colors.orange, Colors.green, Colors.yellow, Colors.orange, Colors.blue, Colors.purple, Colors.teal];
-                return _buildPomodoroBar(colorList[i % colorList.length], value, label);
+          child: BarChart(
+            BarChartData(
+              alignment: BarChartAlignment.spaceAround,
+              maxY: 10,
+              barTouchData: BarTouchData(enabled: false),
+              titlesData: FlTitlesData(
+                show: true,
+                bottomTitles: AxisTitles(
+                  sideTitles: SideTitles(
+                    showTitles: true,
+                    getTitlesWidget: (value, meta) {
+                      final i = value.toInt();
+                      final date = DateTime.now().subtract(Duration(days: 6 - i));
+                      final label = i == 6
+                        ? 'Today'
+                        : i == 5
+                          ? 'Yesterday'
+                          : '${date.month}/${date.day}';
+                      return Text(label, style: TextStyle(color: Colors.grey[600], fontSize: MediaQuery.of(context).size.width * 0.025));
+                    },
+                  ),
+                ),
+                leftTitles: AxisTitles(
+                  sideTitles: SideTitles(
+                    showTitles: true,
+                    getTitlesWidget: (value, meta) {
+                      return Text(
+                        value.toInt().toString(),
+                        style: TextStyle(color: Colors.grey[600], fontSize: 10),
+                      );
+                    },
+                  ),
+                ),
+                topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+              ),
+              gridData: FlGridData(show: false),
+              borderData: FlBorderData(show: false),
+              barGroups: List.generate(7, (i) {
+                // TODO: Replace with actual pomodoro count for each day
+                final pomodorosCompleted = 2 + i; // Example data
+                final colorList = [Color(0xFF9333EA), Color(0xFF10B981), Color(0xFF3B82F6), Color(0xFFEF4444), Color(0xFFF59E0B)];
+                return BarChartGroupData(
+                  x: i,
+                  barRods: [
+                    BarChartRodData(
+                      toY: pomodorosCompleted.toDouble(),
+                      color: colorList[i % colorList.length],
+                      width: 12,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ],
+                );
               }),
             ),
           ),
-        ],
-      ),
+        ),
+        Padding(
+          padding: EdgeInsets.only(top: 4, left: 8),
+          child: Text('no. of pomodoros completed', style: TextStyle(color: Colors.grey[400], fontSize: 12)),
+        ),
+      ],
     );
   }
 
@@ -468,7 +499,7 @@ class _ReportScreenState extends State<ReportScreen> {
   final firstDayOfMonth = DateTime(year, month, 1);
   final lastDayOfMonth = DateTime(year, month + 1, 0);
     final daysInMonth = lastDayOfMonth.day;
-    final firstWeekday = (firstDayOfMonth.weekday == 7) ? 0 : firstDayOfMonth.weekday; // Monday=1, Sunday=7
+    final firstWeekday = (firstDayOfMonth.weekday == 7) ? 0 : firstDayOfMonth.weekday;
     final today = DateTime.now();
     List<Widget> rows = [];
     int dayCounter = 1;
@@ -531,6 +562,9 @@ class _ReportScreenState extends State<ReportScreen> {
   }
 
   Widget _buildFocusTimeChart() {
+    // Use stacked bar chart data
+    final stackedBarGroups = _generateStackedBarGroups();
+    final tallestStackedBar = stackedBarGroups.map((g) => g.barRods.map((r) => r.toY).reduce((a, b) => a > b ? a : b)).reduce((a, b) => a > b ? a : b);
     return Container(
       height: MediaQuery.of(context).size.height * 0.25,
       padding: EdgeInsets.all(MediaQuery.of(context).size.width * 0.04),
@@ -541,7 +575,7 @@ class _ReportScreenState extends State<ReportScreen> {
       child: BarChart(
         BarChartData(
           alignment: BarChartAlignment.spaceAround,
-          maxY: 7,
+          maxY: tallestStackedBar.ceilToDouble(),
           barTouchData: BarTouchData(enabled: false),
           titlesData: FlTitlesData(
             show: true,
@@ -549,8 +583,19 @@ class _ReportScreenState extends State<ReportScreen> {
               sideTitles: SideTitles(
                 showTitles: true,
                 getTitlesWidget: (value, meta) {
+                  final i = value.toInt();
+                  final daysAgo = 6 - i;
+                  String label;
+                  if (daysAgo == 0) {
+                    label = 'Today';
+                  } else if (daysAgo == 1) {
+                    label = 'Yesterday';
+                  } else {
+                    final date = DateTime.now().subtract(Duration(days: daysAgo));
+                    label = '${date.month}/${date.day}';
+                  }
                   return Text(
-                    value.toInt().toString(),
+                    label,
                     style: TextStyle(color: Colors.grey[600], fontSize: 10),
                   );
                 },
@@ -572,30 +617,62 @@ class _ReportScreenState extends State<ReportScreen> {
           ),
           gridData: FlGridData(show: false),
           borderData: FlBorderData(show: false),
-          barGroups: _generateBarGroups(),
+          barGroups: stackedBarGroups,
         ),
       ),
     );
   }
 
-  List<BarChartGroupData> _generateBarGroups() {
+  List<BarChartGroupData> _generateStackedBarGroups() {
     final colors = [
-      Colors.red,
-      Colors.orange,
-      Colors.yellow,
-      Colors.green,
-      Colors.blue,
-      Colors.purple,
       Colors.teal,
+      Colors.green,
+      Colors.yellow,
+      Colors.orange,
+      Colors.red,
+      Colors.purple,
+      Colors.blue,
+      Colors.cyan,
+      Colors.pink,
+      Colors.brown,
+      Colors.grey,
+      Colors.indigo,
     ];
     
-    return List.generate(14, (index) {
+    // Data representing stacked segments for each bar
+    final stackedData = [
+      [0.5, 0.8, 1.2, 1.5],
+      [0.4, 0.9, 1.4, 1.6, 1.9],
+      [0.3, 0.7, 1.1, 1.8, 2.2],
+      [0.2, 0.6, 1.0, 1.3, 1.7, 2.8],
+      [0.4, 0.8, 1.5, 1.8, 2.4, 2.7],
+      [0.3, 0.9, 1.2, 1.7, 2.2, 2.8, 4.3],
+      [0.5, 1.0, 1.8, 2.5, 3.0, 4.0, 4.8],
+      [0.2, 0.8, 1.5, 2.2, 2.8, 3.5, 4.0, 4.7],
+    ];
+    
+    return List.generate(7, (index) {
+      final segments = stackedData[index];
+      List<BarChartRodStackItem> stackItems = [];
+      
+      for (int i = 0; i < segments.length; i++) {
+        double fromY = i == 0 ? 0 : segments[i - 1];
+        double toY = segments[i];
+        stackItems.add(
+          BarChartRodStackItem(
+            fromY,
+            toY,
+            colors[i % colors.length],
+          ),
+        );
+      }
+      
       return BarChartGroupData(
         x: index,
         barRods: [
           BarChartRodData(
-            toY: (index % 7 + 1).toDouble(),
-            color: colors[index % colors.length],
+            toY: segments.last,
+            rodStackItems: stackItems,
             width: 12,
             borderRadius: BorderRadius.circular(2),
           ),
@@ -774,6 +851,13 @@ class _ReportScreenState extends State<ReportScreen> {
       decoration: BoxDecoration(
         color: Color(0xFF2D2D2D),
         borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.08),
+            blurRadius: 8,
+            offset: Offset(0, 2),
+          ),
+        ],
       ),
       child: BarChart(
         BarChartData(
@@ -786,9 +870,20 @@ class _ReportScreenState extends State<ReportScreen> {
               sideTitles: SideTitles(
                 showTitles: true,
                 getTitlesWidget: (value, meta) {
+                  final i = value.toInt();
+                  final daysAgo = 6 - i;
+                  String label;
+                  if (daysAgo == 0) {
+                    label = 'Today';
+                  } else if (daysAgo == 1) {
+                    label = 'Yesterday';
+                  } else {
+                    final date = DateTime.now().subtract(Duration(days: daysAgo));
+                    label = '${date.month}/${date.day}';
+                  }
                   return Text(
-                    value.toInt().toString(),
-                    style: TextStyle(color: Colors.grey[600], fontSize: 10),
+                    label,
+                    style: TextStyle(color: Colors.grey[600], fontSize: 10, fontWeight: FontWeight.w600),
                   );
                 },
               ),
@@ -799,7 +894,7 @@ class _ReportScreenState extends State<ReportScreen> {
                 getTitlesWidget: (value, meta) {
                   return Text(
                     value.toInt().toString(),
-                    style: TextStyle(color: Colors.grey[600], fontSize: 10),
+                    style: TextStyle(color: Colors.blueGrey, fontSize: 10, fontWeight: FontWeight.w500),
                   );
                 },
               ),
@@ -809,30 +904,54 @@ class _ReportScreenState extends State<ReportScreen> {
           ),
           gridData: FlGridData(show: false),
           borderData: FlBorderData(show: false),
-          barGroups: _generateTaskBarGroups(),
+          barGroups: _generateTaskStackedBarGroups(),
         ),
       ),
     );
   }
 
-  List<BarChartGroupData> _generateTaskBarGroups() {
+  List<BarChartGroupData> _generateTaskStackedBarGroups() {
     final colors = [
-      Colors.orange,
-      Colors.blue,
-      Colors.green,
-      Colors.purple,
-      Colors.yellow,
-      Colors.red,
-      Colors.teal,
+      Color(0xFF9333EA),
+      Color(0xFF10B981),
+      Color(0xFF3B82F6),
+      Color(0xFFEF4444),
+      Color(0xFFF59E0B),
     ];
     
-    return List.generate(14, (index) {
+    // Task chart stacked data
+    final taskStackedData = [
+      [0.3, 1.0, 2.0, 3.0, 4.0, 5.0],
+      [0.5, 1.2, 2.2, 3.0, 4.0],
+      [0.2, 0.8, 1.5, 2.0, 3.0],
+      [0.4, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0],
+      [0.3, 0.8, 1.8, 2.5, 3.0, 4.0],
+      [0.5, 1.2, 2.0, 3.2, 4.0, 5.0, 6.0],
+      [0.2, 1.0, 2.2, 3.0, 4.0, 5.0, 7.0],
+    ];
+    
+    return List.generate(7, (index) {
+      final segments = taskStackedData[index];
+      List<BarChartRodStackItem> stackItems = [];
+      
+      for (int i = 0; i < segments.length; i++) {
+        double fromY = i == 0 ? 0 : segments[i - 1];
+        double toY = segments[i];
+        stackItems.add(
+          BarChartRodStackItem(
+            fromY,
+            toY,
+            colors[i % colors.length],
+          ),
+        );
+      }
+      
       return BarChartGroupData(
         x: index,
         barRods: [
           BarChartRodData(
-            toY: (index % 6 + 2).toDouble(),
-            color: colors[index % colors.length],
+            toY: segments.last,
+            rodStackItems: stackItems,
             width: 12,
             borderRadius: BorderRadius.circular(2),
           ),

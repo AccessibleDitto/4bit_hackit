@@ -29,7 +29,6 @@ class TimerModePage extends StatefulWidget {
 
 class _TimerModePageState extends State<TimerModePage> with TickerProviderStateMixin {
   late AudioPlayer _audioPlayer;
-  OverlayEntry? _topNotificationEntry;
   late VoidCallback _settingsListener;
 
   Timer? _timer;
@@ -58,27 +57,43 @@ class _TimerModePageState extends State<TimerModePage> with TickerProviderStateM
 
   final UserStats _userStats = UserStats();
 
-  final List<Task> _tasks = TimerUtils.getDefaultTasks();
   dynamic _currentFullTask; // Track the currently selected full task with timeSpent
   int _sessionStartTime = 0; // Track when the current session started (in seconds since epoch)
   int _initialEstimatedSeconds = 0; // Track the estimated time for progress calculation
 
   void _showTaskSelectionModal() {
+    // Filter out completed tasks (where timeSpent >= estimatedTime)
+    final fullTasks = TaskData.getTasksList();
+    const colorOrder = [
+      Color(0xFF9333EA),
+      Color(0xFF10B981),
+      Color(0xFF3B82F6),
+      Color(0xFFEF4444),
+      Color(0xFFF59E0B),
+    ];
+    // Map fullTasks to TimerModels.Task for dropdown
+    final incompleteTasks = fullTasks
+      .where((t) => t.timeSpent < t.estimatedTime)
+      .toList();
+    final dropdownTasks = incompleteTasks.asMap().map((index, t) => MapEntry(index, Task(
+      title: t.title,
+      color: colorOrder[index % colorOrder.length],
+      estimatedTime: t.estimatedTime,
+      focusMinutes: 25,
+    ))).values.toList();
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
       builder: (BuildContext context) {
         return TaskSelectionModal(
-          tasks: _tasks,
+          tasks: dropdownTasks,
           onTaskSelected: (task) {
-            // Find the corresponding full task from tasks_updated.dart
-            final fullTasks = TaskData.getTasksList(); // Get the full task list
+            // Find the corresponding full task from fullTasks
             final fullTask = fullTasks.firstWhere(
               (t) => t.title == task.title,
               orElse: () => fullTasks.first, // Fallback to first task if not found
             );
-            
             setState(() {
               _selectedTask = task.title;
               _currentFullTask = fullTask;
@@ -436,46 +451,6 @@ class _TimerModePageState extends State<TimerModePage> with TickerProviderStateM
         _timerState = TimerState.idle;
         _progressAnimationController.reset();
       }
-    });
-  }
-
-  void _showTopNotification(String message, {Color backgroundColor = Colors.black87}) {
-    _topNotificationEntry?.remove();
-    _topNotificationEntry = OverlayEntry(
-      builder: (context) => Positioned(
-        top: MediaQuery.of(context).padding.top + 56,
-        left: 0,
-        right: 0,
-        child: Material(
-          color: Colors.transparent,
-          child: Container(
-            margin: const EdgeInsets.symmetric(horizontal: 24),
-            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 20),
-            decoration: BoxDecoration(
-              color: backgroundColor,
-              borderRadius: BorderRadius.circular(12),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black26,
-                  blurRadius: 8,
-                  offset: Offset(0, 2),
-                ),
-              ],
-            ),
-            child: Center(
-              child: Text(
-                message,
-                style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-    Overlay.of(context, rootOverlay: true).insert(_topNotificationEntry!);
-    Future.delayed(const Duration(seconds: 5), () {
-      _topNotificationEntry?.remove();
-      _topNotificationEntry = null;
     });
   }
 
