@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'services/user_stats_service.dart';
 import 'services/firebase_service.dart';
+import 'theme/app_theme.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -59,22 +60,14 @@ class _ProfileScreenState extends State<ProfileScreen>
   @override
   void initState() {
     super.initState();
-    _userStats.initializeSampleData();
-    // from firebase
-    _loadUserData();
     
-    // Initialize form with current data
-    _fullNameController.text = _currentFullName;
-    _usernameController.text = _currentUsername;
-    _selectedGender = _currentGender;
-
     _animationController = AnimationController(
       duration: const Duration(milliseconds: 800),
       vsync: this,
     );
 
     _editAnimationController = AnimationController(
-      duration: const Duration(milliseconds: 400),
+      duration: const Duration(milliseconds: 400), 
       vsync: this,
     );
 
@@ -82,21 +75,25 @@ class _ProfileScreenState extends State<ProfileScreen>
 
     _fadeAnimation = CurvedAnimation(
       parent: _animationController,
-      curve: Curves.easeOut,
+      curve: Curves.easeOut, 
     );
 
     _slideAnimation = Tween<Offset>(
-      begin: const Offset(0, 0.3),
+      begin: const Offset(0, 0.2), 
       end: Offset.zero,
     ).animate(CurvedAnimation(
       parent: _animationController,
-      curve: Curves.elasticOut,
+      curve: Curves.elasticOut, 
     ));
 
     _editModeAnimation = CurvedAnimation(
       parent: _editAnimationController,
       curve: Curves.easeInOut,
     );
+
+    _fullNameController.text = _currentFullName;
+    _usernameController.text = _currentUsername;
+    _selectedGender = _currentGender;
 
     _scaleAnimation = Tween<double>(
       begin: 0.0,
@@ -106,8 +103,11 @@ class _ProfileScreenState extends State<ProfileScreen>
       curve: Curves.elasticOut,
     ));
 
-    // Start animation
-    _animationController.forward();
+    _loadUserData();
+    
+    Future.delayed(const Duration(milliseconds: 100), () {
+      if (mounted) _animationController.forward();
+    });
   }
 
   @override
@@ -123,7 +123,7 @@ class _ProfileScreenState extends State<ProfileScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF121212),
+      backgroundColor: AppColors.background,
       body: SafeArea(
         child: Column(
           children: [
@@ -706,108 +706,116 @@ class _ProfileScreenState extends State<ProfileScreen>
 
   Future<void> _loadUserData() async {
     try {
-      // get current user email 
       final prefs = await SharedPreferences.getInstance();
       _currentUserEmail = prefs.getString('current_user_email');
       
-      if (_currentUserEmail != null) {
-        debugPrint('Loading user data for: $_currentUserEmail');
-        
-        // load user data frm firebase
-        final userData = await _firebaseService.loadGmailUserData(_currentUserEmail!);
-        
-        // Extract user information
-        final userInfo = userData['userData'] as Map<String, dynamic>?;
-        
-        setState(() {
-          // Set name and username based on email if user info exists
-          if (userInfo != null) {
-            _currentFullName = userInfo['name'] ?? _extractNameFromEmail(_currentUserEmail!);
-            _currentUsername = userInfo['username'] ?? _extractUsernameFromEmail(_currentUserEmail!);
-            final loadedGender = userInfo['gender'] ?? 'Prefer not to say';
-            _currentGender = loadedGender;
-            _selectedGender = loadedGender;
-            
-            // Format the joined date
-            if (userInfo['createdAt'] != null) {
-              final timestamp = userInfo['createdAt'];
-              DateTime? dateTime;
-              
-              if (timestamp is Timestamp) {
-                // Handle Firestore Timestamp object
-                dateTime = timestamp.toDate();
-              } else if (timestamp is Map) {
-                // Handle Firestore Timestamp as Map
-                if (timestamp.containsKey('_seconds')) {
-                  final seconds = timestamp['_seconds'] as int;
-                  dateTime = DateTime.fromMillisecondsSinceEpoch(seconds * 1000);
-                } else if (timestamp.containsKey('seconds')) {
-                  final seconds = timestamp['seconds'] as int;
-                  dateTime = DateTime.fromMillisecondsSinceEpoch(seconds * 1000);
-                }
-              } else if (timestamp is int) {
-                // Handle Unix timestamp in seconds
-                dateTime = DateTime.fromMillisecondsSinceEpoch(timestamp * 1000);
-              } else if (timestamp is double) {
-                // Handle Unix timestamp as double
-                dateTime = DateTime.fromMillisecondsSinceEpoch((timestamp * 1000).round());
-              }
-              
-              if (dateTime != null) {
-                _joinedDate = _formatDate(dateTime);
-                debugPrint('Parsed join date: $_joinedDate from timestamp: $timestamp');
-              } else {
-                _joinedDate = 'Unknown';
-                debugPrint('Could not parse timestamp: $timestamp (type: ${timestamp.runtimeType})');
-              }
-            } else {
-              _joinedDate = 'Unknown';
-              debugPrint('No createdAt field found in user data');
-            }
-          } else {
-            // Fallback to email-based data
-            _currentFullName = _extractNameFromEmail(_currentUserEmail!);
-            _currentUsername = _extractUsernameFromEmail(_currentUserEmail!);
-            _currentGender = 'Prefer not to say';
-            _selectedGender = 'Prefer not to say';
-            _joinedDate = 'Recently';
-          }
-          
-          // update form 
-          _fullNameController.text = _currentFullName;
-          _usernameController.text = _currentUsername;
-        });
-        
-        debugPrint('Loaded user data: Name=$_currentFullName, Username=$_currentUsername, Gender=$_currentGender, Joined=$_joinedDate');
-      } else {
-        debugPrint('No current user email found in SharedPreferences');
-        // dropdown
-        setState(() {
-          _currentFullName = 'User';
-          _currentUsername = 'user';
-          _currentGender = 'Prefer not to say';
-          _selectedGender = 'Prefer not to say';
-          _joinedDate = 'Recently';
-          
-          // update form 
-          _fullNameController.text = _currentFullName;
-          _usernameController.text = _currentUsername;
-        });
+      if (_currentUserEmail == null) {
+        debugPrint('Profile: No user email found, using defaults');
+        _setDefaultUserData();
+        return;
       }
-    } catch (e) {
-      debugPrint('Error loading user data: $e');
-      // default values in case of error
-      setState(() {
-        _currentFullName = 'User';
-        _currentUsername = 'user';
-        _currentGender = 'Prefer not to say';
-        _selectedGender = 'Prefer not to say';
-        _joinedDate = 'Recently';
+      debugPrint('Profile: Loading user data for: $_currentUserEmail');
+      final userData = await _firebaseService.loadGmailUserData(_currentUserEmail!);
+      
+      if (mounted) {
+        _processUserData(userData);
+      }
+      
+    } catch (error) {
+      debugPrint('Profile: Error loading user data: $error');
+      if (mounted) {
+        _setDefaultUserData();
+        _showErrorMessage('Failed to load profile data');
+      }
+    }
+  }
+
+  void _processUserData(Map<String, dynamic> userData) {
+    final userInfo = userData['userData'] as Map<String, dynamic>?;
+    
+    setState(() {
+      if (userInfo != null) {
+        // update profile
+        _currentFullName = userInfo['name'] ?? _extractNameFromEmail(_currentUserEmail!);
+        _currentUsername = userInfo['username'] ?? _extractUsernameFromEmail(_currentUserEmail!);
+        final loadedGender = userInfo['gender'] ?? 'Prefer not to say';
+        _currentGender = loadedGender;
+        _selectedGender = loadedGender;
         
-        // update form 
+        _processJoinDate(userInfo['createdAt']);
+        
+        // update form controllers
         _fullNameController.text = _currentFullName;
         _usernameController.text = _currentUsername;
-      });
+        
+        debugPrint('Profile: Successfully loaded user data for $_currentFullName');
+      } else {
+        _setDefaultUserData();
+      }
+      _loadUserStatsData();
+    });
+  }
+
+  // firebase integration 
+  Future<void> _loadUserStatsData() async {
+    try {
+      await _userStats.initializeFromFirebase();
+      debugPrint('Profile: User stats loaded from Firebase successfully');
+    } catch (error) {
+      debugPrint('Profile: Error loading stats data: $error');
+      _userStats.initializeSampleData();
+    }
+  }
+
+  // set default user data for fallback
+  void _setDefaultUserData() {
+    setState(() {
+      _currentFullName = _extractNameFromEmail(_currentUserEmail ?? 'User');
+      _currentUsername = _extractUsernameFromEmail(_currentUserEmail ?? 'user');
+      _currentGender = 'Prefer not to say';
+      _selectedGender = _currentGender;
+      _fullNameController.text = _currentFullName;
+      _usernameController.text = _currentUsername;
+    });
+  }
+
+  void _processJoinDate(dynamic timestamp) {
+    try {
+      DateTime? dateTime;
+      
+      if (timestamp is Timestamp) {
+        dateTime = timestamp.toDate();
+      } else if (timestamp is Map) {
+        if (timestamp.containsKey('_seconds')) {
+          final seconds = timestamp['_seconds'] as int;
+          dateTime = DateTime.fromMillisecondsSinceEpoch(seconds * 1000);
+        } else if (timestamp.containsKey('seconds')) {
+          final seconds = timestamp['seconds'] as int;
+          dateTime = DateTime.fromMillisecondsSinceEpoch(seconds * 1000);
+        }
+      } else if (timestamp is int) {
+        dateTime = DateTime.fromMillisecondsSinceEpoch(timestamp * 1000);
+      }
+      
+      if (dateTime != null) {
+        _joinedDate = _formatJoinDate(dateTime);
+        debugPrint('Profile: Parsed join date: $_joinedDate');
+      }
+    } catch (e) {
+      debugPrint('Profile: Error parsing join date: $e');
+      _joinedDate = 'Recently'; // fallback
+    }
+  }
+
+  void _showErrorMessage(String message) {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(message),
+          backgroundColor: AppColors.error,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
     }
   }
 
@@ -822,7 +830,7 @@ class _ProfileScreenState extends State<ProfileScreen>
     return email.split('@')[0].replaceAll('.', '');
   }
 
-  String _formatDate(DateTime date) {
+  String _formatJoinDate(DateTime date) {
     final months = [
       'January', 'February', 'March', 'April', 'May', 'June',
       'July', 'August', 'September', 'October', 'November', 'December'

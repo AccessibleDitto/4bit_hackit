@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'services/firebase_service.dart';
 import 'register.dart';
-// import 'calendar_page.dart';
+import 'theme/app_theme.dart';
 
 // Firebase Authentication login page
 class LoginPage extends StatefulWidget {
@@ -119,71 +119,32 @@ class _LoginPageState extends State<LoginPage> {
   @override
   Widget build(BuildContext context) {
     return Theme(
-      data: ThemeData.dark().copyWith(
-        scaffoldBackgroundColor: const Color(0xFF181829),
-        inputDecorationTheme: InputDecorationTheme(
-          filled: true,
-          fillColor: const Color(0xFF2D223A),
-          hintStyle: const TextStyle(color: Colors.white70),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(18),
-            borderSide: BorderSide.none,
-          ),
-        ),
-        textTheme: const TextTheme(
-          bodyLarge: TextStyle(color: Colors.white),
-          bodyMedium: TextStyle(color: Colors.white70),
-          titleLarge: TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        appBarTheme: const AppBarTheme(
-          backgroundColor: Colors.transparent,
-          foregroundColor: Colors.white,
-          elevation: 0,
-        ),
-        elevatedButtonTheme: ElevatedButtonThemeData(
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Color(0xFF8F5CF7),
-            foregroundColor: Colors.white,
-            shape: const StadiumBorder(),
-            padding: EdgeInsets.symmetric(vertical: 16),
-          ),
-        ),
-        textButtonTheme: TextButtonThemeData(
-          style: TextButton.styleFrom(foregroundColor: Color(0xFFFFA726)),
-        ),
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: Color(0xFF8F5CF7),
-        ).copyWith(secondary: Color(0xFFFFA726)),
-      ),
+      data: AppTheme.darkTheme,
       child: Scaffold(
-        appBar: AppBar(
-          leading: Navigator.canPop(context)
-              ? IconButton(
-                  icon: const Icon(Icons.arrow_back),
-                  onPressed: () => Navigator.of(context).pop(),
-                )
-              : null,
-        ),
         body: Container(
-          margin: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [
-              _header(context),
-              _inputField(context),
-              if (_errorMessage != null)
-                Padding(
-                  padding: const EdgeInsets.only(top: 8.0),
-                  child: Text(
-                    _errorMessage!,
-                    style: const TextStyle(color: Colors.redAccent),
-                  ),
-                ),
-              _signup(context),
-            ],
+          decoration: const BoxDecoration(
+            gradient: AppColors.backgroundGradient,
+          ),
+          child: SafeArea(
+            child: Container(
+              margin: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  _header(context),
+                  _inputField(context),
+                  if (_errorMessage != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8.0),
+                      child: Text(
+                        _errorMessage!,
+                        style: const TextStyle(color: Colors.redAccent),
+                      ),
+                    ),
+                  _signup(context),
+                ],
+              ),
+            ),
           ),
         ),
       ),

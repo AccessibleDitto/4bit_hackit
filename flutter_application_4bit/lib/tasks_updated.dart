@@ -165,6 +165,29 @@ List<Task> tasks = [
 // Getter function to expose tasks for other files
 List<Task> getTasksList() => tasks;
 
+// Function to update the whole task and save it
+void saveTask(Task updatedTask) {
+  int index = tasks.indexWhere((task) => task.id == updatedTask.id);
+  if (index != -1) {
+    tasks[index] = updatedTask;
+    // Can add Firebase saving logic here later on
+    // For now, just update the local list
+  }
+}
+
+// Function to update a task's timeSpent by ID
+void updateTaskTimeSpent(String taskId, double additionalTimeSpent) {
+  int index = tasks.indexWhere((task) => task.id == taskId);
+  if (index != -1) {
+    final currentTask = tasks[index];
+    final updatedTask = currentTask.copyWith(
+      timeSpent: currentTask.timeSpent + additionalTimeSpent,
+    );
+    tasks[index] = updatedTask;
+    // Can add Firebase saving logic here later
+  }
+}
+
 class _TasksPageState extends State<TasksPage> {
   bool _showAddMenu = false;
   String _searchQuery = '';

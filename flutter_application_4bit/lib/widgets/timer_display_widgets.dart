@@ -139,26 +139,42 @@ class SessionIndicator extends StatelessWidget {
     final screenWidth = MediaQuery.of(context).size.width;
     final circleSize = screenWidth * 0.7;
     
+    // Calculate session number (represented by dot) sizes and spacing
+    final dotSize = circleSize * 0.04;
+    final dotSpacing = circleSize * 0.013 * 2;
+    final totalWidth = (totalSessions * dotSize) + ((totalSessions - 1) * dotSpacing);
+    final padding = (screenWidth - totalWidth) / 2;
+
     return Container(
       margin: EdgeInsets.only(bottom: circleSize * 0.133),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: List.generate(totalSessions, (index) {
-          final dotSize = circleSize * 0.04;
-          final activeDotSize = circleSize * 0.048;
-          
-          return Container(
-            margin: EdgeInsets.symmetric(horizontal: circleSize * 0.013),
-            width: index < currentSession ? activeDotSize : dotSize,
-            height: index < currentSession ? activeDotSize : dotSize,
-            decoration: BoxDecoration(
-              color: index < currentSession 
-                ? const Color(0xFF9333EA)
-                : const Color(0xFF9333EA).withOpacity(0.3),
-              shape: BoxShape.circle,
-            ),
-          );
-        }),
+      width: screenWidth,
+      height: circleSize * 0.06,
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Container(
+          padding: EdgeInsets.symmetric(horizontal: padding),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: List.generate(totalSessions, (index) {
+              final dotSize = circleSize * 0.04;
+              final activeDotSize = circleSize * 0.048;
+              final isCurrent = index + 1 == currentSession;
+              final isCompleted = index + 1 < currentSession;
+              
+              return Container(
+                margin: EdgeInsets.symmetric(horizontal: circleSize * 0.013),
+                width: isCurrent ? activeDotSize : dotSize,
+                height: isCurrent ? activeDotSize : dotSize,
+                decoration: BoxDecoration(
+                  color: isCompleted || isCurrent
+                    ? const Color(0xFF9333EA)
+                    : const Color(0xFF9333EA).withOpacity(0.3),
+                  shape: BoxShape.circle,
+                ),
+              );
+            }),
+          ),
+        ),
       ),
     );
   }

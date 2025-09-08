@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'services/firebase_service.dart';
 import 'login.dart';
+import 'theme/app_theme.dart';
 
 class SignupPage extends StatefulWidget {
   const SignupPage({super.key});
@@ -86,50 +87,28 @@ class _SignupPageState extends State<SignupPage> {
   @override
   Widget build(BuildContext context) {
     return Theme(
-      data: ThemeData.dark().copyWith(
-        scaffoldBackgroundColor: const Color(0xFF181829),
-        inputDecorationTheme: InputDecorationTheme(
-          filled: true,
-          fillColor: const Color(0xFF2D223A),
-          hintStyle: const TextStyle(color: Colors.white70),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(18),
-            borderSide: BorderSide.none,
-          ),
-        ),
-        textTheme: const TextTheme(
-          bodyLarge: TextStyle(color: Colors.white),
-          bodyMedium: TextStyle(color: Colors.white70),
-          titleLarge: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-        ),
-        appBarTheme: const AppBarTheme(
-          backgroundColor: Colors.transparent,
-          foregroundColor: Colors.white,
-          elevation: 0,
-        ),
-        elevatedButtonTheme: ElevatedButtonThemeData(
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Color(0xFFFFA726),
-            foregroundColor: Colors.white,
-            shape: const StadiumBorder(),
-            padding: EdgeInsets.symmetric(vertical: 16),
-          ),
-        ),
-        textButtonTheme: TextButtonThemeData(
-          style: TextButton.styleFrom(foregroundColor: Color(0xFF8F5CF7)),
-        ),
-        colorScheme: ColorScheme.fromSeed(seedColor: Color(0xFFFFA726)).copyWith(secondary: Color(0xFF8F5CF7)),
-      ),
+      data: AppTheme.darkTheme,
       child: Scaffold(
-        appBar: AppBar(
-          leading: Navigator.canPop(context)
-              ? IconButton(
-                  icon: const Icon(Icons.arrow_back),
-                  onPressed: () => Navigator.of(context).pop(),
-                )
-              : null,
+        body: Container(
+          decoration: const BoxDecoration(
+            gradient: AppColors.backgroundGradient,
+          ),
+          child: SafeArea(
+            child: Scaffold(
+              backgroundColor: Colors.transparent,
+              appBar: AppBar(
+                backgroundColor: Colors.transparent,
+                leading: Navigator.canPop(context)
+                    ? IconButton(
+                        icon: const Icon(Icons.arrow_back),
+                        onPressed: () => Navigator.of(context).pop(),
+                      )
+                    : null,
+              ),
+              body: _page(),
+            ),
+          ),
         ),
-        body: _page(),
       ),
     );
   }

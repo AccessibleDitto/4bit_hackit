@@ -2,6 +2,7 @@ import 'package:just_audio/just_audio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../pomodoro_preferences.dart';
 
 class AmbientMusicController extends StatefulWidget {
   final bool isAmbientMusic;
@@ -258,14 +259,10 @@ class _TimerModeModalState extends State<TimerModeModal> {
     _selectedIsCountdown = widget.isCountdownMode;
   }
 
-  String _formatTime(int seconds) {
-    final minutes = seconds ~/ 60;
-    return '${minutes.toString().padLeft(2, '0')}:00';
-  }
-
   @override
   Widget build(BuildContext context) {
-    final focusTime = _formatTime(widget.focusSeconds);
+    final pomodoroLength = PomodoroSettings.instance.pomodoroLength;
+    final focusTime = '${pomodoroLength.toString().padLeft(2, '0')}:00';
     
     return Container(
       padding: const EdgeInsets.all(24),

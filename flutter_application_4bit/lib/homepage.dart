@@ -8,6 +8,7 @@ import 'dart:async';
 
 // Import the modular files
 import 'models/timer_models.dart';
+import 'tasks_updated.dart' as TaskData show getTasksList, updateTaskTimeSpent;
 import 'services/user_stats_service.dart';
 import 'utils/timer_utils.dart';
 import 'widgets/app_bar_widgets.dart';
@@ -34,18 +35,18 @@ class _TimerModePageState extends State<TimerModePage> with TickerProviderStateM
   Timer? _timer;
   int get _focusSeconds => PomodoroSettings.instance.pomodoroLength * 60;
   int get _breakSeconds => PomodoroSettings.instance.shortBreakLength * 60;
+  int _totalSessions = 0; // Will be calculated based on task's estimated time
   // for testing, set focusSecond and breakSecond to 5sec
   // int _focusSeconds = 5;
   // int _breakSeconds = 5;
   int _currentSeconds = PomodoroSettings.instance.pomodoroLength * 60;
   TimerState _timerState = TimerState.idle;
   int _currentSession = 0;
-  int _totalSessions = 2;
   bool _isBreakTime = false;
   bool _isStrictMode = false;
   bool _isTimerMode = true;
-  bool _isCountdownMode = true;
-  String _timerModeValue = '${PomodoroSettings.instance.pomodoroLength.toString().padLeft(2, '0')}:00 → 00:00';
+  bool _isCountdownMode = true;  // Will be initialized from settings
+  String _timerModeValue = '';
   bool _isAmbientMusic = false;
   String _selectedAmbientMusic = 'None';
   String _selectedTask = 'Select Task';
@@ -58,6 +59,9 @@ class _TimerModePageState extends State<TimerModePage> with TickerProviderStateM
   final UserStats _userStats = UserStats();
 
   final List<Task> _tasks = TimerUtils.getDefaultTasks();
+  dynamic _currentFullTask; // Track the currently selected full task with timeSpent
+  int _sessionStartTime = 0; // Track when the current session started (in seconds since epoch)
+  int _initialEstimatedSeconds = 0; // Track the estimated time for progress calculation
 
   void _showTaskSelectionModal() {
     showModalBottomSheet(
@@ -68,8 +72,18 @@ class _TimerModePageState extends State<TimerModePage> with TickerProviderStateM
         return TaskSelectionModal(
           tasks: _tasks,
           onTaskSelected: (task) {
+            // Find the corresponding full task from tasks_updated.dart
+            final fullTasks = TaskData.getTasksList(); // Get the full task list
+            final fullTask = fullTasks.firstWhere(
+              (t) => t.title == task.title,
+              orElse: () => fullTasks.first, // Fallback to first task if not found
+            );
+            
             setState(() {
               _selectedTask = task.title;
+              _currentFullTask = fullTask;
+              // Initialize timer based on task's previously spent time
+              _initializeTimerForTask(fullTask);
             });
           },
           onAddNewTask: () {
@@ -81,12 +95,47 @@ class _TimerModePageState extends State<TimerModePage> with TickerProviderStateM
     );
   }
 
+  // Initialize timer based on task's timeSpent
+  void _initializeTimerForTask(dynamic task) {
+    int timeSpentSeconds = (task.timeSpent * 3600).round(); // Convert hours to seconds
+    int estimatedTimeSeconds = (task.estimatedTime * 3600).round(); // Convert hours to seconds
+
+    setState(() {
+      if (_isCountdownMode) {
+        // Calculate total sessions and current position
+        int totalNeededSessions = (estimatedTimeSeconds / _focusSeconds).ceil();
+        int completedSessions = (timeSpentSeconds / _focusSeconds).floor();
+
+        // Store the initial estimated time for progress calculation
+        _initialEstimatedSeconds = estimatedTimeSeconds;
+        // Set total number of pomodoro sessions needed for this task
+        _totalSessions = totalNeededSessions;
+        // Set which pomodoro session we're currently in
+        _currentSession = (completedSessions + 1).clamp(1, totalNeededSessions);
+        
+        // Calculate remaining time (estimated - spent)
+        int remainingTimeSeconds = (estimatedTimeSeconds - timeSpentSeconds).clamp(0, estimatedTimeSeconds);
+        _currentSeconds = remainingTimeSeconds;
+      } else {
+        // In count-up mode, simply start from the time already spent
+        _currentSeconds = timeSpentSeconds;
+        // Reset session-related values as they're not used in count-up mode
+        _currentSession = 0;
+        _totalSessions = 0;
+        _initialEstimatedSeconds = 0;
+      }
+    });
+  }
+
   void _startFocusTimer() {
+    // Record when this session started
+    _sessionStartTime = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+    
     setState(() {
       _timerState = TimerState.focusRunning;
       _isBreakTime = false;
       _currentSession = _currentSession == 0 ? 1 : _currentSession;
-      _currentSeconds = _isCountdownMode ? _focusSeconds : 0;
+      // Don't reset _currentSeconds here - it should already be set by _initializeTimerForTask()
     });
     _updateProgressAnimation();
 
@@ -234,6 +283,32 @@ class _TimerModePageState extends State<TimerModePage> with TickerProviderStateM
   }
 
   void _resetToHome() {
+    // Save the current session's progress if we have a task selected
+    if (_currentFullTask != null) {
+      double additionalTimeSpentHours = 0.0;
+      
+      if (_isCountdownMode) {
+        if (_sessionStartTime > 0) {
+          // In countdown mode, calculate from session start time
+          int currentTime = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+          additionalTimeSpentHours = (currentTime - _sessionStartTime) / 3600.0;
+        }
+      } else {
+        // In count-up mode, use the current seconds as time spent
+        additionalTimeSpentHours = _currentSeconds / 3600.0;
+      }
+      
+      if (additionalTimeSpentHours > 0) {
+        // Update the task's timeSpent directly by ID
+        TaskData.updateTaskTimeSpent(_currentFullTask.id, additionalTimeSpentHours);
+      }
+    }
+    
+    // Reset session tracking
+    _sessionStartTime = 0;
+    _currentFullTask = null;
+    _initialEstimatedSeconds = 0;
+    
     _timer?.cancel();
     setState(() {
       _timerState = TimerState.idle;
@@ -252,7 +327,14 @@ class _TimerModePageState extends State<TimerModePage> with TickerProviderStateM
       return (_breakSeconds - _currentSeconds) / _breakSeconds;
     } else {
       if (_isCountdownMode) {
-        return (_focusSeconds - _currentSeconds) / _focusSeconds;
+        // For tasks with estimated time, show progress based on total task completion
+        if (_currentFullTask != null && _initialEstimatedSeconds > 0) {
+          int timeSpentSeconds = (_currentFullTask.timeSpent * 3600).round();
+          return timeSpentSeconds / _initialEstimatedSeconds;
+        } else {
+          // Fallback to session-based progress for non-task timers
+          return (_focusSeconds - _currentSeconds) / _focusSeconds;
+        }
       } else {
         // For count-up mode, show a circular progress that does not complete
         return (_currentSeconds % 60) / 60.0;
@@ -304,28 +386,53 @@ class _TimerModePageState extends State<TimerModePage> with TickerProviderStateM
 
   Future<void> _loadTimerModeFromPrefs() async {
     final prefs = await SharedPreferences.getInstance();
-    int pomodoroLength = prefs.getInt('pomodoroLength') ?? PomodoroSettings.instance.pomodoroLength;
-    String defaultMode = '${pomodoroLength.toString().padLeft(2, '0')}:00 → 00:00';
+    String defaultMode = '${PomodoroSettings.instance.pomodoroLength.toString().padLeft(2, '0')}:00 → 00:00';
     String savedMode = prefs.getString('timerMode') ?? defaultMode;
+    
     setState(() {
-      _timerModeValue = savedMode;
-      _isCountdownMode = (savedMode == defaultMode);
+      // Default to countdown mode
+      _isCountdownMode = savedMode == defaultMode;
+      _timerModeValue = _isCountdownMode ? 
+          '${PomodoroSettings.instance.pomodoroLength.toString().padLeft(2, '0')}:00 → 00:00' : 
+          '00:00 → ∞';
+      _currentSeconds = _isCountdownMode ? _focusSeconds : 0;
     });
   }
 
   void _onTimerModeChanged(bool isCountdown) {
     setState(() {
+      // Save the current progress before switching modes
+      int timeSpentSeconds = 0;
+      if (_currentFullTask != null) {
+        if (_isCountdownMode) {
+          timeSpentSeconds = _initialEstimatedSeconds - _currentSeconds;
+        } else {
+          timeSpentSeconds = _currentSeconds;
+        }
+      }
+
       _isCountdownMode = isCountdown;
       _timerModeValue = isCountdown
           ? '${PomodoroSettings.instance.pomodoroLength.toString().padLeft(2, '0')}:00 → 00:00'
           : '00:00 → ∞';
+      // Save to both SharedPreferences and PomodoroSettings
       SharedPreferences.getInstance().then((prefs) {
         prefs.setString('timerMode', _timerModeValue);
       });
-      // Reset timer when mode changes
+
+      // Handle timer state changes
       if (_timerState == TimerState.focusRunning || _timerState == TimerState.focusPaused) {
         _timer?.cancel();
-        _currentSeconds = isCountdown ? _focusSeconds : 0;
+        if (_currentFullTask != null) {
+          if (isCountdown) {
+            // Switching to countdown mode
+            int estimatedTimeSeconds = (_currentFullTask.estimatedTime * 3600).round();
+            _currentSeconds = (estimatedTimeSeconds - timeSpentSeconds).clamp(0, estimatedTimeSeconds);
+          } else {
+            // Switching to countup mode
+            _currentSeconds = timeSpentSeconds;
+          }
+        }
         _timerState = TimerState.idle;
         _progressAnimationController.reset();
       }
@@ -403,7 +510,7 @@ class _TimerModePageState extends State<TimerModePage> with TickerProviderStateM
     _timer?.cancel();
     _confettiController.dispose();
     _progressAnimationController.dispose();
-  _audioPlayer.dispose();
+    _audioPlayer.dispose();
     super.dispose();
   }
 
@@ -476,8 +583,8 @@ class _TimerModePageState extends State<TimerModePage> with TickerProviderStateM
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          // Always show session indicator when a task is selected
-                          if (_selectedTask != 'Select Task')
+                          // Show session indicator only in countdown mode and when a task is selected
+                          if (_selectedTask != 'Select Task' && _isCountdownMode)
                             SessionIndicator(
                               currentSession: _currentSession,
                               totalSessions: _totalSessions,
