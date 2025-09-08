@@ -4,6 +4,81 @@ import 'task_manager.dart';
 import 'firebase_service.dart';
 
 class UserStats {
+  // Store and calculate in minutes; display in hours + minutes
+  int get weekFocusTimeMinutes {
+    final now = DateTime.now();
+    final startOfWeek = now.subtract(Duration(days: now.weekday - 1));
+    return _taskManager.completedTasks.where((task) {
+      if (task.scheduledFor == null) return false;
+      final d = task.scheduledFor!;
+      return d.isAfter(startOfWeek.subtract(const Duration(seconds: 1))) && d.isBefore(now.add(const Duration(days: 1)));
+    }).fold(0, (sum, task) => sum + (task.timeSpent * 60).round());
+  }
+
+  String get weekFocusTime {
+    final minutes = weekFocusTimeMinutes;
+    final hours = minutes ~/ 60;
+    final mins = minutes % 60;
+    if (hours > 0) {
+      return '${hours}h ${mins}m';
+    }
+    return '${mins}m';
+  }
+
+  int get twoWeeksFocusTimeMinutes {
+    final now = DateTime.now();
+    final start = now.subtract(const Duration(days: 13));
+    return _taskManager.completedTasks.where((task) {
+      if (task.scheduledFor == null) return false;
+      final d = task.scheduledFor!;
+      return d.isAfter(start.subtract(const Duration(seconds: 1))) && d.isBefore(now.add(const Duration(days: 1)));
+    }).fold(0, (sum, task) => sum + (task.timeSpent * 60).round());
+  }
+
+  String get twoWeeksFocusTime {
+    final minutes = twoWeeksFocusTimeMinutes;
+    final hours = minutes ~/ 60;
+    final mins = minutes % 60;
+    if (hours > 0) {
+      return '${hours}h ${mins}m';
+    }
+    return '${mins}m';
+  }
+
+  int get monthFocusTimeMinutes {
+    final now = DateTime.now();
+    final start = DateTime(now.year, now.month, 1);
+    return _taskManager.completedTasks.where((task) {
+      if (task.scheduledFor == null) return false;
+      final d = task.scheduledFor!;
+      return d.isAfter(start.subtract(const Duration(seconds: 1))) && d.isBefore(now.add(const Duration(days: 1)));
+    }).fold(0, (sum, task) => sum + (task.timeSpent * 60).round());
+  }
+
+  String get monthFocusTime {
+    final minutes = monthFocusTimeMinutes;
+    final hours = minutes ~/ 60;
+    final mins = minutes % 60;
+    if (hours > 0) {
+      return '${hours}h ${mins}m';
+    }
+    return '${mins}m';
+  }
+  // Returns total focus time for today (in minutes)
+  int get todayFocusTimeMinutes {
+    // If track by pomodoros per day, add that here. For now, it only sums up by tasks, not pomodoros.
+    return _taskManager.todayFocusTimeFromTasks;
+  }
+
+  String get todayFocusTime {
+    final minutes = todayFocusTimeMinutes;
+    final hours = minutes ~/ 60;
+    final mins = minutes % 60;
+    if (hours > 0) {
+      return '${hours}h ${mins}m';
+    }
+    return '${mins}m';
+  }
   static final UserStats _instance = UserStats._internal();
   factory UserStats() => _instance;
   UserStats._internal();

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'widgets/navigation_widgets.dart';
+import 'services/user_stats_service.dart';
 
 class ReportScreen extends StatefulWidget {
   @override
@@ -10,6 +11,19 @@ class ReportScreen extends StatefulWidget {
 class _ReportScreenState extends State<ReportScreen> {
   bool isPomodoroTab = true;
   int selectedTabIndex = 0;
+
+  // Dropdown selections for each section
+  String pomodoroRecordsRange = 'Weekly';
+  String focusTimeGoalRange = 'Monthly';
+  String focusTimeChartRange = 'Biweekly';
+  String focusTimeTasksRange = 'Weekly';
+  String projectTimeDistributionRange = 'Weekly';
+  String taskChartRange = 'Weekly';
+  final List<String> rangeOptions = ['Weekly', 'Monthly', 'Biweekly'];
+
+  // Calendar state
+  int displayedMonth = DateTime.now().month;
+  int displayedYear = DateTime.now().year;
 
   @override
   Widget build(BuildContext context) {
@@ -104,11 +118,11 @@ class _ReportScreenState extends State<ReportScreen> {
           Row(
             children: [
               Expanded(
-                child: _buildStatCard('2h 5m', 'Focus Time Today'),
+                child: _buildStatCard(UserStats().todayFocusTime, 'Focus Time Today'),
               ),
               SizedBox(width: MediaQuery.of(context).size.width * 0.03),
               Expanded(
-                child: _buildStatCard('39h 35m', 'Focus Time This Week'),
+                child: _buildStatCard(UserStats().weekFocusTime, 'Focus Time This Week'),
               ),
             ],
           ),
@@ -116,11 +130,11 @@ class _ReportScreenState extends State<ReportScreen> {
           Row(
             children: [
               Expanded(
-                child: _buildStatCard('79h 10m', 'Focus Time This Two Weeks'),
+                child: _buildStatCard(UserStats().twoWeeksFocusTime, 'Focus Time This Two Weeks'),
               ),
               SizedBox(width: MediaQuery.of(context).size.width * 0.03),
               Expanded(
-                child: _buildStatCard('160h 25m', 'Focus Time This Month'),
+                child: _buildStatCard(UserStats().monthFocusTime, 'Focus Time This Month'),
               ),
             ],
           ),
@@ -128,23 +142,39 @@ class _ReportScreenState extends State<ReportScreen> {
           SizedBox(height: MediaQuery.of(context).size.height * 0.03),
           
           // Pomodoro Records
-          _buildSectionHeader('Pomodoro Records', 'Weekly'),
+          _buildSectionHeaderWithDropdown('Pomodoro Records', pomodoroRecordsRange, (String? newValue) {
+            setState(() {
+              pomodoroRecordsRange = newValue!;
+            });
+          }),
           SizedBox(height: MediaQuery.of(context).size.height * 0.02),
           _buildPomodoroChart(),
-          
+
           SizedBox(height: MediaQuery.of(context).size.height * 0.03),
-          
+
           // Focus Time Goal
-          _buildSectionHeader('Focus Time Goal', 'Monthly'),
+          _buildSectionHeaderWithDropdown('Focus Time Goal', focusTimeGoalRange, (String? newValue) {
+            setState(() {
+              focusTimeGoalRange = newValue!;
+            });
+          }),
           SizedBox(height: MediaQuery.of(context).size.height * 0.02),
           _buildCalendarView(),
-          
+
           SizedBox(height: MediaQuery.of(context).size.height * 0.03),
-          
+
           // Focus Time Chart
-          _buildSectionHeader('Focus Time Chart', 'Biweekly'),
+          _buildSectionHeaderWithDropdown('Focus Time Chart', focusTimeChartRange, (String? newValue) {
+            setState(() {
+              focusTimeChartRange = newValue!;
+            });
+          }),
           SizedBox(height: MediaQuery.of(context).size.height * 0.02),
           _buildFocusTimeChart(),
+          Padding(
+            padding: EdgeInsets.only(top: 4, left: 8),
+            child: Text('in hours', style: TextStyle(color: Colors.grey[400], fontSize: 12)),
+          ),
         ],
       ),
     );
@@ -184,23 +214,39 @@ class _ReportScreenState extends State<ReportScreen> {
           SizedBox(height: MediaQuery.of(context).size.height * 0.03),
           
           // Focus Time Tasks
-          _buildSectionHeader('Focus Time', 'Tasks'),
+          _buildSectionHeaderWithDropdown('Focus Time', focusTimeTasksRange, (String? newValue) {
+            setState(() {
+              focusTimeTasksRange = newValue!;
+            });
+          }),
           SizedBox(height: MediaQuery.of(context).size.height * 0.02),
           _buildTaskList(),
-          
+
           SizedBox(height: MediaQuery.of(context).size.height * 0.03),
-          
+
           // Project Time Distribution
-          _buildSectionHeader('Project Time Distribution', 'Weekly'),
+          _buildSectionHeaderWithDropdown('Project Time Distribution', projectTimeDistributionRange, (String? newValue) {
+            setState(() {
+              projectTimeDistributionRange = newValue!;
+            });
+          }),
           SizedBox(height: MediaQuery.of(context).size.height * 0.02),
           _buildProjectDistributionChart(),
-          
+
           SizedBox(height: MediaQuery.of(context).size.height * 0.03),
 
           // Task Chart
-          _buildSectionHeader('Task Chart', 'Biweekly'),
+          _buildSectionHeaderWithDropdown('Task Chart', taskChartRange, (String? newValue) {
+            setState(() {
+              taskChartRange = newValue!;
+            });
+          }),
           SizedBox(height: MediaQuery.of(context).size.height * 0.02),
           _buildTaskChart(),
+          Padding(
+            padding: EdgeInsets.only(top: 4, left: 8),
+            child: Text('no. of tasks completed', style: TextStyle(color: Colors.grey[400], fontSize: 12)),
+          ),
         ],
       ),
     );
@@ -237,7 +283,7 @@ class _ReportScreenState extends State<ReportScreen> {
     );
   }
 
-  Widget _buildSectionHeader(String title, String subtitle) {
+  Widget _buildSectionHeaderWithDropdown(String title, String selectedValue, ValueChanged<String?> onChanged, {List<String>? options}) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
@@ -258,15 +304,21 @@ class _ReportScreenState extends State<ReportScreen> {
             color: Color(0xFF2D2D2D),
             borderRadius: BorderRadius.circular(16),
           ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                subtitle,
-                style: TextStyle(color: Colors.grey[400], fontSize: MediaQuery.of(context).size.width * 0.03),
-              ),
-              Icon(Icons.keyboard_arrow_down, color: Colors.grey[400], size: 16),
-            ],
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<String>(
+              value: selectedValue,
+              icon: Icon(Icons.keyboard_arrow_down, color: Colors.grey[400], size: 16),
+              dropdownColor: Color(0xFF2D2D2D),
+              style: TextStyle(color: Colors.grey[400], fontSize: MediaQuery.of(context).size.width * 0.03),
+              itemHeight: 48,
+              items: rangeOptions.map((String value) {
+                return DropdownMenuItem<String>(
+                  value: value,
+                  child: Text(value),
+                );
+              }).toList(),
+              onChanged: onChanged,
+            ),
           ),
         ),
       ],
@@ -299,15 +351,18 @@ class _ReportScreenState extends State<ReportScreen> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                _buildPomodoroBar(Colors.orange, 0.3, 'Today'),
-                _buildPomodoroBar(Colors.green, 0.5, 'Yester'),
-                _buildPomodoroBar(Colors.yellow, 0.7, 'Dec 18'),
-                _buildPomodoroBar(Colors.orange, 0.8, 'Dec 17'),
-                _buildPomodoroBar(Colors.blue, 0.6, 'Dec 16'),
-                _buildPomodoroBar(Colors.purple, 0.4, 'Dec 15'),
-                _buildPomodoroBar(Colors.teal, 0.5, 'Dec 14'),
-              ],
+              children: List.generate(7, (i) {
+                final date = DateTime.now().subtract(Duration(days: 6 - i));
+                final label = i == 6
+                  ? 'Today'
+                  : i == 5
+                    ? 'Yester'
+                    : '${date.month}/${date.day}';
+                // TODO: Replace 0.3 + i*0.1 with actual focus time value for that day
+                final value = 0.3 + i * 0.1;
+                final colorList = [Colors.orange, Colors.green, Colors.yellow, Colors.orange, Colors.blue, Colors.purple, Colors.teal];
+                return _buildPomodoroBar(colorList[i % colorList.length], value, label);
+              }),
             ),
           ),
         ],
@@ -347,6 +402,8 @@ class _ReportScreenState extends State<ReportScreen> {
   }
 
   Widget _buildCalendarView() {
+    final monthName = _monthName(displayedMonth);
+    final year = displayedYear;
     return Container(
       padding: EdgeInsets.all(MediaQuery.of(context).size.width * 0.04),
       decoration: BoxDecoration(
@@ -358,12 +415,36 @@ class _ReportScreenState extends State<ReportScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Icon(Icons.chevron_left, color: Colors.white),
+              GestureDetector(
+                onTap: () {
+                  setState(() {
+                    if (displayedMonth == 1) {
+                      displayedMonth = 12;
+                      displayedYear--;
+                    } else {
+                      displayedMonth--;
+                    }
+                  });
+                },
+                child: Icon(Icons.chevron_left, color: Colors.white),
+              ),
               Text(
-                'December 2023',
+                '$monthName $year',
                 style: TextStyle(color: Colors.white, fontSize: 16),
               ),
-              Icon(Icons.chevron_right, color: Colors.white),
+              GestureDetector(
+                onTap: () {
+                  setState(() {
+                    if (displayedMonth == 12) {
+                      displayedMonth = 1;
+                      displayedYear++;
+                    } else {
+                      displayedMonth++;
+                    }
+                  });
+                },
+                child: Icon(Icons.chevron_right, color: Colors.white),
+              ),
             ],
           ),
           SizedBox(height: 16),
@@ -377,35 +458,49 @@ class _ReportScreenState extends State<ReportScreen> {
                 .toList(),
           ),
           SizedBox(height: 8),
-          _buildCalendarGrid(),
+          _buildCalendarGridDynamic(displayedYear, displayedMonth),
         ],
       ),
     );
   }
 
-  Widget _buildCalendarGrid() {
-    return Column(
-      children: [
-        for (int week = 0; week < 5; week++)
-          Padding(
-            padding: EdgeInsets.symmetric(vertical: 4),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                for (int day = 1; day <= 7; day++)
-                  _buildCalendarDay(week * 7 + day - 6),
-              ],
-            ),
-          ),
-      ],
-    );
+  Widget _buildCalendarGridDynamic(int year, int month) {
+  final firstDayOfMonth = DateTime(year, month, 1);
+  final lastDayOfMonth = DateTime(year, month + 1, 0);
+    final daysInMonth = lastDayOfMonth.day;
+    final firstWeekday = (firstDayOfMonth.weekday == 7) ? 0 : firstDayOfMonth.weekday; // Monday=1, Sunday=7
+    final today = DateTime.now();
+    List<Widget> rows = [];
+    int dayCounter = 1;
+    for (int week = 0; week < 6; week++) {
+      List<Widget> days = [];
+      for (int weekday = 1; weekday <= 7; weekday++) {
+    // cellIndex not used, removed
+        if (week == 0 && weekday < firstWeekday) {
+          days.add(_buildCalendarDayDynamic(null, false, false, false));
+        } else if (dayCounter > daysInMonth) {
+          days.add(_buildCalendarDayDynamic(null, false, false, false));
+        } else {
+          bool isToday = (dayCounter == today.day && month == today.month && year == today.year);
+          // TODO: Replace hasActivity with real data if available
+          bool hasActivity = false;
+          days.add(_buildCalendarDayDynamic(dayCounter, true, hasActivity, isToday));
+          dayCounter++;
+        }
+      }
+      rows.add(Padding(
+        padding: EdgeInsets.symmetric(vertical: 4),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceAround,
+          children: days,
+        ),
+      ));
+      if (dayCounter > daysInMonth) break;
+    }
+    return Column(children: rows);
   }
 
-  Widget _buildCalendarDay(int dayNumber) {
-    bool isActive = dayNumber > 0 && dayNumber <= 31;
-    bool hasActivity = dayNumber > 0 && dayNumber <= 20;
-    bool isToday = dayNumber == 1;
-    
+  Widget _buildCalendarDayDynamic(int? dayNumber, bool isActive, bool hasActivity, bool isToday) {
     return Container(
       width: MediaQuery.of(context).size.width * 0.08,
       height: MediaQuery.of(context).size.width * 0.08,
@@ -416,7 +511,7 @@ class _ReportScreenState extends State<ReportScreen> {
       ),
       child: Center(
         child: Text(
-          isActive ? dayNumber.toString() : '',
+          isActive && dayNumber != null ? dayNumber.toString() : '',
           style: TextStyle(
             color: hasActivity ? Colors.white : Colors.grey[600],
             fontSize: 14,
@@ -425,6 +520,14 @@ class _ReportScreenState extends State<ReportScreen> {
         ),
       ),
     );
+  }
+  String _monthName(int month) {
+    const months = [
+      '',
+      'January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December'
+    ];
+    return months[month];
   }
 
   Widget _buildFocusTimeChart() {
@@ -556,7 +659,7 @@ class _ReportScreenState extends State<ReportScreen> {
 
   Widget _buildProjectDistributionChart() {
     return Container(
-      height: MediaQuery.of(context).size.height * 0.25,
+      height: MediaQuery.of(context).size.height * 0.30,
       padding: EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Color(0xFF2D2D2D),
