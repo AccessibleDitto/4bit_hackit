@@ -4,57 +4,58 @@ import 'package:flutter_application_4bit/widgets/navigation_widgets.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_application_4bit/widgets/filtered_tasks_page.dart';
 import 'package:flutter_application_4bit/widgets/navigation_widgets.dart';
+import 'models/task_models.dart';
 
-enum Priority { low, medium, high, urgent }
+// enum Priority { low, medium, high, urgent }
 
-enum TaskStatus { 
-  notStarted,
-  inProgress, 
-  completed, 
-  cancelled,
-  blocked
-}
+// enum TaskStatus { 
+//   notStarted,
+//   inProgress, 
+//   completed, 
+//   cancelled,
+//   blocked
+// }
 
-enum EnergyLevel {
-  low,
-  medium,
-  high
-}
+// enum EnergyLevel {
+//   low,
+//   medium,
+//   high
+// }
 
-enum TimePreference {
-  flexible,
-  morning,
-  afternoon,
-  specific
-}
+// enum TimePreference {
+//   flexible,
+//   morning,
+//   afternoon,
+//   specific
+// }
 
-extension PriorityExtension on Priority {
-  String get displayName {
-    switch (this) {
-      case Priority.low:
-        return 'Low';
-      case Priority.medium:
-        return 'Medium';
-      case Priority.high:
-        return 'High';
-      case Priority.urgent:
-        return 'Urgent';
-    }
-  }
+// extension PriorityExtension on Priority {
+//   String get displayName {
+//     switch (this) {
+//       case Priority.low:
+//         return 'Low';
+//       case Priority.medium:
+//         return 'Medium';
+//       case Priority.high:
+//         return 'High';
+//       case Priority.urgent:
+//         return 'Urgent';
+//     }
+//   }
   
-  Color get color {
-    switch (this) {
-      case Priority.low:
-        return const Color(0xFF71717A);
-      case Priority.medium:
-        return const Color(0xFF3B82F6);
-      case Priority.high:
-        return const Color(0xFFF97316);
-      case Priority.urgent:
-        return const Color(0xFFEF4444);
-    }
-  }
-}
+//   Color get color {
+//     switch (this) {
+//       case Priority.low:
+//         return const Color(0xFF71717A);
+//       case Priority.medium:
+//         return const Color(0xFF3B82F6);
+//       case Priority.high:
+//         return const Color(0xFFF97316);
+//       case Priority.urgent:
+//         return const Color(0xFFEF4444);
+//     }
+//   }
+// }
 
 class TasksPage extends StatefulWidget {
   @override
@@ -77,18 +78,15 @@ String _formatTime(double hours) {
 
 // Top-level task data for access from other files
 List<Project> projects = [
-  Project(
-    id: '1',
+  Project.create(
     name: 'Mobile App Development',
     color: const Color(0xFF9333EA),
   ),
-  Project(
-    id: '2',
+  Project.create(
     name: 'Website Redesign',
     color: const Color(0xFF10B981),
   ),
-  Project(
-    id: '3',
+  Project.create(
     name: 'Marketing Campaign',
     color: const Color(0xFF7C3AED),
   ),
@@ -114,7 +112,7 @@ List<Task> tasks = [
     description: 'Code review for the new authentication module',
     estimatedTime: 1.0,
     timeSpent: 0.5,
-    scheduledFor: DateTime.now().add(Duration(hours: 2)),
+    // scheduledFor: DateTime.now().add(Duration(hours: 2)),
     status: TaskStatus.notStarted,
     priority: Priority.medium,
     projectId: '1',
@@ -1302,9 +1300,8 @@ class _AddProjectPageState extends State<AddProjectPage> {
                   const SizedBox(width: 16),
                   Expanded(
                     child: ElevatedButton(
-                      onPressed: _nameController.text.trim().isEmpty ? null : () {
-                        final newProject = Project(
-                          id: DateTime.now().millisecondsSinceEpoch.toString(),
+                     onPressed: _nameController.text.trim().isEmpty ? null : () {
+                        final newProject = Project.create(
                           name: _nameController.text.trim(),
                           color: _selectedColor,
                         );
@@ -1340,184 +1337,4 @@ class _AddProjectPageState extends State<AddProjectPage> {
   }
 }
 
-// Updated Task class with all improvements from the second document
-class Task {
-  final String id;
-  final String title;
-  final String? description;
-  
-  // Time management
-  final double estimatedTime;
-  final double timeSpent;
-  final DateTime? dueDate;
-  final DateTime? scheduledFor;
-  final TimePreference timePreference;
-  
-  // Status & progress
-  final TaskStatus status;
-  final Priority priority;
-  final double? progressPercentage;
-  
-  // Organization
-  final String? projectId;
-  final List<String> tags;
-  final EnergyLevel energyRequired;
-  
-  // Constraints
-  final List<String> dependencies;
-  final String? location;
-  final bool isRecurring;
-  final String? recurrencePattern;
-  
-  // Metadata
-  final DateTime createdAt;
-  final DateTime updatedAt;
-  final String? createdBy;
-  
-  Task({
-    required this.id,
-    required this.title,
-    this.description,
-    required this.estimatedTime,
-    this.timeSpent = 0.0,
-    this.dueDate,
-    this.scheduledFor,
-    this.timePreference = TimePreference.flexible,
-    this.status = TaskStatus.notStarted,
-    required this.priority,
-    this.progressPercentage,
-    this.projectId,
-    this.tags = const [],
-    this.energyRequired = EnergyLevel.medium,
-    this.dependencies = const [],
-    this.location,
-    this.isRecurring = false,
-    this.recurrencePattern,
-    required this.createdAt,
-    required this.updatedAt,
-    this.createdBy,
-  });
-
-  // Computed properties
-  bool get isOverdue {
-    if (dueDate == null || status == TaskStatus.completed) return false;
-    return DateTime.now().isAfter(dueDate!);
-  }
-
-  bool get shouldScheduleToday {
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    
-    if (scheduledFor != null) {
-      final scheduledDay = DateTime(
-        scheduledFor!.year, 
-        scheduledFor!.month, 
-        scheduledFor!.day
-      );
-      return scheduledDay.isAtSameMomentAs(today);
-    }
-    
-    if (dueDate != null) {
-      final dueDay = DateTime(dueDate!.year, dueDate!.month, dueDate!.day);
-      return dueDay.isBefore(today.add(Duration(days: 1)));
-    }
-    
-    return false;
-  }
-
-  int? get daysUntilDue {
-    if (dueDate == null) return null;
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    final due = DateTime(dueDate!.year, dueDate!.month, dueDate!.day);
-    return due.difference(today).inDays;
-  }
-
-  bool get isReady {
-    return status != TaskStatus.blocked && 
-           status != TaskStatus.completed &&
-           status != TaskStatus.cancelled;
-  }
-
-  double get remainingTime {
-    return estimatedTime - timeSpent;
-  }
-
-  double get completionPercentage {
-    if (progressPercentage != null) return progressPercentage!;
-    if (estimatedTime <= 0) return status == TaskStatus.completed ? 1.0 : 0.0;
-    return (timeSpent / estimatedTime).clamp(0.0, 1.0);
-  }
-
-  Task copyWith({
-    String? title,
-    String? description,
-    double? estimatedTime,
-    double? timeSpent,
-    DateTime? dueDate,
-    DateTime? scheduledFor,
-    TimePreference? timePreference,
-    TaskStatus? status,
-    Priority? priority,
-    double? progressPercentage,
-    String? projectId,
-    List<String>? tags,
-    EnergyLevel? energyRequired,
-    List<String>? dependencies,
-    String? location,
-    bool? isRecurring,
-    String? recurrencePattern,
-  }) {
-    return Task(
-      id: id,
-      title: title ?? this.title,
-      description: description ?? this.description,
-      estimatedTime: estimatedTime ?? this.estimatedTime,
-      timeSpent: timeSpent ?? this.timeSpent,
-      dueDate: dueDate ?? this.dueDate,
-      scheduledFor: scheduledFor ?? this.scheduledFor,
-      timePreference: timePreference ?? this.timePreference,
-      status: status ?? this.status,
-      priority: priority ?? this.priority,
-      progressPercentage: progressPercentage ?? this.progressPercentage,
-      projectId: projectId ?? this.projectId,
-      tags: tags ?? this.tags,
-      energyRequired: energyRequired ?? this.energyRequired,
-      dependencies: dependencies ?? this.dependencies,
-      location: location ?? this.location,
-      isRecurring: isRecurring ?? this.isRecurring,
-      recurrencePattern: recurrencePattern ?? this.recurrencePattern,
-      createdAt: createdAt,
-      updatedAt: DateTime.now(),
-      createdBy: createdBy,
-    );
-  }
-}
-
-class Project {
-  final String id;
-  final String name;
-  final Color color;
-
-  Project({
-    required this.id,
-    required this.name,
-    required this.color,
-  });
-}
-
-class ProjectStats {
-  final int totalTasks;
-  final int completedTasks;
-  final int activeTasks;
-  final double totalTimeSpent;
-  final double totalEstimatedTime;
-
-  ProjectStats({
-    required this.totalTasks,
-    required this.completedTasks,
-    required this.activeTasks,
-    required this.totalTimeSpent,
-    required this.totalEstimatedTime,
-  });
-}
+// Updated Tas

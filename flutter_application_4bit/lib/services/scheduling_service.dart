@@ -6,9 +6,10 @@ import '../models/scheduling_models.dart';
 import '../utils/constants.dart';
 
 class SchedulingService {
-  static const String _groqApiUrl = 'https://api.groq.com/openai/v1/chat/completions';
-  static const String _model = 'llama-3.3-70b-versatile';
-  
+  static const String _groqApiUrl =
+      'https://api.groq.com/openai/v1/chat/completions';
+  static const String _model = 'qwen/qwen3-32b';
+
   Future<SchedulingResult> scheduleUnscheduledTasks({
     required List<Task> unscheduledTasks,
     required List<ExtendedCalendarEventData> existingEvents,
@@ -21,14 +22,14 @@ class SchedulingService {
         schedule: [],
       );
     }
-    
+
     final prompt = _buildSchedulingPrompt(
       unscheduledTasks,
       existingEvents,
       constraints,
       changes,
     );
-    
+
     try {
       final response = await _makeGroqApiCall(prompt);
       return _parseSchedulingResponse(response);
@@ -40,32 +41,40 @@ class SchedulingService {
       rethrow; // keep throwing so caller knows it failed
     }
   }
-  
+
   String _buildSchedulingPrompt(
     List<Task> tasks,
     List<ExtendedCalendarEventData> events,
     SchedulingConstraints constraints,
     Map<String, String>? changes,
   ) {
-    final tasksJson = tasks.map((t) => {
-      'id': t.id,
-      'title': t.title,
-      'description': t.description,
-      'estimatedTime': t.estimatedTime,
-      'priority': t.priority.name,
-      'energyRequired': t.energyRequired.name,
-      'dueDate': t.dueDate?.toIso8601String(),
-      'dependencies': t.dependencies,
-      'timePreference': t.timePreference.name,
-    }).toList();
-    
-    final eventsJson = events.map((e) => {
-      'title': e.title,
-      'startTime': e.startTime?.toIso8601String(),
-      'endTime': e.endTime?.toIso8601String(),
-      'date': e.date.toIso8601String(),
-    }).toList();
-    
+    final tasksJson = tasks
+        .map(
+          (t) => {
+            'id': t.id,
+            'title': t.title,
+            'description': t.description,
+            'estimatedTime': t.estimatedTime,
+            'priority': t.priority.name,
+            'energyRequired': t.energyRequired.name,
+            'dueDate': t.dueDate?.toIso8601String(),
+            'dependencies': t.dependencies,
+            'timePreference': t.timePreference.name,
+          },
+        )
+        .toList();
+
+    final eventsJson = events
+        .map(
+          (e) => {
+            'title': e.title,
+            'startTime': e.startTime?.toIso8601String(),
+            'endTime': e.endTime?.toIso8601String(),
+            'date': e.date.toIso8601String(),
+          },
+        )
+        .toList();
+
     return '''
 You are an expert scheduling assistant. Your job is to create an optimized calendar schedule using these principles:
 
@@ -94,11 +103,15 @@ ${changes != null ? 'REQUESTED CHANGES:\n${jsonEncode(changes)}' : ''}
 OUTPUT REQUIREMENTS:
 - Valid JSON only, no extra text
 - Two fields: "reasoning" and "schedule"
-- reasoning: Explain scheduling decisions
+- reasoning: Use pipe characters | to separate sections instead of newlines
 - schedule: Array of tasks with updated scheduledFor times
-- Ensure no conflicts with existing events
-- Respect task dependencies and constraints
-- Schedule within next 30 days unless specified otherwise
+
+REASONING FORMAT (use pipe | instead of newlines to separate sections):
+## SCHEDULING SUMMARY|Brief overview of the scheduling approach and key decisions made.|## TASK PRIORITIZATION|- High-priority/urgent tasks and their placement reasoning|- Dependencies handled and their impact on scheduling|- Due date considerations|## TIME ALLOCATION STRATEGY|- How time blocks were allocated|- Task batching decisions (grouping similar tasks)|- Day theming approach (if applied)|## ENERGY MATCHING|- High-energy tasks scheduled during peak hours|- Low-energy tasks scheduled appropriately|- Energy level considerations per task|## CONFLICT RESOLUTION|- How existing calendar events were avoided|- Any scheduling conflicts resolved|- Constraints respected (working hours, breaks)|## DETAILED DECISIONS|For each scheduled task, provide:|- Task: [Task Name]|- Scheduled: [Date/Time]|- Reasoning: [Specific placement reasoning]
+
+IMPORTANT: Use | (pipe) characters instead of newlines in the reasoning field to avoid JSON parsing errors.
+
+Ensure no conflicts with existing events, respect task dependencies and constraints, and schedule within next 30 days unless specified otherwise.
 
 Task Schema for schedule array:
 {
@@ -111,28 +124,28 @@ Task Schema for schedule array:
 }
 ''';
   }
-  
+
   Future<String> _makeGroqApiCall(String prompt) async {
     final headers = {
       'Authorization': 'Bearer ${AppConstants.groqApiKey}',
       'Content-Type': 'application/json',
     };
-    
+
     final body = {
       'model': _model,
       'messages': [
-        {'role': 'user', 'content': prompt}
+        {'role': 'user', 'content': prompt},
       ],
       'temperature': 0.3,
       'max_tokens': 2000,
     };
-    
+
     final response = await http.post(
       Uri.parse(_groqApiUrl),
       headers: headers,
       body: jsonEncode(body),
     );
-    
+
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
       return data['choices'][0]['message']['content'];
@@ -143,23 +156,89 @@ Task Schema for schedule array:
       throw Exception('API Error: ${response.statusCode}');
     }
   }
-  
- SchedulingResult _parseSchedulingResponse(String response) {
-  try {
-    // Clean up response: remove markdown fences if present
-    String cleaned = response.trim();
-    if (cleaned.startsWith('```')) {
-      // Remove ```json or ``` at the start and ending ```
-      cleaned = cleaned.replaceAll(RegExp(r'^```[a-zA-Z]*\n?'), '');
-      cleaned = cleaned.replaceAll(RegExp(r'```$'), '');
+
+  SchedulingResult _parseSchedulingResponse(String response) {
+    try {
+      print('🔍 Raw response received:\n$response');
+
+      // Clean up response: remove markdown fences if present
+      String cleaned = response.trim();
+
+      // Remove thinking tags if present (some models include <think> tags)
+      // Use a more robust approach to handle multiline thinking tags
+      if (cleaned.contains('<think>')) {
+        final thinkStart = cleaned.indexOf('<think>');
+        final thinkEnd = cleaned.indexOf('</think>');
+        if (thinkStart != -1 && thinkEnd != -1) {
+          // Remove everything from <think> to </think> inclusive
+          cleaned =
+              cleaned.substring(0, thinkStart) +
+              cleaned.substring(thinkEnd + '</think>'.length);
+          cleaned = cleaned.trim();
+        }
+      }
+
+      print('🧹 After removing think tags:\n$cleaned');
+
+      if (cleaned.startsWith('```')) {
+        // Remove ```json or ``` at the start and ending ```
+        cleaned = cleaned.replaceAll(RegExp(r'^```[a-zA-Z]*\n?'), '');
+        cleaned = cleaned.replaceAll(RegExp(r'```$'), '');
+        cleaned = cleaned.trim();
+      }
+
+      print('🧹 After removing markdown:\n$cleaned');
+
+      // Find the JSON part - look for the first { and last }
+      final firstBrace = cleaned.indexOf('{');
+      final lastBrace = cleaned.lastIndexOf('}');
+
+      if (firstBrace != -1 && lastBrace != -1 && firstBrace < lastBrace) {
+        cleaned = cleaned.substring(firstBrace, lastBrace + 1);
+      }
+
+      print('🎯 Final JSON to parse:\n$cleaned');
+
+      final data = jsonDecode(cleaned);
+
+      // Convert pipe-separated reasoning back to newline format for display
+      if (data['reasoning'] != null && data['reasoning'] is String) {
+        data['reasoning'] = (data['reasoning'] as String).replaceAll('|', '\n');
+      }
+
+      return SchedulingResult.fromJson(data);
+    } catch (e, stackTrace) {
+      print('❌ Failed to parse response. Raw response:\n$response');
+      print('❌ Parse error: $e');
+      print('❌ Stack trace: $stackTrace');
+
+      // Try to extract any JSON that might be buried in the response
+      final jsonMatch = RegExp(r'\{.*\}', dotAll: true).firstMatch(response);
+      if (jsonMatch != null) {
+        try {
+          print('🔄 Attempting to parse extracted JSON...');
+          final extractedJson = jsonMatch.group(0)!;
+          print('📝 Extracted JSON: $extractedJson');
+
+          final data = jsonDecode(extractedJson);
+          if (data['reasoning'] != null && data['reasoning'] is String) {
+            data['reasoning'] = (data['reasoning'] as String).replaceAll(
+              '|',
+              '\n',
+            );
+          }
+          return SchedulingResult.fromJson(data);
+        } catch (e2) {
+          print('❌ Even extracted JSON failed to parse: $e2');
+        }
+      }
+
+      // If all else fails, return a fallback result
+      return SchedulingResult(
+        reasoning:
+            "Failed to parse AI response. Raw response logged for debugging.",
+        schedule: [],
+      );
     }
-
-    final data = jsonDecode(cleaned);
-    return SchedulingResult.fromJson(data);
-  } catch (e) {
-    print('❌ Failed to parse response. Raw response:\n$response');
-    throw Exception('Failed to parse scheduling response: $e');
   }
-}
-
 }

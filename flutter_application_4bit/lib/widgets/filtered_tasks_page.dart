@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 // You'll need to import your task models here
 import '../tasks_updated.dart';
+import 'package:flutter_application_4bit/models/task_models.dart';
 
 class FilteredTasksPage extends StatefulWidget {
   final String title;
