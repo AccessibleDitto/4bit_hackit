@@ -9,7 +9,7 @@ class TimerCircle extends StatelessWidget {
   final bool isBreakTime;
   final int focusSeconds;
   final int breakSeconds;
-  final Animation<double> progressAnimation;
+  final double progressValue;
 
   const TimerCircle({
     super.key,
@@ -18,7 +18,7 @@ class TimerCircle extends StatelessWidget {
     required this.isBreakTime,
     required this.focusSeconds,
     required this.breakSeconds,
-    required this.progressAnimation,
+    required this.progressValue,
   });
 
   @override
@@ -57,11 +57,16 @@ class TimerCircle extends StatelessWidget {
           SizedBox(
             width: 300,
             height: 300,
-            child: AnimatedBuilder(
-              animation: progressAnimation,
-              builder: (context, child) {
+            child: TweenAnimationBuilder<double>(
+              duration: const Duration(milliseconds: 800),
+              curve: Curves.linear,
+              tween: Tween<double>(
+                begin: 0,
+                end: progressValue,
+              ),
+              builder: (context, animatedValue, child) {
                 return CircularProgressIndicator(
-                  value: progressAnimation.value,
+                  value: animatedValue,
                   strokeWidth: 16,
                   backgroundColor: const Color(0xFF27272A),
                   valueColor: AlwaysStoppedAnimation<Color>(

@@ -10,6 +10,7 @@ import 'dart:ui';
 import 'homepage.dart';
 import 'tasks_updated.dart';
 import 'settings.dart';
+import 'pomodoro_preferences.dart';
 
 // Initialize Firestore instance
 final db = FirebaseFirestore.instance;
@@ -17,6 +18,7 @@ final db = FirebaseFirestore.instance;
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  await PomodoroSettings.instance.loadFromPrefs();
   runApp(const MyApp());
 }
 

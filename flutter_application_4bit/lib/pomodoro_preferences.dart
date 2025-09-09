@@ -1,11 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 // Singleton for accessing Pomodoro settings globally
 class PomodoroSettings extends ChangeNotifier {
+  Future<void> loadFromPrefs() async {
+    final prefs = await SharedPreferences.getInstance();
+    _pomodoroLength = prefs.getInt('pomodoroLength') ?? 25;
+    _isCountdownMode = prefs.getBool('isCountdownMode') ?? true;
+    notifyListeners();
+  }
+  bool _isCountdownMode = true;
+  bool get isCountdownMode => _isCountdownMode;
+  set isCountdownMode(bool value) {
+    _isCountdownMode = value;
+    notifyListeners();
+  }
   // Break logic toggles
   bool _disableBreak = false;
   bool _autoStartBreak = false;
@@ -321,9 +332,9 @@ class _PomodoroPreferencesScreenState extends State<PomodoroPreferencesScreen> w
           subtitle: '$_pomodoroLength minutes',
           icon: Icons.schedule,
           value: _pomodoroLength.toDouble(),
-          min: 5,
+          min: 25,
           max: 60,
-          divisions: 11,
+          divisions: 7,
           onChanged: (value) async {
             int newValue = value.round();
             setState(() {

@@ -9,7 +9,7 @@ import 'dart:async';
 // Import the modular files
 import 'models/timer_models.dart';
 import 'tasks_updated.dart' as TaskData show getTasksList, updateTaskTimeSpent;
-import 'services/user_stats_service.dart';
+import 'services/global_timer_service.dart';
 import 'utils/timer_utils.dart';
 import 'widgets/app_bar_widgets.dart';
 import 'widgets/task_widgets.dart';
@@ -30,39 +30,29 @@ class TimerModePage extends StatefulWidget {
 class _TimerModePageState extends State<TimerModePage> with TickerProviderStateMixin {
   late AudioPlayer _audioPlayer;
   late VoidCallback _settingsListener;
+  late VoidCallback _timerModeListener;
 
-  Timer? _timer;
+  final GlobalTimerService _globalTimer = GlobalTimerService();
+
   int get _focusSeconds => PomodoroSettings.instance.pomodoroLength * 60;
   int get _breakSeconds => PomodoroSettings.instance.shortBreakLength * 60;
-  int _totalSessions = 0; // Will be calculated based on task's estimated time
-  // for testing, set focusSecond and breakSecond to 5sec
-  // int _focusSeconds = 5;
-  // int _breakSeconds = 5;
-  int _currentSeconds = PomodoroSettings.instance.pomodoroLength * 60;
-  TimerState _timerState = TimerState.idle;
-  int _currentSession = 0;
   bool _isBreakTime = false;
   bool _isStrictMode = false;
-  bool _isTimerMode = true;
+  final bool _isTimerMode = true;
   bool _isCountdownMode = true;  // Will be initialized from settings
   String _timerModeValue = '';
   bool _isAmbientMusic = false;
   String _selectedAmbientMusic = 'None';
-  String _selectedTask = 'Select Task';
 
   late ConfettiController _confettiController;
   late AnimationController _progressAnimationController;
-  late Animation<double> _progressAnimation;
-  int _selectedIndex = 0;
-
-  final UserStats _userStats = UserStats();
+  final ValueNotifier<double> _progressNotifier = ValueNotifier<double>(0.0);
+  final int _selectedIndex = 0;
 
   dynamic _currentFullTask; // Track the currently selected full task with timeSpent
-  int _sessionStartTime = 0; // Track when the current session started (in seconds since epoch)
-  int _initialEstimatedSeconds = 0; // Track the estimated time for progress calculation
 
   void _showTaskSelectionModal() {
-    // Filter out completed tasks (where timeSpent >= estimatedTime)
+    // Filter out completed tasks
     final fullTasks = TaskData.getTasksList();
     const colorOrder = [
       Color(0xFF9333EA),
@@ -71,7 +61,9 @@ class _TimerModePageState extends State<TimerModePage> with TickerProviderStateM
       Color(0xFFEF4444),
       Color(0xFFF59E0B),
     ];
+
     // Map fullTasks to TimerModels.Task for dropdown
+    final pomodoroLength = PomodoroSettings.instance.pomodoroLength;
     final incompleteTasks = fullTasks
       .where((t) => t.timeSpent < t.estimatedTime)
       .toList();
@@ -79,7 +71,7 @@ class _TimerModePageState extends State<TimerModePage> with TickerProviderStateM
       title: t.title,
       color: colorOrder[index % colorOrder.length],
       estimatedTime: t.estimatedTime,
-      focusMinutes: 25,
+      focusMinutes: pomodoroLength,
     ))).values.toList();
     showModalBottomSheet(
       context: context,
@@ -95,8 +87,9 @@ class _TimerModePageState extends State<TimerModePage> with TickerProviderStateM
               orElse: () => fullTasks.first, // Fallback to first task if not found
             );
             setState(() {
-              _selectedTask = task.title;
               _currentFullTask = fullTask;
+              // Set global timer task info for session tracking with time spent
+              _globalTimer.setTaskInfo(task.title, task.estimatedTime, fullTask.timeSpent);
               // Initialize timer based on task's previously spent time
               _initializeTimerForTask(fullTask);
             });
@@ -112,65 +105,42 @@ class _TimerModePageState extends State<TimerModePage> with TickerProviderStateM
 
   // Initialize timer based on task's timeSpent
   void _initializeTimerForTask(dynamic task) {
+    int pomodoroLength = PomodoroSettings.instance.pomodoroLength;
+    int focusSeconds = pomodoroLength * 60;
     int timeSpentSeconds = (task.timeSpent * 3600).round(); // Convert hours to seconds
     int estimatedTimeSeconds = (task.estimatedTime * 3600).round(); // Convert hours to seconds
+    int remainingTimeSeconds = (estimatedTimeSeconds - timeSpentSeconds).clamp(0, estimatedTimeSeconds);
 
     setState(() {
       if (_isCountdownMode) {
-        // Calculate total sessions and current position
-        int totalNeededSessions = (estimatedTimeSeconds / _focusSeconds).ceil();
-        int completedSessions = (timeSpentSeconds / _focusSeconds).floor();
-
-        // Store the initial estimated time for progress calculation
-        _initialEstimatedSeconds = estimatedTimeSeconds;
-        // Set total number of pomodoro sessions needed for this task
-        _totalSessions = totalNeededSessions;
-        // Set which pomodoro session we're currently in
-        _currentSession = (completedSessions + 1).clamp(1, totalNeededSessions);
-        
-        // Calculate remaining time (estimated - spent)
-        int remainingTimeSeconds = (estimatedTimeSeconds - timeSpentSeconds).clamp(0, estimatedTimeSeconds);
-        _currentSeconds = remainingTimeSeconds;
+        // Each session limited to focus time duration
+        int sessionDuration = remainingTimeSeconds.clamp(0, focusSeconds);
+        _globalTimer.start(targetSeconds: sessionDuration, isCountdown: true);
       } else {
-        // In count-up mode, simply start from the time already spent
-        _currentSeconds = timeSpentSeconds;
-        // Reset session-related values as they're not used in count-up mode
-        _currentSession = 0;
-        _totalSessions = 0;
-        _initialEstimatedSeconds = 0;
+        // In count-up mode, start from 0 and limit to focus time duration
+        _globalTimer.start(targetSeconds: focusSeconds, isCountdown: false);
       }
     });
   }
 
   void _startFocusTimer() {
-    // Record when this session started
-    _sessionStartTime = DateTime.now().millisecondsSinceEpoch ~/ 1000;
-    
-    setState(() {
-      _timerState = TimerState.focusRunning;
-      _isBreakTime = false;
-      _currentSession = _currentSession == 0 ? 1 : _currentSession;
-      // Don't reset _currentSeconds here - it should already be set by _initializeTimerForTask()
-    });
+    int pomodoroLength = PomodoroSettings.instance.pomodoroLength;
+    int focusSeconds = pomodoroLength * 60;
+    if (_currentFullTask != null) {
+      // Use task-based timing with remaining time
+      int timeSpentSeconds = (_currentFullTask.timeSpent * 3600).round();
+      int estimatedTimeSeconds = (_currentFullTask.estimatedTime * 3600).round();
+      int remainingTimeSeconds = (estimatedTimeSeconds - timeSpentSeconds).clamp(0, estimatedTimeSeconds);
+      // Each session should not exceed focus time duration
+      int timerDuration = _isCountdownMode ? 
+        remainingTimeSeconds.clamp(0, focusSeconds) : 
+        focusSeconds;
+      _globalTimer.start(targetSeconds: timerDuration, isCountdown: _isCountdownMode);
+    } else {
+      // Default focus timer
+      _globalTimer.start(targetSeconds: focusSeconds, isCountdown: true);
+    }
     _updateProgressAnimation();
-
-    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      setState(() {
-        if (_isCountdownMode) {
-          // Countdown mode: decrease from focusSeconds to 0
-          if (_currentSeconds > 0) {
-            _currentSeconds--;
-            _updateProgressAnimation();
-          } else {
-            _completeFocusSession();
-          }
-        } else {
-          // Count-up mode: increase from 0 indefinitely
-          _currentSeconds++;
-          _updateProgressAnimation();
-        }
-      });
-    });
   }
 
   void _startBreakTimer() {
@@ -180,194 +150,68 @@ class _TimerModePageState extends State<TimerModePage> with TickerProviderStateM
       return;
     }
     setState(() {
-      _timerState = TimerState.breakRunning;
       _isBreakTime = true;
-      _currentSeconds = _breakSeconds;
+      _globalTimer.start(targetSeconds: _breakSeconds, isCountdown: true);
     });
     _updateProgressAnimation();
-
-    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      setState(() {
-        if (_currentSeconds > 0) {
-          _currentSeconds--;
-          _updateProgressAnimation();
-        } else {
-          _completeBreakSession();
-        }
-      });
-    });
-  }
-
-  void _pauseTimer() {
-    _timer?.cancel();
-    setState(() {
-      if (_timerState == TimerState.focusRunning) {
-        _timerState = TimerState.focusPaused;
-      }
-    });
-  }
-
-  void _continueTimer() {
-    if (_timerState == TimerState.focusPaused) {
-      setState(() {
-        _timerState = TimerState.focusRunning;
-      });
-
-      _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
-        setState(() {
-          if (_isCountdownMode) {
-            // Countdown mode: decrease from current to 0
-            if (_currentSeconds > 0) {
-              _currentSeconds--;
-              _updateProgressAnimation();
-            } else {
-              _completeFocusSession();
-            }
-          } else {
-            // Count-up mode: increase from current indefinitely
-            _currentSeconds++;
-            _updateProgressAnimation();
-          }
-        });
-      });
-    }
-  }
-
-  void _completeFocusSession() {
-    _confettiController.play();
-    _timer?.cancel();
-    // Track the completed pomodoro
-    _userStats.completedPomodoro(durationMinutes: _focusSeconds ~/ 60);
-
-    if (_currentSession >= _totalSessions) {
-      // All sessions completed
-      debugPrint('All Pomodoro sessions completed!');
-      setState(() {
-        _timerState = TimerState.completed;
-      });
-    } else {
-      // Handle break logic based on settings
-      if (PomodoroSettings.instance.disableBreak == true) {
-        // If break is disabled, skip break and go to next pomodoro or idle
-        _skipBreak();
-      } else if (PomodoroSettings.instance.autoStartBreak == true) {
-        // Auto start break
-        _startBreakTimer();
-      } else {
-        // Wait for user to start break
-        setState(() {
-          _timerState = TimerState.breakIdle;
-          _isBreakTime = true;
-          _currentSeconds = _breakSeconds;
-        });
-      }
-    }
-  }
-
-  void _completeBreakSession() {
-    _timer?.cancel();
-    _currentSession++;
-
-    if (PomodoroSettings.instance.autoStartNextPomodoro == true && _currentSession <= _totalSessions) {
-      // Auto start next pomodoro
-      _startFocusTimer();
-    } else {
-      setState(() {
-        _timerState = TimerState.idle;
-        _isBreakTime = false;
-        _currentSeconds = _focusSeconds;
-      });
-    }
   }
 
   void _skipBreak() {
-    _timer?.cancel();
-    _currentSession++;
-    
-    if (_currentSession > _totalSessions) {
-      setState(() {
-        _timerState = TimerState.completed;
-      });
-    } else {
-      setState(() {
-        _timerState = TimerState.idle;
-        _isBreakTime = false;
-        _currentSeconds = _focusSeconds;
-      });
-    }
+    int pomodoroLength = PomodoroSettings.instance.pomodoroLength;
+    int focusSeconds = pomodoroLength * 60;
+    setState(() {
+      _isBreakTime = false;
+      _globalTimer.start(targetSeconds: focusSeconds, isCountdown: true);
+    });
   }
 
   void _resetToHome() {
-    // Save the current session's progress if we have a task selected
-    if (_currentFullTask != null) {
+    // Save the current session's progress if we have a task selected and timer was running or paused
+    if (_currentFullTask != null && (_globalTimer.state == GlobalTimerState.running || _globalTimer.state == GlobalTimerState.paused)) {
       double additionalTimeSpentHours = 0.0;
-      
       if (_isCountdownMode) {
-        if (_sessionStartTime > 0) {
-          // In countdown mode, calculate from session start time
-          int currentTime = DateTime.now().millisecondsSinceEpoch ~/ 1000;
-          additionalTimeSpentHours = (currentTime - _sessionStartTime) / 3600.0;
-        }
+        // In countdown mode, calculate time spent in current session
+        int sessionStartSeconds = _globalTimer.targetSeconds;
+        additionalTimeSpentHours = (sessionStartSeconds - _globalTimer.currentSeconds) / 3600.0;
       } else {
         // In count-up mode, use the current seconds as time spent
-        additionalTimeSpentHours = _currentSeconds / 3600.0;
+        additionalTimeSpentHours = _globalTimer.currentSeconds / 3600.0;
       }
-      
       if (additionalTimeSpentHours > 0) {
-        // Update the task's timeSpent directly by ID
-        TaskData.updateTaskTimeSpent(_currentFullTask.id, additionalTimeSpentHours);
+  TaskData.updateTaskTimeSpent(_currentFullTask.id, additionalTimeSpentHours);
       }
     }
-    
     // Reset session tracking
-    _sessionStartTime = 0;
     _currentFullTask = null;
-    _initialEstimatedSeconds = 0;
-    
-    _timer?.cancel();
+    _globalTimer.stop();
     setState(() {
-      _timerState = TimerState.idle;
-      _currentSession = 0;
-      _currentSeconds = _isCountdownMode ? _focusSeconds : 0;
       _isBreakTime = false;
-      _selectedTask = 'Select Task';
     });
-    _progressAnimationController.reset();
   }
 
   double _getProgress() {
-    if (_timerState == TimerState.idle || _timerState == TimerState.completed) return 0.0;
+    if (_globalTimer.state == GlobalTimerState.idle || _globalTimer.state == GlobalTimerState.completed) return 0.0;
     
     if (_isBreakTime) {
-      return (_breakSeconds - _currentSeconds) / _breakSeconds;
+      if (_breakSeconds == 0) return 0.0;
+      return (_breakSeconds - _globalTimer.currentSeconds) / _breakSeconds;
     } else {
       if (_isCountdownMode) {
-        // For tasks with estimated time, show progress based on total task completion
-        if (_currentFullTask != null && _initialEstimatedSeconds > 0) {
-          int timeSpentSeconds = (_currentFullTask.timeSpent * 3600).round();
-          return timeSpentSeconds / _initialEstimatedSeconds;
-        } else {
-          // Fallback to session-based progress for non-task timers
-          return (_focusSeconds - _currentSeconds) / _focusSeconds;
-        }
+        // Show progress based on how much time has elapsed from the original focus time
+        if (_globalTimer.targetSeconds == 0) return 0.0;
+        double elapsed = (_focusSeconds - _globalTimer.currentSeconds).toDouble();
+        return elapsed / _focusSeconds;
       } else {
-        // For count-up mode, show a circular progress that does not complete
-        return (_currentSeconds % 60) / 60.0;
+        // For count-up mode, show progress based on current seconds vs focus time
+        if (_focusSeconds == 0) return 0.0;
+        return _globalTimer.currentSeconds / _focusSeconds;
       }
     }
   }
 
   void _updateProgressAnimation() {
-    double targetProgress = _getProgress();
-    _progressAnimation = Tween<double>(
-      begin: _progressAnimation.value,
-      end: targetProgress,
-    ).animate(CurvedAnimation(
-      parent: _progressAnimationController,
-      curve: Curves.linear,
-    ));
-    _progressAnimationController.reset();
-    _progressAnimationController.forward();
+    double currentProgress = _getProgress();
+    _progressNotifier.value = currentProgress;
   }
 
   void _showModeModal(String title, String description, bool currentValue, Function(bool) onChanged) {
@@ -401,28 +245,50 @@ class _TimerModePageState extends State<TimerModePage> with TickerProviderStateM
 
   Future<void> _loadTimerModeFromPrefs() async {
     final prefs = await SharedPreferences.getInstance();
-    String defaultMode = '${PomodoroSettings.instance.pomodoroLength.toString().padLeft(2, '0')}:00 → 00:00';
-    String savedMode = prefs.getString('timerMode') ?? defaultMode;
-    
-    setState(() {
-      // Default to countdown mode
-      _isCountdownMode = savedMode == defaultMode;
-      _timerModeValue = _isCountdownMode ? 
-          '${PomodoroSettings.instance.pomodoroLength.toString().padLeft(2, '0')}:00 → 00:00' : 
-          '00:00 → ∞';
-      _currentSeconds = _isCountdownMode ? _focusSeconds : 0;
-    });
+    // Try to load timer mode as a boolean first
+    bool? savedCountdownMode = prefs.getBool('isCountdownMode');
+    if (savedCountdownMode != null) {
+      setState(() {
+        _isCountdownMode = savedCountdownMode;
+        _timerModeValue = _isCountdownMode ?
+            '${PomodoroSettings.instance.pomodoroLength.toString().padLeft(2, '0')}:00 → 00:00' :
+            '00:00 → ∞';
+      });
+    } else {
+      // Fallback to string comparison for legacy support
+      String defaultMode = '${PomodoroSettings.instance.pomodoroLength.toString().padLeft(2, '0')}:00 → 00:00';
+      String savedMode = prefs.getString('timerMode') ?? defaultMode;
+      setState(() {
+        _isCountdownMode = savedMode == defaultMode;
+        _timerModeValue = _isCountdownMode ?
+            '${PomodoroSettings.instance.pomodoroLength.toString().padLeft(2, '0')}:00 → 00:00' :
+            '00:00 → ∞';
+      });
+    }
   }
 
   void _onTimerModeChanged(bool isCountdown) {
     setState(() {
       // Save the current progress before switching modes
-      int timeSpentSeconds = 0;
-      if (_currentFullTask != null) {
+      double additionalTimeSpentHours = 0.0;
+      if (_currentFullTask != null && _globalTimer.state != GlobalTimerState.idle) {
         if (_isCountdownMode) {
-          timeSpentSeconds = _initialEstimatedSeconds - _currentSeconds;
+          // In countdown mode, calculate time spent from when timer started
+          int originalTargetSeconds = _globalTimer.targetSeconds;
+          int timeElapsedSeconds = originalTargetSeconds - _globalTimer.currentSeconds;
+          additionalTimeSpentHours = timeElapsedSeconds / 3600.0;
         } else {
-          timeSpentSeconds = _currentSeconds;
+          // In count-up mode, use the current seconds as time spent
+          additionalTimeSpentHours = _globalTimer.currentSeconds / 3600.0;
+        }
+        
+        // Update the task's timeSpent before switching modes
+        if (additionalTimeSpentHours > 0) {
+          TaskData.updateTaskTimeSpent(_currentFullTask.id, additionalTimeSpentHours);
+          // Update the local task object as well
+          _currentFullTask.timeSpent += additionalTimeSpentHours;
+          // Update the global timer's session information with new timeSpent
+          _globalTimer.updateTaskTimeSpent(_currentFullTask.timeSpent, _currentFullTask.estimatedTime);
         }
       }
 
@@ -431,25 +297,30 @@ class _TimerModePageState extends State<TimerModePage> with TickerProviderStateM
           ? '${PomodoroSettings.instance.pomodoroLength.toString().padLeft(2, '0')}:00 → 00:00'
           : '00:00 → ∞';
       // Save to both SharedPreferences and PomodoroSettings
+      PomodoroSettings.instance.isCountdownMode = isCountdown;
       SharedPreferences.getInstance().then((prefs) {
         prefs.setString('timerMode', _timerModeValue);
+        prefs.setBool('isCountdownMode', isCountdown);
       });
 
       // Handle timer state changes
-      if (_timerState == TimerState.focusRunning || _timerState == TimerState.focusPaused) {
-        _timer?.cancel();
+      if (_globalTimer.state == GlobalTimerState.running) {
+        int pomodoroLength = PomodoroSettings.instance.pomodoroLength;
+        int focusSeconds = pomodoroLength * 60;
+        _globalTimer.stop();
         if (_currentFullTask != null) {
           if (isCountdown) {
-            // Switching to countdown mode
+            // Switching to countdown mode - calculate remaining time and limit to focus time duration
+            int timeSpentSeconds = (_currentFullTask.timeSpent * 3600).round();
             int estimatedTimeSeconds = (_currentFullTask.estimatedTime * 3600).round();
-            _currentSeconds = (estimatedTimeSeconds - timeSpentSeconds).clamp(0, estimatedTimeSeconds);
+            int remainingTimeSeconds = (estimatedTimeSeconds - timeSpentSeconds).clamp(0, estimatedTimeSeconds);
+            int sessionDuration = remainingTimeSeconds.clamp(0, focusSeconds);
+            _globalTimer.start(targetSeconds: sessionDuration, isCountdown: true);
           } else {
-            // Switching to countup mode
-            _currentSeconds = timeSpentSeconds;
+            // Switching to countup mode - start from 0 and limit to focus time duration
+            _globalTimer.start(targetSeconds: focusSeconds, isCountdown: false);
           }
         }
-        _timerState = TimerState.idle;
-        _progressAnimationController.reset();
       }
     });
   }
@@ -459,42 +330,61 @@ class _TimerModePageState extends State<TimerModePage> with TickerProviderStateM
     super.initState();
     _confettiController = ConfettiController(duration: const Duration(seconds: 2));
     _progressAnimationController = AnimationController(
-      duration: const Duration(milliseconds: 800),
+      duration: const Duration(milliseconds: 950),
       vsync: this,
     );
-    _progressAnimation = Tween<double>(
-      begin: 0.0,
-      end: 0.0,
-    ).animate(CurvedAnimation(
-      parent: _progressAnimationController,
-      curve: Curves.linear,
-    ));
 
   _audioPlayer = AudioPlayer();
 
     _settingsListener = () {
       setState(() {});
     };
+    _timerModeListener = () {
+      setState(() {
+        _isCountdownMode = PomodoroSettings.instance.isCountdownMode;
+        _timerModeValue = _isCountdownMode
+            ? '${PomodoroSettings.instance.pomodoroLength.toString().padLeft(2, '0')}:00 → 00:00'
+            : '00:00 → ∞';
+      });
+    };
     PomodoroSettings.instance.addListener(_settingsListener);
+    PomodoroSettings.instance.addListener(_timerModeListener);
     _loadTimerModeFromPrefs();
+
+    _globalTimer.onTick = () {
+      setState(() {
+        _updateProgressAnimation();
+      });
+    };
+    _globalTimer.onComplete = () {
+      setState(() {
+        if (!_isBreakTime && _currentFullTask != null) {
+          // Focus session completed, advance to next session
+          _globalTimer.nextSession();
+        }
+      }); // Update UI when session completes
+    };
   }
 
   @override
   void dispose() {
-    PomodoroSettings.instance.removeListener(_settingsListener);
-    _timer?.cancel();
+  PomodoroSettings.instance.removeListener(_settingsListener);
+  PomodoroSettings.instance.removeListener(_timerModeListener);
     _confettiController.dispose();
     _progressAnimationController.dispose();
+    _progressNotifier.dispose();
     _audioPlayer.dispose();
+    _globalTimer.onTick = null;
+    _globalTimer.onComplete = null;
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_timerState == TimerState.completed) {
+    if (_globalTimer.state == GlobalTimerState.completed) {
       return CongratulationsScreen(
-        selectedTask: _selectedTask,
-        totalSessions: _totalSessions,
+        selectedTask: _globalTimer.selectedTask,
+        totalSessions: _globalTimer.totalSessions,
         confettiController: _confettiController,
         onViewReport: () {
           // View Report functionality
@@ -535,8 +425,10 @@ class _TimerModePageState extends State<TimerModePage> with TickerProviderStateM
                   children: [
                     // Top App Bar
                     TimerAppBar(
-                      selectedTask: _selectedTask,
-                      timerState: _timerState,
+                      selectedTask: _globalTimer.selectedTask,
+                      timerState: _isBreakTime ? TimerState.breakRunning :
+                                 (_globalTimer.state == GlobalTimerState.running ? TimerState.focusRunning : 
+                                 (_globalTimer.state == GlobalTimerState.paused ? TimerState.focusPaused : TimerState.idle)),
                       onBackPressed: () {
                         if (!_isStrictMode) {
                           Navigator.pop(context);
@@ -548,9 +440,9 @@ class _TimerModePageState extends State<TimerModePage> with TickerProviderStateM
                       },
                     ),
                     // Task Selection Dropdown (only show when idle)
-                    if (_timerState == TimerState.idle)
+                    if (_globalTimer.state == GlobalTimerState.idle)
                       TaskSelector(
-                        selectedTask: _selectedTask,
+                        selectedTask: _globalTimer.selectedTask,
                         onTap: _showTaskSelectionModal,
                       ),
                     // Main Timer Section
@@ -559,31 +451,78 @@ class _TimerModePageState extends State<TimerModePage> with TickerProviderStateM
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           // Show session indicator only in countdown mode and when a task is selected
-                          if (_selectedTask != 'Select Task' && _isCountdownMode)
+                          if (_globalTimer.selectedTask != 'Select Task' && _isCountdownMode)
                             SessionIndicator(
-                              currentSession: _currentSession,
-                              totalSessions: _totalSessions,
+                              currentSession: _globalTimer.currentSession,
+                              totalSessions: _globalTimer.totalSessions,
                             ),
-                          // Timer Circle
-                          TimerCircle(
-                            currentSeconds: _currentSeconds,
-                            timerState: _timerState,
-                            isBreakTime: _isBreakTime,
-                            focusSeconds: _focusSeconds,
-                            breakSeconds: _breakSeconds,
-                            progressAnimation: _progressAnimation,
-                          ),
+                          // Timer Circle - only show in countdown mode
+                          if (_isCountdownMode)
+                            ValueListenableBuilder<double>(
+                              valueListenable: _progressNotifier,
+                              builder: (context, progressValue, child) {
+                                return TimerCircle(
+                                  currentSeconds: _globalTimer.currentSeconds,
+                                  timerState: _isBreakTime ? TimerState.breakRunning :
+                                             (_globalTimer.state == GlobalTimerState.running ? TimerState.focusRunning : 
+                                             (_globalTimer.state == GlobalTimerState.paused ? TimerState.focusPaused : TimerState.idle)),
+                                  isBreakTime: _isBreakTime,
+                                  focusSeconds: _focusSeconds,
+                                  breakSeconds: _breakSeconds,
+                                  progressValue: progressValue,
+                                );
+                              },
+                            )
+                          else
+                            // In count-up mode, show timer display without progress circle
+                            Container(
+                              width: 300,
+                              height: 300,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: const Color(0xFF0F0F0F),
+                                border: Border.all(
+                                  color: const Color(0xFF27272A),
+                                  width: 8,
+                                ),
+                              ),
+                              child: Center(
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      TimerUtils.formatTime(_globalTimer.currentSeconds),
+                                      style: const TextStyle(
+                                        fontSize: 48,
+                                        fontWeight: FontWeight.w600,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      _isBreakTime ? 'Break Time' : 'Count Up Mode',
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        color: Colors.white.withOpacity(0.7),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
                           const SizedBox(height: 40),
                           // Action Buttons
                           TimerActionButtons(
-                            timerState: _timerState,
-                            selectedTask: _selectedTask,
+                            timerState: _isBreakTime ? TimerState.breakRunning :
+                                       (_globalTimer.state == GlobalTimerState.running ? TimerState.focusRunning : 
+                                       (_globalTimer.state == GlobalTimerState.paused ? TimerState.focusPaused : TimerState.idle)),
+                            selectedTask: _globalTimer.selectedTask,
                             onStartFocus: _startFocusTimer,
-                            onPause: _pauseTimer,
-                            onContinue: _continueTimer,
-                            onStartBreak: _startBreakTimer,
-                            onSkipBreak: _skipBreak,
+                            onPause: _globalTimer.pause,
+                            onContinue: _globalTimer.resume,
                             onReset: _resetToHome,
+                            onStartBreak: _startBreakTimer,
                           ),
                         ],
                       ),
