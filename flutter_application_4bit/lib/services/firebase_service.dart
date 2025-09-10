@@ -56,8 +56,6 @@ class FirebaseService {
   Future<void> createUserWithGmailId(String email, String password) async {
     try {
       String emailAsId = email; 
-      
-      // Check if user document already exists and clean it up if needed
       final docRef = _firestore.collection('users').doc(emailAsId);
       final existingDoc = await docRef.get();
       
@@ -750,7 +748,7 @@ class FirebaseService {
 
   // ========== COMBINE HELPER ==========
   
-  // Move taskStats to consolidated userStats structure
+  // combine task and user stats structure
   Future<void> migrateToConsolidatedStructure() async {
     try {
       await _ensureAuthenticated();
@@ -930,8 +928,6 @@ class FirebaseService {
       return [];
     }
   }
-
-  
   // Get Firebase sync status
   Map<String, dynamic> getSyncStatus() {
     return {
@@ -995,7 +991,7 @@ class FirebaseService {
       final userDoc = effectiveUserId;
       if (userDoc == null) throw Exception('No user identifier available');
       
-      // Use the Project model's toJson method to ensure all fields match exactly
+      // project model
       final projectData = project.toJson();
       
       await _firestore
@@ -1034,8 +1030,7 @@ class FirebaseService {
         if (data['updatedAt'] is Timestamp) {
           data['updatedAt'] = (data['updatedAt'] as Timestamp).toDate().toIso8601String();
         }
-        
-        // Use the Project model's fromJson method to ensure consistency
+
         return Project.fromJson(data);
       }).toList();
     } catch (e) {
