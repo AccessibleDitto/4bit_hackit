@@ -1,12 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:calendar_view/calendar_view.dart';
-import 'package:flutter_application_4bit/event_parser.dart';
 import '../models/calendar_models.dart';
 import '../models/task_models.dart';
 import '../models/scheduling_models.dart';
-import '../services/task_manager_local.dart';
 import '../services/scheduling_service.dart';
-import '../widgets/task_form_widget.dart';
 import '../widgets/chat_interface.dart';
 import '../utils/date_utils.dart';
 import '../widgets/event_tile_builder.dart';
@@ -16,7 +13,7 @@ import '../dialogs/event_form_dialog.dart';
 import '../widgets/navigation_widgets.dart';
 import '../utils/constants.dart';
 // Import the tasks source of truth
-import 'tasks_updated.dart' as tasks_source; // Adjust import path as needed
+import 'tasks_updated.dart' as tasks_source;
 
 class CalendarPage extends StatefulWidget {
   const CalendarPage({Key? key}) : super(key: key);
@@ -128,7 +125,11 @@ class CalendarPageState extends State<CalendarPage> {
     // Try to find project by ID first
     final project = tasks_source.projects.firstWhere(
       (p) => p.id == task.projectId,
-      orElse: () => Project.create(name: '', color: task.priority.color),
+      orElse: () => tasks_source.Project(
+        id: '', 
+        name: '', 
+        color: task.priority.color,
+      ),
     );
 
     if (project.name.isNotEmpty && _projectColors.containsKey(project.name)) {
@@ -284,7 +285,11 @@ print('📊 Total existing events: ${existingEvents.length}');
     // Get project name for display
     final project = tasks_source.projects.firstWhere(
       (p) => p.id == task.projectId,
-      orElse: () => Project.create(name: 'Tasks', color: task.priority.color),
+      orElse: () => tasks_source.Project(
+        id: '', 
+        name: 'Tasks', 
+        color: task.priority.color,
+      ),
     );
 
     final event = ExtendedCalendarEventData(
@@ -418,8 +423,11 @@ Future<void> _undoLastScheduling(List<Task> tasksToUndo) async {
                   final task = unscheduledTasks[index];
                   final project = tasks_source.projects.firstWhere(
                     (p) => p.id == task.projectId,
-                    orElse: () =>
-                        Project.create(name: '', color: task.priority.color),
+                    orElse: () => tasks_source.Project(
+                      id: '', 
+                      name: '', 
+                      color: task.priority.color,
+                    ),
                   );
 
                   return Card(
@@ -614,13 +622,6 @@ Future<void> _undoLastScheduling(List<Task> tasksToUndo) async {
     });
   }
 
-  void _exitDayView() {
-    setState(() {
-      _isInDayView = false;
-      _selectedDayViewDate = null;
-    });
-  }
-
   void _showEventDetails(BuildContext context, CalendarEventData event) {
     EventDialogs.showEventDetails(
       context,
@@ -735,7 +736,7 @@ Future<void> _undoLastScheduling(List<Task> tasksToUndo) async {
       _projects.add(projectName);
       _assignProjectColorIfNeeded(projectName);
       // Also add to the tasks source of truth using the factory method
-      final newProject = Project.create(
+      final newProject = tasks_source.Project.create(
         name: projectName,
         color: _projectColors[projectName]!,
       );

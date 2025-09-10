@@ -3,7 +3,6 @@ import 'package:flutter_application_4bit/widgets/date_selection_task.dart';
 import 'package:flutter_application_4bit/widgets/navigation_widgets.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_application_4bit/widgets/filtered_tasks_page.dart';
-import 'package:flutter_application_4bit/widgets/navigation_widgets.dart';
 import 'models/task_models.dart';
 
 // enum Priority { low, medium, high, urgent }
@@ -65,7 +64,7 @@ class TasksPage extends StatefulWidget {
 String formatTime(double hours) {
   if (hours == 0) return '0h';
   int wholeHours = hours.floor();
-  int minutes = ((hours - wholeHours) * 60).round();
+  int minutes = ((hours - wholeHours) * 60).floor();
   
   // Handle 60 minutes = 1 hour conversion
   if (minutes == 60) {
@@ -1354,174 +1353,6 @@ class _AddProjectPageState extends State<AddProjectPage> {
   }
 }
 
-// Updated Task class with all improvements from the second document
-class Task {
-  int get sessions {
-    // Calculate number of sessions based on estimated time and default focusMinutes (25)
-    int focusMinutes = 25;
-    if (estimatedTime <= 0) return 1;
-    return (estimatedTime * 60 / focusMinutes).ceil();
-  }
-
-  int get sessionsLeft {
-    // Calculate sessions left based on remaining time and default focusMinutes (25)
-    int focusMinutes = 25;
-    double remaining = remainingTime;
-    if (remaining <= 0) return 0;
-    return (remaining * 60 / focusMinutes).ceil();
-  }
-  final String id;
-  final String title;
-  final String? description;
-  
-  // Time management
-  final double estimatedTime;
-  final double timeSpent;
-  final DateTime? dueDate;
-  final DateTime? scheduledFor;
-  final TimePreference timePreference;
-  
-  // Status & progress
-  final TaskStatus status;
-  final Priority priority;
-  final double? progressPercentage;
-  
-  // Organization
-  final String? projectId;
-  final List<String> tags;
-  final EnergyLevel energyRequired;
-  
-  // Constraints
-  final List<String> dependencies;
-  final String? location;
-  final bool isRecurring;
-  final String? recurrencePattern;
-  
-  // Metadata
-  final DateTime createdAt;
-  final DateTime updatedAt;
-  final String? createdBy;
-  
-  Task({
-    required this.id,
-    required this.title,
-    this.description,
-    required this.estimatedTime,
-    this.timeSpent = 0.0,
-    this.dueDate,
-    this.scheduledFor,
-    this.timePreference = TimePreference.flexible,
-    this.status = TaskStatus.notStarted,
-    required this.priority,
-    this.progressPercentage,
-    this.projectId,
-    this.tags = const [],
-    this.energyRequired = EnergyLevel.medium,
-    this.dependencies = const [],
-    this.location,
-    this.isRecurring = false,
-    this.recurrencePattern,
-    required this.createdAt,
-    required this.updatedAt,
-    this.createdBy,
-  });
-
-  // Computed properties
-  bool get isOverdue {
-    if (dueDate == null || status == TaskStatus.completed) return false;
-    return DateTime.now().isAfter(dueDate!);
-  }
-
-  bool get shouldScheduleToday {
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    
-    if (scheduledFor != null) {
-      final scheduledDay = DateTime(
-        scheduledFor!.year, 
-        scheduledFor!.month, 
-        scheduledFor!.day
-      );
-      return scheduledDay.isAtSameMomentAs(today);
-    }
-    
-    if (dueDate != null) {
-      final dueDay = DateTime(dueDate!.year, dueDate!.month, dueDate!.day);
-      return dueDay.isBefore(today.add(Duration(days: 1)));
-    }
-    
-    return false;
-  }
-
-  int? get daysUntilDue {
-    if (dueDate == null) return null;
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    final due = DateTime(dueDate!.year, dueDate!.month, dueDate!.day);
-    return due.difference(today).inDays;
-  }
-
-  bool get isReady {
-    return status != TaskStatus.blocked && 
-           status != TaskStatus.completed &&
-           status != TaskStatus.cancelled;
-  }
-
-  double get remainingTime {
-    return estimatedTime - timeSpent;
-  }
-
-  double get completionPercentage {
-    if (progressPercentage != null) return progressPercentage!;
-    if (estimatedTime <= 0) return status == TaskStatus.completed ? 1.0 : 0.0;
-    return (timeSpent / estimatedTime).clamp(0.0, 1.0);
-  }
-
-  Task copyWith({
-    String? title,
-    String? description,
-    double? estimatedTime,
-    double? timeSpent,
-    DateTime? dueDate,
-    DateTime? scheduledFor,
-    TimePreference? timePreference,
-    TaskStatus? status,
-    Priority? priority,
-    double? progressPercentage,
-    String? projectId,
-    List<String>? tags,
-    EnergyLevel? energyRequired,
-    List<String>? dependencies,
-    String? location,
-    bool? isRecurring,
-    String? recurrencePattern,
-  }) {
-    return Task(
-      id: id,
-      title: title ?? this.title,
-      description: description ?? this.description,
-      estimatedTime: estimatedTime ?? this.estimatedTime,
-      timeSpent: timeSpent ?? this.timeSpent,
-      dueDate: dueDate ?? this.dueDate,
-      scheduledFor: scheduledFor ?? this.scheduledFor,
-      timePreference: timePreference ?? this.timePreference,
-      status: status ?? this.status,
-      priority: priority ?? this.priority,
-      progressPercentage: progressPercentage ?? this.progressPercentage,
-      projectId: projectId ?? this.projectId,
-      tags: tags ?? this.tags,
-      energyRequired: energyRequired ?? this.energyRequired,
-      dependencies: dependencies ?? this.dependencies,
-      location: location ?? this.location,
-      isRecurring: isRecurring ?? this.isRecurring,
-      recurrencePattern: recurrencePattern ?? this.recurrencePattern,
-      createdAt: createdAt,
-      updatedAt: DateTime.now(),
-      createdBy: createdBy,
-    );
-  }
-}
-
 class Project {
   final String id;
   final String name;
@@ -1532,6 +1363,19 @@ class Project {
     required this.name,
     required this.color,
   });
+
+  // Helper method for creating new projects
+  factory Project.create({
+    required String name,
+    required Color color,
+    String? description,
+  }) {
+    return Project(
+      id: DateTime.now().millisecondsSinceEpoch.toString(), // Generate ID
+      name: name,
+      color: color,
+    );
+  }
 }
 
 class ProjectStats {

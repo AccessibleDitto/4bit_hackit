@@ -8,7 +8,8 @@ import 'dart:async';
 
 // Import the modular files
 import 'models/timer_models.dart';
-import 'tasks_updated.dart' as TaskData show getTasksList, updateTaskTimeSpent, TaskStatus, startTask, completeTask;
+import 'tasks_updated.dart' as TaskData show getTasksList, updateTaskTimeSpent, startTask, completeTask;
+import 'models/task_models.dart' show TaskStatus;
 import 'services/global_timer_service.dart';
 import 'utils/timer_utils.dart';
 import 'widgets/app_bar_widgets.dart';
@@ -65,7 +66,7 @@ class _TimerModePageState extends State<TimerModePage> with TickerProviderStateM
     // Map fullTasks to TimerModels.Task for dropdown - only show incomplete tasks
     final pomodoroLength = PomodoroSettings.instance.pomodoroLength;
     final incompleteTasks = fullTasks
-      .where((t) => t.status != TaskData.TaskStatus.completed && t.status != TaskData.TaskStatus.cancelled)
+      .where((t) => t.status != TaskStatus.completed && t.status != TaskStatus.cancelled)
       .toList();
     final dropdownTasks = incompleteTasks.asMap().map((index, t) => MapEntry(index, Task(
       title: t.title,
@@ -90,7 +91,7 @@ class _TimerModePageState extends State<TimerModePage> with TickerProviderStateM
             setState(() {
               _currentFullTask = fullTask;
               // Start the task if it's not started yet
-              if (fullTask.status == TaskData.TaskStatus.notStarted) {
+              if (fullTask.status == TaskStatus.notStarted) {
                 TaskData.startTask(fullTask.id);
               }
               // Set global timer task info for session tracking with time spent

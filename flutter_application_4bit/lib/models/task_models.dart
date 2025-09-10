@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 
 enum Priority { low, medium, high, urgent }
 
-
 enum TaskStatus { 
   notStarted,
   inProgress, 
@@ -89,6 +88,21 @@ extension EnergyLevelExtension on EnergyLevel {
 }
 
 class Task {
+    int get sessions {
+    // Calculate number of sessions based on estimated time and default focusMinutes (25)
+    int focusMinutes = 25;
+    if (estimatedTime <= 0) return 1;
+    return (estimatedTime * 60 / focusMinutes).ceil();
+  }
+
+  int get sessionsLeft {
+    // Calculate sessions left based on remaining time and default focusMinutes (25)
+    int focusMinutes = 25;
+    double remaining = remainingTime;
+    if (remaining <= 0) return 0;
+    return (remaining * 60 / focusMinutes).ceil();
+  }
+
   // === CORE PROPERTIES ===
   final String id;
   final String title;
