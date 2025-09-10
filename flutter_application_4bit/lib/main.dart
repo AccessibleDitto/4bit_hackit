@@ -13,6 +13,7 @@ import 'settings.dart';
 import 'pomodoro_preferences.dart';
 import 'profile.dart';
 import 'report.dart';
+import 'services/user_stats_service.dart';
 
 // Initialize Firestore instance
 final db = FirebaseFirestore.instance;
@@ -21,6 +22,14 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   await PomodoroSettings.instance.loadFromPrefs();
+  
+  try {
+    await UserStats().initializeFromFirebase();
+    debugPrint('UserStats initialized successfully with Firebase integration');
+  } catch (e) {
+    debugPrint('Error initializing UserStats: $e');
+  }
+  
   runApp(const MyApp());
 }
 

@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'task_manager.dart';
 import 'firebase_service.dart';
+import '../models/task_models.dart';
 
 class UserStats {
   // Store and calculate in minutes; display in hours + minutes
@@ -139,19 +140,42 @@ class UserStats {
         _earnedBadges = List<String>.from(data['earnedBadges'] ?? []);
         _recentAchievements = await _firebaseService.loadAchievements();
         
-        debugPrint('User Stats loaded successfully');
-      } else {
-        debugPrint('No user stats found, using defaults');
+        displayFirebaseData();
       }
+      
+      await _loadTaskStatsFromFirebase();
     } catch (e) {
       debugPrint('Error loading user stats from Firebase: $e');
     }
   }
 
+  Future<void> _loadTaskStatsFromFirebase() async {
+    try {
+      final taskStats = await _firebaseService.loadTaskStats();
+      if (taskStats != null) {
+      }
+    } catch (e) {
+      debugPrint('Error loading task stats from Firebase: $e');
+    }
+  }
+
   Future<void> saveToFirebase() async {
     try {
+      // Save user stats
       await _firebaseService.saveUserStats(this);
-      debugPrint('UserStats saved to Firebase successfully');
+      
+      // Save task statistics
+      final taskStats = {
+        'totalTasks': _taskManager.tasks.length,
+        'completedTasks': _taskManager.totalTasksCompleted,
+        'inProgressTasks': _taskManager.tasks.where((t) => t.status == TaskStatus.inProgress).length,
+        'priorityTasksCompleted': _taskManager.completedTasks.where((t) => t.priority == Priority.high || t.priority == Priority.urgent).length,
+        'todayCompletedTasks': _taskManager.todayCompletedTasks,
+        'totalFocusTimeFromTasks': _taskManager.totalFocusTimeFromTasks,
+        'todayFocusTimeFromTasks': _taskManager.todayFocusTimeFromTasks,
+      };
+      await _firebaseService.saveTaskStats(taskStats);
+      
     } catch (e) {
       debugPrint('Error saving user stats to Firebase: $e');
     }
@@ -163,6 +187,9 @@ class UserStats {
     _totalFocusTimeMinutes += durationMinutes;
     _updateStreak();
     _checkForNewBadges(); 
+
+    _firebaseService.updatePomodoroCount(_pomodorosCompleted, _totalFocusTimeMinutes, _streakDays);
+    saveToFirebase();
   }
 
   void completedTask() {
@@ -179,7 +206,7 @@ class UserStats {
   void onTaskCompleted(String taskTitle) {
     _addAchievement('✅', 'Task Completed', 'Completed: $taskTitle');
     _updateStreak();
-    _checkForNewBadges();
+    _checkForTaskBadges();
     saveToFirebase();
   }
 
@@ -236,7 +263,11 @@ class UserStats {
       _addAchievement('💎', 'Consistency', 'Use app for 30 days');
     }
 
-    _earnedBadges.addAll(newBadges);
+    if (newBadges.isNotEmpty) {
+      _earnedBadges.addAll(newBadges);
+      _firebaseService.updateBadges(_earnedBadges);
+      saveToFirebase();
+    }
   }
 
   void _checkForTaskBadges() {
@@ -267,7 +298,11 @@ class UserStats {
       _addAchievement('⭐', 'Priority Master', 'Complete all priority tasks');
     }
 
-    _earnedBadges.addAll(newBadges);
+    if (newBadges.isNotEmpty) {
+      _earnedBadges.addAll(newBadges);
+      _firebaseService.updateBadges(_earnedBadges);
+      saveToFirebase();
+    }
   }
 
   void _addAchievement(String emoji, String title, String description) {
@@ -285,6 +320,36 @@ class UserStats {
     }
     
     _firebaseService.saveAchievement(achievement);
+  }
+
+  Map<String, dynamic> getComprehensiveStats() {
+    return {
+      'pomodorosCompleted': _pomodorosCompleted,
+      'tasksCompleted': tasksCompleted,
+      'streakDays': _streakDays,
+      'totalFocusTimeMinutes': _totalFocusTimeMinutes,
+      
+      // time 
+      'todayFocusTime': todayFocusTime,
+      'weekFocusTime': weekFocusTime,
+      'monthFocusTime': monthFocusTime,
+      'totalFocusTime': totalFocusTime,
+      
+      // achievement
+      'totalBadges': _earnedBadges.length,
+      'totalAchievements': _recentAchievements.length,
+      'earnedBadges': _earnedBadges,
+      'recentAchievements': _recentAchievements,
+      
+      // tasks
+      'todayFocusTimeMinutes': todayFocusTimeMinutes,
+      'weekFocusTimeMinutes': weekFocusTimeMinutes,
+      'monthFocusTimeMinutes': monthFocusTimeMinutes,
+      
+      // status
+      'lastActiveDate': _lastActiveDate,
+      'lastSyncTime': DateTime.now(),
+    };
   }
 
   // Badge information
@@ -318,16 +383,74 @@ class UserStats {
   // Initialization
   Future<void> initializeFromFirebase() async {
     try {
+      await _firebaseService.migrateToConsolidatedStructure();
+      
       await loadFromFirebase();
       
       if (_pomodorosCompleted == 0 && _earnedBadges.isEmpty) {
-        debugPrint('No Firebase data found, using sample data for demo');
         initializeSampleData();
+        await saveToFirebase();
       }
+      
+      debugPrint('UserStats initialization complete. Stats loaded: ${getComprehensiveStats()}');
+      
     } catch (e) {
       debugPrint('Error initializing from Firebase: $e');
       initializeSampleData();
     }
+  }
+
+  bool validateDataConsistency() {
+    final isValid = _pomodorosCompleted >= 0 && 
+                   _totalFocusTimeMinutes >= 0 && 
+                   _streakDays >= 0 &&
+                   _earnedBadges.isNotEmpty || _pomodorosCompleted == 0;
+    
+    if (!isValid) {
+      debugPrint('Data consistency check failed!');
+      debugPrint('Pomodoros: $_pomodorosCompleted, Focus: $_totalFocusTimeMinutes, Streak: $_streakDays');
+    }
+    
+    return isValid;
+  }
+
+  void displayFirebaseData() {
+    debugPrint('=== FIREBASE USER STATS ===');
+    debugPrint('Pomodoros Completed: $_pomodorosCompleted');
+    debugPrint('Total Focus Time: $_totalFocusTimeMinutes minutes ($totalFocusTime)');
+    debugPrint('Streak Days: $_streakDays');
+    debugPrint('Tasks Completed: $tasksCompleted');
+    debugPrint('Today Focus Time: $todayFocusTime');
+    debugPrint('Week Focus Time: $weekFocusTime');
+    debugPrint('Month Focus Time: $monthFocusTime');
+    debugPrint('Earned Badges (${_earnedBadges.length}): ${_earnedBadges.join(', ')}');
+    debugPrint('Recent Achievements (${_recentAchievements.length}): ${_recentAchievements.map((a) => a.title).join(', ')}');
+    debugPrint('Last Active: $_lastActiveDate');
+    debugPrint('=== END FIREBASE DATA ===');
+  }
+
+  // Get comprehensive Firebase integration status
+  Future<Map<String, dynamic>> getFirebaseIntegrationStatus() async {
+    final status = <String, dynamic>{};
+    
+    try {
+      final firebaseStatus = _firebaseService.getSyncStatus();
+      status['firebase'] = firebaseStatus;
+      status['currentStats'] = getComprehensiveStats();
+      
+      final integrationTest = await _firebaseService.testFirebaseIntegration();
+      status['integrationTest'] = integrationTest;
+      status['dataConsistency'] = validateDataConsistency();
+      status['lastSyncAttempt'] = DateTime.now().toIso8601String();
+      
+      debugPrint('Firebase Integration Status: $status');
+      
+    } catch (e) {
+      status['error'] = e.toString();
+      debugPrint('Error getting Firebase integration status: $e');
+    }
+    
+    return status;
   }
 
   void initializeSampleData() {
@@ -338,27 +461,6 @@ class UserStats {
     _earnedBadges = []; 
     
     _taskManager.initializeSampleData();
-    
-    // _recentAchievements = [
-    //   Achievement(
-    //     emoji: '🎯',
-    //     title: 'Task Master',
-    //     description: 'Completed 10 tasks in one day',
-    //     timestamp: DateTime.now().subtract(const Duration(days: 2)),
-    //   ),
-    //   Achievement(
-    //     emoji: '⚡',
-    //     title: 'Speed Runner',
-    //     description: 'Completed 5 pomodoros in a row',
-    //     timestamp: DateTime.now().subtract(const Duration(days: 7)),
-    //   ),
-    //   Achievement(
-    //     emoji: '🌟',
-    //     title: 'Early Bird',
-    //     description: 'Started session before 7 AM',
-    //     timestamp: DateTime.now().subtract(const Duration(days: 14)),
-    //   ),
-    // ];
     _recentAchievements = []; 
   }
 }
