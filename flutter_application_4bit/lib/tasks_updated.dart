@@ -4,57 +4,58 @@ import 'package:flutter_application_4bit/widgets/navigation_widgets.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_application_4bit/widgets/filtered_tasks_page.dart';
 import 'package:flutter_application_4bit/widgets/navigation_widgets.dart';
+import 'models/task_models.dart';
 
-enum Priority { low, medium, high, urgent }
+// enum Priority { low, medium, high, urgent }
 
-enum TaskStatus { 
-  notStarted,
-  inProgress, 
-  completed, 
-  cancelled,
-  blocked
-}
+// enum TaskStatus { 
+//   notStarted,
+//   inProgress, 
+//   completed, 
+//   cancelled,
+//   blocked
+// }
 
-enum EnergyLevel {
-  low,
-  medium,
-  high
-}
+// enum EnergyLevel {
+//   low,
+//   medium,
+//   high
+// }
 
-enum TimePreference {
-  flexible,
-  morning,
-  afternoon,
-  specific
-}
+// enum TimePreference {
+//   flexible,
+//   morning,
+//   afternoon,
+//   specific
+// }
 
-extension PriorityExtension on Priority {
-  String get displayName {
-    switch (this) {
-      case Priority.low:
-        return 'Low';
-      case Priority.medium:
-        return 'Medium';
-      case Priority.high:
-        return 'High';
-      case Priority.urgent:
-        return 'Urgent';
-    }
-  }
+// extension PriorityExtension on Priority {
+//   String get displayName {
+//     switch (this) {
+//       case Priority.low:
+//         return 'Low';
+//       case Priority.medium:
+//         return 'Medium';
+//       case Priority.high:
+//         return 'High';
+//       case Priority.urgent:
+//         return 'Urgent';
+//     }
+//   }
   
-  Color get color {
-    switch (this) {
-      case Priority.low:
-        return const Color(0xFF71717A);
-      case Priority.medium:
-        return const Color(0xFF3B82F6);
-      case Priority.high:
-        return const Color(0xFFF97316);
-      case Priority.urgent:
-        return const Color(0xFFEF4444);
-    }
-  }
-}
+//   Color get color {
+//     switch (this) {
+//       case Priority.low:
+//         return const Color(0xFF71717A);
+//       case Priority.medium:
+//         return const Color(0xFF3B82F6);
+//       case Priority.high:
+//         return const Color(0xFFF97316);
+//       case Priority.urgent:
+//         return const Color(0xFFEF4444);
+//     }
+//   }
+// }
 
 class TasksPage extends StatefulWidget {
   @override
@@ -87,18 +88,15 @@ String _formatTime(double hours) {
 
 // Top-level task data for access from other files
 List<Project> projects = [
-  Project(
-    id: '1',
+  Project.create(
     name: 'Mobile App Development',
     color: const Color(0xFF9333EA),
   ),
-  Project(
-    id: '2',
+  Project.create(
     name: 'Website Redesign',
     color: const Color(0xFF10B981),
   ),
-  Project(
-    id: '3',
+  Project.create(
     name: 'Marketing Campaign',
     color: const Color(0xFF7C3AED),
   ),
@@ -124,7 +122,7 @@ List<Task> tasks = [
     description: 'Code review for the new authentication module',
     estimatedTime: 1.0,
     timeSpent: 0.5,
-    scheduledFor: DateTime.now().add(Duration(hours: 2)),
+    // scheduledFor: DateTime.now().add(Duration(hours: 2)),
     status: TaskStatus.notStarted,
     priority: Priority.medium,
     projectId: '1',
@@ -1319,9 +1317,8 @@ class _AddProjectPageState extends State<AddProjectPage> {
                   const SizedBox(width: 16),
                   Expanded(
                     child: ElevatedButton(
-                      onPressed: _nameController.text.trim().isEmpty ? null : () {
-                        final newProject = Project(
-                          id: DateTime.now().millisecondsSinceEpoch.toString(),
+                     onPressed: _nameController.text.trim().isEmpty ? null : () {
+                        final newProject = Project.create(
                           name: _nameController.text.trim(),
                           color: _selectedColor,
                         );

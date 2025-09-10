@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 
 enum Priority { low, medium, high, urgent }
 
+
 enum TaskStatus { 
   notStarted,
   inProgress, 
@@ -207,49 +208,58 @@ class Task {
 
   // === METHODS ===
   
-  Task copyWith({
-    String? title,
-    String? description,
-    double? estimatedTime,
-    double? timeSpent,
-    DateTime? dueDate,
-    DateTime? scheduledFor,
-    TimePreference? timePreference,
-    TaskStatus? status,
-    Priority? priority,
-    double? progressPercentage,
-    String? projectId,
-    List<String>? tags,
-    EnergyLevel? energyRequired,
-    List<String>? dependencies,
-    String? location,
-    bool? isRecurring,
-    String? recurrencePattern,
-  }) {
-    return Task(
-      id: id,
-      title: title ?? this.title,
-      description: description ?? this.description,
-      estimatedTime: estimatedTime ?? this.estimatedTime,
-      timeSpent: timeSpent ?? this.timeSpent,
-      dueDate: dueDate ?? this.dueDate,
-      scheduledFor: scheduledFor ?? this.scheduledFor,
-      timePreference: timePreference ?? this.timePreference,
-      status: status ?? this.status,
-      priority: priority ?? this.priority,
-      progressPercentage: progressPercentage ?? this.progressPercentage,
-      projectId: projectId ?? this.projectId,
-      tags: tags ?? this.tags,
-      energyRequired: energyRequired ?? this.energyRequired,
-      dependencies: dependencies ?? this.dependencies,
-      location: location ?? this.location,
-      isRecurring: isRecurring ?? this.isRecurring,
-      recurrencePattern: recurrencePattern ?? this.recurrencePattern,
-      createdAt: createdAt,
-      updatedAt: DateTime.now(),
-      createdBy: createdBy,
-    );
-  }
+  // Replace your existing copyWith method in the Task class with this fixed version
+
+Task copyWith({
+  String? title,
+  String? description,
+  double? estimatedTime,
+  double? timeSpent,
+  DateTime? dueDate,
+  DateTime? scheduledFor,  // This can be explicitly null
+  TimePreference? timePreference,
+  TaskStatus? status,
+  Priority? priority,
+  double? progressPercentage,
+  String? projectId,
+  List<String>? tags,
+  EnergyLevel? energyRequired,
+  List<String>? dependencies,
+  String? location,
+  bool? isRecurring,
+  String? recurrencePattern,
+  // Add explicit flags for nullable fields that need to be set to null
+  bool clearDueDate = false,
+  bool clearScheduledFor = false,
+  bool clearProgressPercentage = false,
+  bool clearProjectId = false,
+  bool clearLocation = false,
+  bool clearRecurrencePattern = false,
+}) {
+  return Task(
+    id: id,
+    title: title ?? this.title,
+    description: description ?? this.description,
+    estimatedTime: estimatedTime ?? this.estimatedTime,
+    timeSpent: timeSpent ?? this.timeSpent,
+    dueDate: clearDueDate ? null : (dueDate ?? this.dueDate),
+    scheduledFor: clearScheduledFor ? null : (scheduledFor ?? this.scheduledFor),
+    timePreference: timePreference ?? this.timePreference,
+    status: status ?? this.status,
+    priority: priority ?? this.priority,
+    progressPercentage: clearProgressPercentage ? null : (progressPercentage ?? this.progressPercentage),
+    projectId: clearProjectId ? null : (projectId ?? this.projectId),
+    tags: tags ?? this.tags,
+    energyRequired: energyRequired ?? this.energyRequired,
+    dependencies: dependencies ?? this.dependencies,
+    location: clearLocation ? null : (location ?? this.location),
+    isRecurring: isRecurring ?? this.isRecurring,
+    recurrencePattern: clearRecurrencePattern ? null : (recurrencePattern ?? this.recurrencePattern),
+    createdAt: createdAt,
+    updatedAt: DateTime.now(),
+    createdBy: createdBy,
+  );
+}
 
   Map<String, dynamic> toJson() => {
     'id': id,
@@ -439,7 +449,6 @@ void demonstrateImprovedTaskClass() {
 // ===================================================
 // 🎯 PROJECT MODEL
 // ===================================================
-
 class Project {
   final String id;
   final String name;
@@ -447,7 +456,7 @@ class Project {
   final String? description;
   final DateTime createdAt;
   final DateTime updatedAt;
-
+  
   Project({
     required this.id,
     required this.name,
@@ -456,7 +465,40 @@ class Project {
     required this.createdAt,
     required this.updatedAt,
   });
-
+  
+  // Helper method for creating new projects
+  factory Project.create({
+    required String name,
+    required Color color,
+    String? description,
+  }) {
+    final now = DateTime.now();
+    return Project(
+      id: DateTime.now().millisecondsSinceEpoch.toString(), // Generate ID
+      name: name,
+      color: color,
+      description: description,
+      createdAt: now,
+      updatedAt: now,
+    );
+  }
+  
+  // Helper method for updating projects
+  Project copyWith({
+    String? name,
+    Color? color,
+    String? description,
+  }) {
+    return Project(
+      id: id,
+      name: name ?? this.name,
+      color: color ?? this.color,
+      description: description ?? this.description,
+      createdAt: createdAt, // Keep original
+      updatedAt: DateTime.now(), // Update timestamp
+    );
+  }
+  
   Map<String, dynamic> toJson() => {
     'id': id,
     'name': name,
@@ -465,7 +507,7 @@ class Project {
     'createdAt': createdAt.toIso8601String(),
     'updatedAt': updatedAt.toIso8601String(),
   };
-
+  
   factory Project.fromJson(Map<String, dynamic> json) {
     return Project(
       id: json['id'],
@@ -476,4 +518,20 @@ class Project {
       updatedAt: DateTime.parse(json['updatedAt']),
     );
   }
+}
+
+class ProjectStats {
+  final int totalTasks;
+  final int completedTasks;
+  final int activeTasks;
+  final double totalTimeSpent;
+  final double totalEstimatedTime;
+
+  ProjectStats({
+    required this.totalTasks,
+    required this.completedTasks,
+    required this.activeTasks,
+    required this.totalTimeSpent,
+    required this.totalEstimatedTime,
+  });
 }
