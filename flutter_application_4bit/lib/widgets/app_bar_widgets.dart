@@ -8,7 +8,6 @@ class TimerAppBar extends StatelessWidget {
   final TimerState timerState;
   final VoidCallback onBackPressed;
   final VoidCallback onResetToHome;
-  final VoidCallback onSettingsPressed;
 
   const TimerAppBar({
     super.key,
@@ -16,7 +15,6 @@ class TimerAppBar extends StatelessWidget {
     required this.timerState,
     required this.onBackPressed,
     required this.onResetToHome,
-    required this.onSettingsPressed,
   });
 
   @override
@@ -103,11 +101,10 @@ class TimerAppBar extends StatelessWidget {
           ),
           GestureDetector(
             onTap: () {
-              onSettingsPressed();
               HapticFeedback.lightImpact();
             },
             child: const Icon(
-              Icons.notifications_outlined,
+              Icons.notifications,
               color: Colors.white,
               size: 24,
             ),

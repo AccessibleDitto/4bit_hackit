@@ -9,8 +9,8 @@ import 'dart:async';
 
 // Import the modular files
 import 'models/timer_models.dart';
+import 'tasks_updated.dart' as TaskData show getTasksList, updateTaskTimeSpent, startTask, completeTask;
 import 'models/task_models.dart' show TaskStatus;
-import 'tasks_updated.dart' as TaskData show getTasksList, updateTaskTimeSpent, markTaskAsCompleted;
 import 'services/global_timer_service.dart';
 import 'services/user_stats_service.dart';
 import 'utils/timer_utils.dart';
@@ -65,15 +65,16 @@ class _TimerModePageState extends State<TimerModePage> with TickerProviderStateM
       Color(0xFFF59E0B),
     ];
 
-    // Map fullTasks to TimerModels.Task for dropdown
+    // Map fullTasks to TimerModels.Task for dropdown - only show incomplete tasks
     final pomodoroLength = PomodoroSettings.instance.pomodoroLength;
     final incompleteTasks = fullTasks
-      .where((t) => t.timeSpent < t.estimatedTime && t.status != TaskStatus.completed)
+      .where((t) => t.status != TaskStatus.completed && t.status != TaskStatus.cancelled)
       .toList();
     final dropdownTasks = incompleteTasks.asMap().map((index, t) => MapEntry(index, Task(
       title: t.title,
       color: colorOrder[index % colorOrder.length],
       estimatedTime: t.estimatedTime,
+      timeSpent: t.timeSpent,
       focusMinutes: pomodoroLength,
     ))).values.toList();
     showModalBottomSheet(
@@ -91,6 +92,10 @@ class _TimerModePageState extends State<TimerModePage> with TickerProviderStateM
             );
             setState(() {
               _currentFullTask = fullTask;
+              // Start the task if it's not started yet
+              if (fullTask.status == TaskStatus.notStarted) {
+                TaskData.startTask(fullTask.id);
+              }
               // Set global timer task info for session tracking with time spent
               _globalTimer.setTaskInfo(task.title, task.estimatedTime, fullTask.timeSpent);
               // Initialize timer based on task's previously spent time
@@ -403,8 +408,13 @@ class _TimerModePageState extends State<TimerModePage> with TickerProviderStateM
           // Check if this was the last session before advancing
           bool isLastSession = _globalTimer.currentSession >= _globalTimer.totalSessions;
           
-          // Focus session completed, advance to next session
-          _globalTimer.nextSession();
+          // Check if this is the last session for the task
+          if (_globalTimer.currentSession >= _globalTimer.totalSessions) {
+            // Task completed - mark as completed
+            TaskData.completeTask(_currentFullTask.id);
+          } else {
+            // Focus session completed, advance to next session
+            _globalTimer.nextSession();
           
           // Check if all sessions are completed
           if (isLastSession) {
@@ -422,6 +432,7 @@ class _TimerModePageState extends State<TimerModePage> with TickerProviderStateM
           } else {
             // More sessions remain - reset state to idle for next session
             _globalTimer.setState(GlobalTimerState.idle);
+          }
           }
         }
       }); // Update UI when session completes
@@ -498,15 +509,8 @@ class _TimerModePageState extends State<TimerModePage> with TickerProviderStateM
                       timerState: _isBreakTime ? TimerState.breakRunning :
                                  (_globalTimer.state == GlobalTimerState.running ? TimerState.focusRunning : 
                                  (_globalTimer.state == GlobalTimerState.paused ? TimerState.focusPaused : TimerState.idle)),
-                      onBackPressed: () {
-                        if (!_isStrictMode) {
-                          Navigator.pop(context);
-                        }
-                      },
+                      onBackPressed: () {},
                       onResetToHome: _resetToHome,
-                      onSettingsPressed: () {
-                        // Settings functionality
-                      },
                     ),
                     // Task Selection Dropdown (only show when idle)
                     if (_globalTimer.state == GlobalTimerState.idle)
@@ -539,6 +543,8 @@ class _TimerModePageState extends State<TimerModePage> with TickerProviderStateM
                                   focusSeconds: _focusSeconds,
                                   breakSeconds: _breakSeconds,
                                   progressValue: progressValue,
+                                  currentSession: _globalTimer.currentSession,
+                                  totalSessions: _globalTimer.totalSessions,
                                 );
                               },
                             )
@@ -610,7 +616,7 @@ class _TimerModePageState extends State<TimerModePage> with TickerProviderStateM
                         _isStrictMode,
                         (value) {
                           setState(() => _isStrictMode = value);
-                        },
+                        },  
                       ),
                       onTimerModePressed: () {
                         showModalBottomSheet(
