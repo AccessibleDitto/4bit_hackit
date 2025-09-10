@@ -162,7 +162,11 @@ class UserStats {
     _pomodorosCompleted++;
     _totalFocusTimeMinutes += durationMinutes;
     _updateStreak();
-    _checkForNewBadges();
+    _checkForNewBadges(); 
+  }
+
+  void completedTask() {
+    _checkForTaskBadges();
     saveToFirebase();
   }
 
@@ -232,7 +236,12 @@ class UserStats {
       _addAchievement('💎', 'Consistency', 'Use app for 30 days');
     }
 
-    // Task achievements
+    _earnedBadges.addAll(newBadges);
+  }
+
+  void _checkForTaskBadges() {
+    final newBadges = <String>[];
+
     if (tasksCompleted >= 1 && !_earnedBadges.contains('first_task')) {
       newBadges.add('first_task');
       _addAchievement('✅', 'First Task', 'Complete your first task');
@@ -322,34 +331,35 @@ class UserStats {
   }
 
   void initializeSampleData() {
-    _pomodorosCompleted = 127;
-    _totalFocusTimeMinutes = 2535; // 42h 15m
-    _streakDays = 12;
-    _lastActiveDate = DateTime.now();
-    _earnedBadges = ['first_timer', 'on_fire', 'time_master', 'focused'];
+    _pomodorosCompleted = 0; 
+    _totalFocusTimeMinutes = 0; 
+    _streakDays = 0; 
+    _lastActiveDate = null; 
+    _earnedBadges = []; 
     
     _taskManager.initializeSampleData();
     
-    _recentAchievements = [
-      Achievement(
-        emoji: '🎯',
-        title: 'Task Master',
-        description: 'Completed 10 tasks in one day',
-        timestamp: DateTime.now().subtract(const Duration(days: 2)),
-      ),
-      Achievement(
-        emoji: '⚡',
-        title: 'Speed Runner',
-        description: 'Completed 5 pomodoros in a row',
-        timestamp: DateTime.now().subtract(const Duration(days: 7)),
-      ),
-      Achievement(
-        emoji: '🌟',
-        title: 'Early Bird',
-        description: 'Started session before 7 AM',
-        timestamp: DateTime.now().subtract(const Duration(days: 14)),
-      ),
-    ];
+    // _recentAchievements = [
+    //   Achievement(
+    //     emoji: '🎯',
+    //     title: 'Task Master',
+    //     description: 'Completed 10 tasks in one day',
+    //     timestamp: DateTime.now().subtract(const Duration(days: 2)),
+    //   ),
+    //   Achievement(
+    //     emoji: '⚡',
+    //     title: 'Speed Runner',
+    //     description: 'Completed 5 pomodoros in a row',
+    //     timestamp: DateTime.now().subtract(const Duration(days: 7)),
+    //   ),
+    //   Achievement(
+    //     emoji: '🌟',
+    //     title: 'Early Bird',
+    //     description: 'Started session before 7 AM',
+    //     timestamp: DateTime.now().subtract(const Duration(days: 14)),
+    //   ),
+    // ];
+    _recentAchievements = []; 
   }
 }
 

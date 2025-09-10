@@ -7,7 +7,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 class PomodoroSettings extends ChangeNotifier {
   Future<void> loadFromPrefs() async {
     final prefs = await SharedPreferences.getInstance();
-    _pomodoroLength = prefs.getInt('pomodoroLength') ?? 25;
+    // _pomodoroLength = prefs.getInt('pomodoroLength') ?? 25; // this was original time
+    _pomodoroLength = prefs.getInt('pomodoroLength') ?? 1; 
     _isCountdownMode = prefs.getBool('isCountdownMode') ?? true;
     notifyListeners();
   }
@@ -41,7 +42,8 @@ class PomodoroSettings extends ChangeNotifier {
   static final PomodoroSettings instance = PomodoroSettings._internal();
   PomodoroSettings._internal();
 
-  int _pomodoroLength = 25;
+  // int _pomodoroLength = 25; // this was original time
+  int _pomodoroLength = 1; 
   int _shortBreakLength = 5;
   int _longBreakLength = 15;
   int _longBreakAfter = 4;
@@ -86,7 +88,7 @@ class _PomodoroPreferencesScreenState extends State<PomodoroPreferencesScreen> w
 
   // pomodoro settings
   bool _strictMode = false;
-  int _pomodoroLength = 25; // minutes
+  int _pomodoroLength = 1; 
   int _shortBreakLength = 5; // minutes
   int _longBreakLength = 15; // minutes
   int _longBreakAfter = 4; // pomodoros
@@ -155,7 +157,8 @@ class _PomodoroPreferencesScreenState extends State<PomodoroPreferencesScreen> w
 
   Future<void> _loadPomodoroSettings() async {
     final prefs = await SharedPreferences.getInstance();
-    int loadedLength = prefs.getInt('pomodoroLength') ?? 25;
+    // int loadedLength = prefs.getInt('pomodoroLength') ?? 25; // this was original time
+    int loadedLength = prefs.getInt('pomodoroLength') ?? 1;
     String defaultMode = '${loadedLength.toString().padLeft(2, '0')}:00 → 00:00';
     List<String> options = [defaultMode, '00:00 → ∞'];
     String loadedTimerMode = prefs.getString('timerMode') ?? defaultMode;
@@ -332,9 +335,9 @@ class _PomodoroPreferencesScreenState extends State<PomodoroPreferencesScreen> w
           subtitle: '$_pomodoroLength minutes',
           icon: Icons.schedule,
           value: _pomodoroLength.toDouble(),
-          min: 25,
-          max: 60,
-          divisions: 7,
+          min: 1, // this was 25
+          max: 60, 
+          divisions: 7, 
           onChanged: (value) async {
             int newValue = value.round();
             setState(() {

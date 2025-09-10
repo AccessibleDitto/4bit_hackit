@@ -44,6 +44,10 @@ class GlobalTimerService {
   int get totalSessions => _totalSessions;
   String get selectedTask => _selectedTask;
 
+  void setState(GlobalTimerState newState) {
+    _state = newState;
+  }
+
   void setTaskInfo(String taskName, double estimatedHours, double timeSpentHours) {
     _selectedTask = taskName;
     refreshSessionInfo(estimatedHours: estimatedHours, timeSpentHours: timeSpentHours);

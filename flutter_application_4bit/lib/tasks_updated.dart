@@ -98,7 +98,7 @@ List<Task> tasks = [
     title: 'Complete Flutter app',
     description: 'Finish implementing the remaining features for the mobile application',
     estimatedTime: 3.0,
-    timeSpent: 2.5,
+    timeSpent: 2.95,
     dueDate: DateTime.now(),
     status: TaskStatus.inProgress,
     priority: Priority.high,
@@ -183,6 +183,18 @@ void updateTaskTimeSpent(String taskId, double additionalTimeSpent) {
     );
     tasks[index] = updatedTask;
     // Can add Firebase saving logic here later
+  }
+}
+
+void markTaskAsCompleted(String taskId) {
+  int index = tasks.indexWhere((task) => task.id == taskId);
+  if (index != -1) {
+    final currentTask = tasks[index];
+    final updatedTask = currentTask.copyWith(
+      timeSpent: currentTask.estimatedTime, 
+      status: TaskStatus.completed,
+    );
+    tasks[index] = updatedTask;
   }
 }
 

@@ -148,7 +148,7 @@ class SessionIndicator extends StatelessWidget {
     final dotSize = circleSize * 0.04;
     final dotSpacing = circleSize * 0.013 * 2;
     final totalWidth = (totalSessions * dotSize) + ((totalSessions - 1) * dotSpacing);
-    final padding = (screenWidth - totalWidth) / 2;
+    final padding = ((screenWidth - totalWidth) / 2).clamp(0.0, double.infinity);
 
     return Container(
       margin: EdgeInsets.only(bottom: circleSize * 0.133),
