@@ -11,6 +11,9 @@ class TimerCircle extends StatelessWidget {
   final int breakSeconds;
   final double progressValue;
 
+  final int currentSession;
+  final int totalSessions;
+
   const TimerCircle({
     super.key,
     required this.currentSeconds,
@@ -19,6 +22,8 @@ class TimerCircle extends StatelessWidget {
     required this.focusSeconds,
     required this.breakSeconds,
     required this.progressValue,
+    required this.currentSession,
+    required this.totalSessions,
   });
 
   @override
@@ -119,7 +124,7 @@ class TimerCircle extends StatelessWidget {
         return 'Ready to focus';
       case TimerState.focusRunning:
       case TimerState.focusPaused:
-        return 'Focus Time';
+        return 'Session $currentSession of $totalSessions';
       case TimerState.breakIdle:
       case TimerState.breakRunning:
         return 'Break Time - Take a rest';
@@ -148,7 +153,7 @@ class SessionIndicator extends StatelessWidget {
     final dotSize = circleSize * 0.04;
     final dotSpacing = circleSize * 0.013 * 2;
     final totalWidth = (totalSessions * dotSize) + ((totalSessions - 1) * dotSpacing);
-    final padding = (screenWidth - totalWidth) / 2;
+    final padding = ((screenWidth - totalWidth) / 2).clamp(0.0, double.infinity);
 
     return Container(
       margin: EdgeInsets.only(bottom: circleSize * 0.133),

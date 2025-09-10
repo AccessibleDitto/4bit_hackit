@@ -45,7 +45,7 @@ class _FilteredTasksPageState extends State<FilteredTasksPage> {
   String _formatTime(double hours) {
     if (hours == 0) return '0h';
     int wholeHours = hours.floor();
-    int minutes = ((hours - wholeHours) * 60).round();
+    int minutes = ((hours - wholeHours) * 60).floor();
     
     if (minutes == 0) {
       return '${wholeHours}h';

@@ -128,7 +128,9 @@ class TaskItem extends StatelessWidget {
                       ),
                       const SizedBox(width: 6),
                       Text(
-                        '${task.sessions} sessions planned',
+                        task.sessionsLeft > 0
+                          ? '${task.sessionsLeft} sessions of ${task.sessions} left'
+                          : 'All sessions completed!',
                         style: GoogleFonts.inter(
                           color: const Color(0xFFA1A1AA),
                           fontSize: 14,

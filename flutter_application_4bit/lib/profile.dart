@@ -763,7 +763,7 @@ class _ProfileScreenState extends State<ProfileScreen>
       debugPrint('Profile: User stats loaded from Firebase successfully');
     } catch (error) {
       debugPrint('Profile: Error loading stats data: $error');
-      _userStats.initializeSampleData();
+      // _userStats.initializeSampleData(); 
     }
   }
 

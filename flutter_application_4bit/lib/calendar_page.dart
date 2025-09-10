@@ -1,12 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:calendar_view/calendar_view.dart';
-import 'package:flutter_application_4bit/event_parser.dart';
 import '../models/calendar_models.dart';
 import '../models/task_models.dart';
 import '../models/scheduling_models.dart';
-import '../services/task_manager_local.dart';
 import '../services/scheduling_service.dart';
-import '../widgets/task_form_widget.dart';
 import '../widgets/chat_interface.dart';
 import '../utils/date_utils.dart';
 import '../widgets/event_tile_builder.dart';
@@ -294,13 +291,6 @@ class CalendarPageState extends State<CalendarPage> {
       _selectedDayViewDate = date;
       _isInDayView = true;
       _previousViewIndex = _selectedIndex;
-    });
-  }
-
-  void _exitDayView() {
-    setState(() {
-      _isInDayView = false;
-      _selectedDayViewDate = null;
     });
   }
 

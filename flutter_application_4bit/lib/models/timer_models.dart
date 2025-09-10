@@ -6,12 +6,14 @@ class Task {
   final String title;
   final Color color;
   final double estimatedTime; // in hours
+  final double timeSpent; // in hours
   final int focusMinutes;
 
   const Task({
     required this.title,
     required this.color,
-    double? estimatedTime,  // Make it nullable
+    double? estimatedTime,  // make it nullable
+    this.timeSpent = 0.0,
     this.focusMinutes = 25,
   }) : this.estimatedTime = estimatedTime ?? 1.0;  // Default to 1 hour if null
 
@@ -20,6 +22,13 @@ class Task {
     // If estimatedTime is 0 or negative, return 1 session as minimum
     if (estimatedTime <= 0) return 1;
     return (estimatedTime * 60 / focusMinutes).ceil();
+  }
+
+  int get sessionsLeft {
+    // Calculate sessions left based on remaining time
+    double remainingTime = estimatedTime - timeSpent;
+    if (remainingTime <= 0) return 0;
+    return (remainingTime * 60 / focusMinutes).ceil();
   }
 }
 

@@ -1,15 +1,19 @@
+import 'package:flutter_application_4bit/tasks_updated.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:confetti/confetti.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'dart:async';
 
 // Import the modular files
 import 'models/timer_models.dart';
-import 'tasks_updated.dart' as TaskData show getTasksList, updateTaskTimeSpent;
+import 'tasks_updated.dart' as TaskData show getTasksList, updateTaskTimeSpent, startTask, completeTask;
+import 'models/task_models.dart' show TaskStatus;
 import 'services/global_timer_service.dart';
+import 'services/user_stats_service.dart';
 import 'utils/timer_utils.dart';
 import 'widgets/app_bar_widgets.dart';
 import 'widgets/task_widgets.dart';
@@ -62,15 +66,16 @@ class _TimerModePageState extends State<TimerModePage> with TickerProviderStateM
       Color(0xFFF59E0B),
     ];
 
-    // Map fullTasks to TimerModels.Task for dropdown
+    // Map fullTasks to TimerModels.Task for dropdown - only show incomplete tasks
     final pomodoroLength = PomodoroSettings.instance.pomodoroLength;
     final incompleteTasks = fullTasks
-      .where((t) => t.timeSpent < t.estimatedTime)
+      .where((t) => t.status != TaskStatus.completed && t.status != TaskStatus.cancelled)
       .toList();
     final dropdownTasks = incompleteTasks.asMap().map((index, t) => MapEntry(index, Task(
       title: t.title,
       color: colorOrder[index % colorOrder.length],
       estimatedTime: t.estimatedTime,
+      timeSpent: t.timeSpent,
       focusMinutes: pomodoroLength,
     ))).values.toList();
     showModalBottomSheet(
@@ -88,6 +93,10 @@ class _TimerModePageState extends State<TimerModePage> with TickerProviderStateM
             );
             setState(() {
               _currentFullTask = fullTask;
+              // Start the task if it's not started yet
+              if (fullTask.status == TaskStatus.notStarted) {
+                TaskData.startTask(fullTask.id);
+              }
               // Set global timer task info for session tracking with time spent
               _globalTimer.setTaskInfo(task.title, task.estimatedTime, fullTask.timeSpent);
               // Initialize timer based on task's previously spent time
@@ -187,6 +196,44 @@ class _TimerModePageState extends State<TimerModePage> with TickerProviderStateM
     setState(() {
       _isBreakTime = false;
     });
+  }
+
+  void _checkAndShowBadgePopup() {
+    final userStats = UserStats();
+    final recentAchievements = userStats.recentAchievements;
+    
+    if (recentAchievements.isNotEmpty) {
+      final latestAchievement = recentAchievements.first;
+      
+      final now = DateTime.now();
+      final achievementTime = latestAchievement.timestamp;
+      final timeDifference = now.difference(achievementTime).inSeconds;
+      
+      if (timeDifference <= 5) {
+        Future.delayed(const Duration(seconds: 2), () {
+          if (mounted) {
+            _showBadgeEarnedDialog(latestAchievement);
+          }
+        });
+      }
+    }
+  }
+
+  void _showBadgeEarnedDialog(Achievement achievement) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => BadgeEarnedDialog(
+        achievement: achievement,
+        onDismiss: () {
+          Navigator.of(context).pop();
+        },
+        onViewProfile: () {
+          Navigator.of(context).pop();
+          Navigator.pushNamed(context, '/profile');
+        },
+      ),
+    );
   }
 
   double _getProgress() {
@@ -306,7 +353,7 @@ class _TimerModePageState extends State<TimerModePage> with TickerProviderStateM
       // Handle timer state changes
       if (_globalTimer.state == GlobalTimerState.running) {
         int pomodoroLength = PomodoroSettings.instance.pomodoroLength;
-        int focusSeconds = pomodoroLength * 60;
+        int focusSeconds = pomodoroLength * 1;
         _globalTimer.stop();
         if (_currentFullTask != null) {
           if (isCountdown) {
@@ -359,10 +406,44 @@ class _TimerModePageState extends State<TimerModePage> with TickerProviderStateM
     _globalTimer.onComplete = () {
       setState(() {
         if (!_isBreakTime && _currentFullTask != null) {
-          // Focus session completed, advance to next session
-          _globalTimer.nextSession();
+          // Check if this was the last session before advancing
+          bool isLastSession = _globalTimer.currentSession >= _globalTimer.totalSessions;
+          
+          // Check if this is the last session for the task
+          if (_globalTimer.currentSession >= _globalTimer.totalSessions) {
+            // Task completed - mark as completed
+            TaskData.completeTask(_currentFullTask.id);
+          } else {
+            // Focus session completed, advance to next session
+            _globalTimer.nextSession();
+          
+          // Check if all sessions are completed
+          if (isLastSession) {
+            // All sessions completed - mark task as complete and show congratulations
+            // Mark the task as completed (sets timeSpent = estimatedTime and status = completed)
+            TaskData.completeTask(_currentFullTask.id);
+            _currentFullTask.timeSpent = _currentFullTask.estimatedTime;
+            // Call completedTask() for task-related badges when full task is done
+            UserStats().completedTask();
+            // Check for new task badges after task completion
+            Future.delayed(const Duration(milliseconds: 500), () {
+              _checkAndShowBadgePopup();
+            });
+            _globalTimer.setState(GlobalTimerState.completed);
+          } else {
+            // More sessions remain - reset state to idle for next session
+            _globalTimer.setState(GlobalTimerState.idle);
+          }
+          }
         }
       }); // Update UI when session completes
+      
+      // Track pomodoro completion for achievements
+      if (!_isBreakTime) {
+        final pomodoroLength = PomodoroSettings.instance.pomodoroLength.toInt();
+        UserStats().completedPomodoro(durationMinutes: pomodoroLength);
+        _checkAndShowBadgePopup();
+      }
     };
   }
 
@@ -387,7 +468,7 @@ class _TimerModePageState extends State<TimerModePage> with TickerProviderStateM
         totalSessions: _globalTimer.totalSessions,
         confettiController: _confettiController,
         onViewReport: () {
-          // View Report functionality
+          Navigator.pushNamed(context, '/report');
           HapticFeedback.lightImpact();
         },
         onStartNewSession: _resetToHome,
@@ -429,15 +510,8 @@ class _TimerModePageState extends State<TimerModePage> with TickerProviderStateM
                       timerState: _isBreakTime ? TimerState.breakRunning :
                                  (_globalTimer.state == GlobalTimerState.running ? TimerState.focusRunning : 
                                  (_globalTimer.state == GlobalTimerState.paused ? TimerState.focusPaused : TimerState.idle)),
-                      onBackPressed: () {
-                        if (!_isStrictMode) {
-                          Navigator.pop(context);
-                        }
-                      },
+                      onBackPressed: () {},
                       onResetToHome: _resetToHome,
-                      onSettingsPressed: () {
-                        // Settings functionality
-                      },
                     ),
                     // Task Selection Dropdown (only show when idle)
                     if (_globalTimer.state == GlobalTimerState.idle)
@@ -470,6 +544,8 @@ class _TimerModePageState extends State<TimerModePage> with TickerProviderStateM
                                   focusSeconds: _focusSeconds,
                                   breakSeconds: _breakSeconds,
                                   progressValue: progressValue,
+                                  currentSession: _globalTimer.currentSession,
+                                  totalSessions: _globalTimer.totalSessions,
                                 );
                               },
                             )
@@ -541,7 +617,7 @@ class _TimerModePageState extends State<TimerModePage> with TickerProviderStateM
                         _isStrictMode,
                         (value) {
                           setState(() => _isStrictMode = value);
-                        },
+                        },  
                       ),
                       onTimerModePressed: () {
                         showModalBottomSheet(
@@ -598,6 +674,204 @@ class _TimerModePageState extends State<TimerModePage> with TickerProviderStateM
           isStrictMode: _isStrictMode,
         ),
       ),
+    );
+  }
+}
+
+class BadgeEarnedDialog extends StatefulWidget {
+  final Achievement achievement;
+  final VoidCallback onDismiss;
+  final VoidCallback onViewProfile;
+
+  const BadgeEarnedDialog({
+    super.key,
+    required this.achievement,
+    required this.onDismiss,
+    required this.onViewProfile,
+  });
+
+  @override
+  State<BadgeEarnedDialog> createState() => _BadgeEarnedDialogState();
+}
+
+class _BadgeEarnedDialogState extends State<BadgeEarnedDialog>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _animationController;
+  late Animation<double> _scaleAnimation;
+  late Animation<double> _fadeAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _animationController = AnimationController(
+      duration: const Duration(milliseconds: 600),
+      vsync: this,
+    );
+    
+    _scaleAnimation = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(
+      parent: _animationController,
+      curve: Curves.elasticOut,
+    ));
+    
+    _fadeAnimation = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(
+      parent: _animationController,
+      curve: Curves.easeOut,
+    ));
+    
+    _animationController.forward();
+  }
+
+  @override
+  void dispose() {
+    _animationController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _animationController,
+      builder: (context, child) {
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          child: FadeTransition(
+            opacity: _fadeAnimation,
+            child: ScaleTransition(
+              scale: _scaleAnimation,
+              child: Container(
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1E1E1E),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: const Color(0xFF9333EA).withOpacity(0.3),
+                    width: 2,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF9333EA).withOpacity(0.2),
+                      blurRadius: 20,
+                      spreadRadius: 5,
+                    ),
+                  ],
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Achievement Icon
+                    Container(
+                      width: 80,
+                      height: 80,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF9333EA).withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: const Color(0xFF9333EA).withOpacity(0.3),
+                          width: 2,
+                        ),
+                      ),
+                      child: Center(
+                        child: Text(
+                          widget.achievement.emoji,
+                          style: const TextStyle(fontSize: 40),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    
+                    // earned text
+                    Text(
+                      'Achievement Earned!',
+                      style: GoogleFonts.inter(
+                        color: const Color(0xFF9333EA),
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    
+                    // title
+                    Text(
+                      widget.achievement.title,
+                      style: GoogleFonts.inter(
+                        color: Colors.white,
+                        fontSize: 24,
+                        fontWeight: FontWeight.w700,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 8),
+                    
+                    // acheivement desc
+                    Text(
+                      widget.achievement.description,
+                      style: GoogleFonts.inter(
+                        color: const Color(0xFFA1A1AA),
+                        fontSize: 16,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 24),
+                    
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: widget.onDismiss,
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: Colors.white,
+                              side: const BorderSide(color: Color(0xFF9333EA)),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                            ),
+                            child: Text(
+                              'Continue',
+                              style: GoogleFonts.inter(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: ElevatedButton(
+                            onPressed: widget.onViewProfile,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF9333EA),
+                              foregroundColor: Colors.white,
+                              elevation: 0,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                            ),
+                            child: Text(
+                              'View Profile',
+                              style: GoogleFonts.inter(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }

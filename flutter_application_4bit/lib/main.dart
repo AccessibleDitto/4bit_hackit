@@ -11,6 +11,8 @@ import 'homepage.dart';
 import 'tasks_updated.dart';
 import 'settings.dart';
 import 'pomodoro_preferences.dart';
+import 'profile.dart';
+import 'report.dart';
 
 // Initialize Firestore instance
 final db = FirebaseFirestore.instance;
@@ -38,6 +40,8 @@ class MyApp extends StatelessWidget {
         '/home': (context) => TimerModePage(),
         '/login': (context) => LoginPage(),
         '/register': (context) => SignupPage(),
+        '/profile': (context) => ProfileScreen(),
+        '/report': (context) => ReportScreen(),
       },
       debugShowCheckedModeBanner: false,
     );
