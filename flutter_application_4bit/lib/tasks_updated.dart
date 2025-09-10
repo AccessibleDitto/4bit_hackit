@@ -61,10 +61,16 @@ class TasksPage extends StatefulWidget {
   _TasksPageState createState() => _TasksPageState();
 }
 
-String _formatTime(double hours) {
+String formatTime(double hours) {
   if (hours == 0) return '0h';
   int wholeHours = hours.floor();
   int minutes = ((hours - wholeHours) * 60).round();
+  
+  // Handle 60 minutes = 1 hour conversion
+  if (minutes == 60) {
+    wholeHours += 1;
+    minutes = 0;
+  }
   
   if (minutes == 0) {
     return '${wholeHours}h';
@@ -73,6 +79,10 @@ String _formatTime(double hours) {
   } else {
     return '${wholeHours}h ${minutes}m';
   }
+}
+
+String _formatTime(double hours) {
+  return formatTime(hours);
 }
 
 // Top-level task data for access from other files
@@ -100,7 +110,7 @@ List<Task> tasks = [
     title: 'Complete Flutter app',
     description: 'Finish implementing the remaining features for the mobile application',
     estimatedTime: 3.0,
-    timeSpent: 2.5,
+    timeSpent: 2.999,
     dueDate: DateTime.now(),
     status: TaskStatus.inProgress,
     priority: Priority.high,
@@ -180,11 +190,49 @@ void updateTaskTimeSpent(String taskId, double additionalTimeSpent) {
   int index = tasks.indexWhere((task) => task.id == taskId);
   if (index != -1) {
     final currentTask = tasks[index];
+    final newTimeSpent = currentTask.timeSpent + additionalTimeSpent;
+    
+    // Determine new status based on progress
+    TaskStatus newStatus = currentTask.status;
+    if (currentTask.status == TaskStatus.notStarted && additionalTimeSpent > 0) {
+      newStatus = TaskStatus.inProgress;
+    } else if (newTimeSpent >= currentTask.estimatedTime) {
+      newStatus = TaskStatus.completed;
+    }
+    
     final updatedTask = currentTask.copyWith(
-      timeSpent: currentTask.timeSpent + additionalTimeSpent,
+      timeSpent: newTimeSpent,
+      status: newStatus,
     );
     tasks[index] = updatedTask;
     // Can add Firebase saving logic here later
+  }
+}
+
+// Function to mark task as completed
+void completeTask(String taskId) {
+  int index = tasks.indexWhere((task) => task.id == taskId);
+  if (index != -1) {
+    final currentTask = tasks[index];
+    final updatedTask = currentTask.copyWith(
+      status: TaskStatus.completed,
+      timeSpent: currentTask.estimatedTime, // Set to full estimated time
+    );
+    tasks[index] = updatedTask;
+  }
+}
+
+// Function to start task (change from notStarted to inProgress)
+void startTask(String taskId) {
+  int index = tasks.indexWhere((task) => task.id == taskId);
+  if (index != -1) {
+    final currentTask = tasks[index];
+    if (currentTask.status == TaskStatus.notStarted) {
+      final updatedTask = currentTask.copyWith(
+        status: TaskStatus.inProgress,
+      );
+      tasks[index] = updatedTask;
+    }
   }
 }
 
@@ -231,8 +279,7 @@ class _TasksPageState extends State<TasksPage> {
   List<Task> get scheduledTasks => filteredTasks.where((task) => 
     task.scheduledFor != null && task.status != TaskStatus.completed).toList();
   
-  List<Task> get allTasks => filteredTasks.where((task) => 
-    task.status != TaskStatus.completed && task.status != TaskStatus.cancelled).toList();
+  List<Task> get allTasks => filteredTasks; // Show all tasks including completed ones
   
   List<Task> get priorityTasks => filteredTasks.where((task) => 
     (task.priority == Priority.high || task.priority == Priority.urgent) && 
@@ -757,37 +804,7 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
   double _selectedTime = 1.0;
   Priority _selectedPriority = Priority.medium;
   String? _selectedProjectId;
-  DateTime? _scheduledDate = DateTime.now();
   final TextEditingController _titleController = TextEditingController();
-
-  String get _dateDisplayText {
-    if (_scheduledDate == null) return 'No Date';
-    
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    final tomorrow = today.add(const Duration(days: 1));
-    final selectedDay = DateTime(_scheduledDate!.year, _scheduledDate!.month, _scheduledDate!.day);
-    
-    if (selectedDay == today) {
-      return 'Today';
-    } else if (selectedDay == tomorrow) {
-      return 'Tomorrow';
-    } else if (selectedDay.isAfter(today) && selectedDay.isBefore(today.add(const Duration(days: 7)))) {
-      const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-      return 'Later This Week (${dayNames[selectedDay.weekday - 1]})';
-    } else if (selectedDay.isAfter(today.add(Duration(days: 7 - today.weekday))) && 
-               selectedDay.isBefore(today.add(Duration(days: 14 - today.weekday)))) {
-      return 'Next Week';
-    } else {
-      return '${selectedDay.day} ${_getMonthName(selectedDay.month)}';
-    }
-  }
-
-  String _getMonthName(int month) {
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-                   'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    return months[month - 1];
-  }
 
   DateTime? selectedDate;
   TimeOfDay? selectedTime;
@@ -1342,6 +1359,20 @@ class _AddProjectPageState extends State<AddProjectPage> {
 
 // Updated Task class with all improvements from the second document
 class Task {
+  int get sessions {
+    // Calculate number of sessions based on estimated time and default focusMinutes (25)
+    int focusMinutes = 25;
+    if (estimatedTime <= 0) return 1;
+    return (estimatedTime * 60 / focusMinutes).ceil();
+  }
+
+  int get sessionsLeft {
+    // Calculate sessions left based on remaining time and default focusMinutes (25)
+    int focusMinutes = 25;
+    double remaining = remainingTime;
+    if (remaining <= 0) return 0;
+    return (remaining * 60 / focusMinutes).ceil();
+  }
   final String id;
   final String title;
   final String? description;
