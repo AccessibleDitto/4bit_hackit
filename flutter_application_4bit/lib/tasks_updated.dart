@@ -90,14 +90,17 @@ List<Project> projects = [
   Project.create(
     name: 'Mobile App Development',
     color: const Color(0xFF9333EA),
+    id: '1',
   ),
   Project.create(
     name: 'Website Redesign',
     color: const Color(0xFF10B981),
+    id: '2',
   ),
   Project.create(
     name: 'Marketing Campaign',
     color: const Color(0xFF7C3AED),
+    id: '3',
   ),
 ];
 
@@ -969,18 +972,18 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
                   width: 1,
                 ),
               ),
-              child: DropdownButton<String?>(
+              child: DropdownButton<String>(
                 value: _selectedProjectId,
                 hint: Text('Select Project', style: GoogleFonts.inter(color: const Color(0xFF71717A))),
                 dropdownColor: const Color(0xFF27272A),
                 underline: Container(),
                 isExpanded: true,
                 items: [
-                  DropdownMenuItem<String?>(
-                    value: null,
-                    child: Text('No Project', style: GoogleFonts.inter(color: Colors.white)),
+                  const DropdownMenuItem<String>(
+                    value: '',
+                    child: Text('No Project', style: TextStyle(color: Colors.white)),
                   ),
-                  ...widget.projects.map((project) => DropdownMenuItem<String?>(
+                  ...widget.projects.map((project) => DropdownMenuItem<String>(
                     value: project.id,
                     child: Row(
                       children: [
@@ -993,14 +996,14 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
                           ),
                         ),
                         const SizedBox(width: 8),
-                        Text(project.name, style: GoogleFonts.inter(color: Colors.white)),
+                        Text(project.name, style: const TextStyle(color: Colors.white)),
                       ],
                     ),
                   )),
                 ],
-                onChanged: (value) {
+                onChanged: (String? value) {
                   setState(() {
-                    _selectedProjectId = value;
+                    _selectedProjectId = value == '' ? null : value;
                   });
                 },
               ),
