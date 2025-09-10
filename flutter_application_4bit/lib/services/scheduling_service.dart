@@ -34,11 +34,10 @@ class SchedulingService {
       final response = await _makeGroqApiCall(prompt);
       return _parseSchedulingResponse(response);
     } catch (e, stackTrace) {
-      // Log the error and stack trace for debugging
       print('⚠️ Scheduling failed: $e');
       print('📜 Stack trace: $stackTrace');
       print('📝 Prompt that caused error:\n$prompt');
-      rethrow; // keep throwing so caller knows it failed
+      rethrow;
     }
   }
 
@@ -101,8 +100,8 @@ ${jsonEncode(constraints.toJson())}
 ${changes != null ? 'REQUESTED CHANGES:\n${jsonEncode(changes)}' : ''}
 
 OUTPUT REQUIREMENTS:
-- Valid JSON only, no extra text
-- Two fields: "reasoning" and "schedule"
+- Think through the problem step by step in <think> tags
+- Then provide a valid JSON response with two fields: "reasoning" and "schedule"
 - reasoning: Use pipe characters | to separate sections instead of newlines
 - schedule: Array of tasks with updated scheduledFor times
 
@@ -137,7 +136,7 @@ Task Schema for schedule array:
         {'role': 'user', 'content': prompt},
       ],
       'temperature': 0.3,
-      'max_tokens': 2000,
+      'max_tokens': 4000, // Increased from 2000
     };
 
     final response = await http.post(
@@ -150,7 +149,6 @@ Task Schema for schedule array:
       final data = jsonDecode(response.body);
       return data['choices'][0]['message']['content'];
     } else {
-      // Log the raw response for debugging
       print('❌ API Error: ${response.statusCode}');
       print('📩 Response body: ${response.body}');
       throw Exception('API Error: ${response.statusCode}');
@@ -161,84 +159,167 @@ Task Schema for schedule array:
     try {
       print('🔍 Raw response received:\n$response');
 
-      // Clean up response: remove markdown fences if present
-      String cleaned = response.trim();
+      // Extract thinking content and JSON separately
+      final parsedContent = _extractThinkingAndJson(response);
+      
+      print('💭 Thinking content: ${parsedContent.thinking}');
+      print('📦 JSON content: ${parsedContent.json}');
 
-      // Remove thinking tags if present (some models include <think> tags)
-      // Use a more robust approach to handle multiline thinking tags
-      if (cleaned.contains('<think>')) {
-        final thinkStart = cleaned.indexOf('<think>');
-        final thinkEnd = cleaned.indexOf('</think>');
-        if (thinkStart != -1 && thinkEnd != -1) {
-          // Remove everything from <think> to </think> inclusive
-          cleaned =
-              cleaned.substring(0, thinkStart) +
-              cleaned.substring(thinkEnd + '</think>'.length);
-          cleaned = cleaned.trim();
+      // If we have valid JSON, parse it
+      if (parsedContent.json.isNotEmpty) {
+        try {
+          final data = jsonDecode(parsedContent.json) as Map<String, dynamic>;
+          
+          // Combine thinking and reasoning
+          String combinedReasoning = '';
+          
+          if (parsedContent.thinking.isNotEmpty) {
+            combinedReasoning += '## AI THINKING PROCESS\n${parsedContent.thinking}\n\n';
+          }
+          
+          if (data['reasoning'] != null && data['reasoning'] is String) {
+            String reasoning = (data['reasoning'] as String).replaceAll('|', '\n');
+            combinedReasoning += reasoning;
+          }
+
+          // Update the data with combined reasoning
+          data['reasoning'] = combinedReasoning.trim();
+          
+          return SchedulingResult.fromJson(data);
+        } catch (e) {
+          print('❌ JSON parse error: $e');
+          // Fall through to thinking-only result
         }
       }
 
-      print('🧹 After removing think tags:\n$cleaned');
-
-      if (cleaned.startsWith('```')) {
-        // Remove ```json or ``` at the start and ending ```
-        cleaned = cleaned.replaceAll(RegExp(r'^```[a-zA-Z]*\n?'), '');
-        cleaned = cleaned.replaceAll(RegExp(r'```$'), '');
-        cleaned = cleaned.trim();
+      // If JSON parsing fails or no JSON found, create a result with just thinking content
+      if (parsedContent.thinking.isNotEmpty) {
+        return SchedulingResult(
+          reasoning: '## AI THINKING PROCESS\n${parsedContent.thinking}\n\n## STATUS\nThe AI is still processing the scheduling request. The thinking process shows the analysis in progress.',
+          schedule: [],
+        );
       }
 
-      print('🧹 After removing markdown:\n$cleaned');
+      // Last fallback
+      return SchedulingResult(
+        reasoning: "## ERROR\nFailed to parse AI response. The response may have been incomplete or malformed.\n\n## RAW RESPONSE\n$response",
+        schedule: [],
+      );
 
-      // Find the JSON part - look for the first { and last }
-      final firstBrace = cleaned.indexOf('{');
-      final lastBrace = cleaned.lastIndexOf('}');
-
-      if (firstBrace != -1 && lastBrace != -1 && firstBrace < lastBrace) {
-        cleaned = cleaned.substring(firstBrace, lastBrace + 1);
-      }
-
-      print('🎯 Final JSON to parse:\n$cleaned');
-
-      final data = jsonDecode(cleaned);
-
-      // Convert pipe-separated reasoning back to newline format for display
-      if (data['reasoning'] != null && data['reasoning'] is String) {
-        data['reasoning'] = (data['reasoning'] as String).replaceAll('|', '\n');
-      }
-
-      return SchedulingResult.fromJson(data);
     } catch (e, stackTrace) {
-      print('❌ Failed to parse response. Raw response:\n$response');
-      print('❌ Parse error: $e');
+      print('❌ Failed to parse response: $e');
       print('❌ Stack trace: $stackTrace');
 
-      // Try to extract any JSON that might be buried in the response
-      final jsonMatch = RegExp(r'\{.*\}', dotAll: true).firstMatch(response);
-      if (jsonMatch != null) {
-        try {
-          print('🔄 Attempting to parse extracted JSON...');
-          final extractedJson = jsonMatch.group(0)!;
-          print('📝 Extracted JSON: $extractedJson');
-
-          final data = jsonDecode(extractedJson);
-          if (data['reasoning'] != null && data['reasoning'] is String) {
-            data['reasoning'] = (data['reasoning'] as String).replaceAll(
-              '|',
-              '\n',
-            );
-          }
-          return SchedulingResult.fromJson(data);
-        } catch (e2) {
-          print('❌ Even extracted JSON failed to parse: $e2');
-        }
-      }
-
-      // If all else fails, return a fallback result
       return SchedulingResult(
-        reasoning:
-            "Failed to parse AI response. Raw response logged for debugging.",
+        reasoning: "## PARSING ERROR\nFailed to parse AI response: $e\n\n## RAW RESPONSE\n$response",
         schedule: [],
       );
     }
   }
+
+  ParsedContent _extractThinkingAndJson(String response) {
+    String thinking = '';
+    String json = '';
+    
+    // Extract thinking content between <think> tags
+    final thinkRegex = RegExp(r'<think>(.*?)</think>', dotAll: true);
+    final thinkMatch = thinkRegex.firstMatch(response);
+    
+    if (thinkMatch != null) {
+      thinking = thinkMatch.group(1)?.trim() ?? '';
+    }
+    
+    // Remove thinking content and extract JSON
+    String withoutThinking = response.replaceAll(thinkRegex, '').trim();
+    
+    // Remove markdown fences if present
+    withoutThinking = withoutThinking.replaceAll(RegExp(r'^```[a-zA-Z]*\n?'), '');
+    withoutThinking = withoutThinking.replaceAll(RegExp(r'```$'), '');
+    withoutThinking = withoutThinking.trim();
+    
+    // Look for JSON content
+    final jsonStart = withoutThinking.indexOf('{');
+    final jsonEnd = withoutThinking.lastIndexOf('}');
+    
+    if (jsonStart != -1 && jsonEnd != -1 && jsonStart <= jsonEnd) {
+      json = withoutThinking.substring(jsonStart, jsonEnd + 1);
+      
+      // Validate that this looks like valid JSON structure
+      if (_isValidJsonStructure(json)) {
+        // Good, we have valid JSON
+      } else {
+        // Try a more sophisticated approach
+        json = _extractJsonWithBraceMatching(withoutThinking);
+      }
+    }
+    
+    return ParsedContent(thinking: thinking, json: json);
+  }
+
+  String _extractJsonWithBraceMatching(String text) {
+    final firstBrace = text.indexOf('{');
+    if (firstBrace == -1) return '';
+    
+    int braceCount = 0;
+    int jsonEnd = -1;
+    bool inString = false;
+    bool escaped = false;
+    
+    for (int i = firstBrace; i < text.length; i++) {
+      final char = text[i];
+      
+      if (escaped) {
+        escaped = false;
+        continue;
+      }
+      
+      if (char == '\\') {
+        escaped = true;
+        continue;
+      }
+      
+      if (char == '"') {
+        inString = !inString;
+        continue;
+      }
+      
+      if (!inString) {
+        if (char == '{') {
+          braceCount++;
+        } else if (char == '}') {
+          braceCount--;
+          if (braceCount == 0) {
+            jsonEnd = i;
+            break;
+          }
+        }
+      }
+    }
+    
+    if (jsonEnd != -1) {
+      return text.substring(firstBrace, jsonEnd + 1);
+    }
+    
+    return '';
+  }
+
+  bool _isValidJsonStructure(String json) {
+    if (json.isEmpty || !json.startsWith('{') || !json.endsWith('}')) {
+      return false;
+    }
+    
+    try {
+      jsonDecode(json);
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+}
+
+class ParsedContent {
+  final String thinking;
+  final String json;
+  
+  ParsedContent({required this.thinking, required this.json});
 }

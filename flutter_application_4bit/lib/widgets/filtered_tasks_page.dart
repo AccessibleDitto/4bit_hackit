@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_application_4bit/widgets/task_detail_modal.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 // You'll need to import your task models here
@@ -74,11 +75,29 @@ class _FilteredTasksPageState extends State<FilteredTasksPage> {
     }
   }
 
+  void _showTaskDetail(Task task) {
+  showModalBottomSheet(
+    context: context,
+    backgroundColor: Colors.transparent,
+    isScrollControlled: true,
+    builder: (context) => TaskDetailModal(
+      task: task,
+      projects: projects,
+      onTaskUpdate: (updatedTask) {
+        saveTask(updatedTask);  // Use your existing saveTask function
+        setState(() {}); // Refresh the UI
+      },
+    ),
+  );
+}
+
   Widget _buildTaskCard(Task task) {
     final isOverdue = task.isOverdue;
     final progress = task.completionPercentage;
     
-    return Container(
+    return GestureDetector(
+    onTap: () => _showTaskDetail(task),
+    child: Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -235,6 +254,7 @@ class _FilteredTasksPageState extends State<FilteredTasksPage> {
           ],
         ],
       ),
+    )
     );
   }
 
