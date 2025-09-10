@@ -485,10 +485,11 @@ class Project {
     required String name,
     required Color color,
     String? description,
+    String? id,
   }) {
     final now = DateTime.now();
     return Project(
-      id: DateTime.now().millisecondsSinceEpoch.toString(), // Generate ID
+      id: id ?? DateTime.now().millisecondsSinceEpoch.toString(), // Generate ID
       name: name,
       color: color,
       description: description,

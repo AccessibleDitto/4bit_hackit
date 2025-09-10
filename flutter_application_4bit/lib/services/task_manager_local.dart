@@ -74,4 +74,75 @@ class TaskManager {
       print('Error loading tasks: $e');
     }
   }
+
+
+  // BELOW IS THE CODE FOR THE TOOL CALLING
+    
+  void saveTask(Task task) {
+    final index = tasks.indexWhere((t) => t.id == task.id);
+    if (index != -1) {
+      tasks[index] = task;
+    } else {
+      tasks.add(task);
+    }
+  }
+
+  Task createTask({
+    required String title,
+    String? description,
+    required double estimatedTime,
+    required Priority priority,
+    DateTime? dueDate,
+    DateTime? scheduledFor,
+    String? projectId,
+    EnergyLevel energyRequired = EnergyLevel.medium,
+    TimePreference timePreference = TimePreference.flexible,
+    List<String> tags = const [],
+    List<String> dependencies = const [],
+    String? location,
+  }) {
+    final task = Task(
+      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      title: title,
+      description: description,
+      estimatedTime: estimatedTime,
+      priority: priority,
+      dueDate: dueDate,
+      scheduledFor: scheduledFor,
+      projectId: projectId,
+      energyRequired: energyRequired,
+      timePreference: timePreference,
+      tags: tags,
+      dependencies: dependencies,
+      location: location,
+      createdAt: DateTime.now(),
+      updatedAt: DateTime.now(),
+    );
+    
+    tasks.add(task);
+    return task;
+  }
+
+  bool deleteTask(String taskId) {
+    final initialLength = tasks.length;
+    tasks.removeWhere((task) => task.id == taskId);
+    return tasks.length < initialLength;
+  }
+
+  Task? findTaskById(String taskId) {
+    try {
+      return tasks.firstWhere((task) => task.id == taskId);
+    } catch (e) {
+      return null;
+    }
+  }
+
+  List<Task> searchTasks(String query) {
+    final lowerQuery = query.toLowerCase();
+    return tasks.where((task) =>
+      task.title.toLowerCase().contains(lowerQuery) ||
+      (task.description?.toLowerCase().contains(lowerQuery) ?? false) ||
+      task.tags.any((tag) => tag.toLowerCase().contains(lowerQuery))
+    ).toList();
+  }
 }
