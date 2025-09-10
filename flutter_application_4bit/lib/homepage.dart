@@ -1,3 +1,4 @@
+import 'package:flutter_application_4bit/tasks_updated.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:confetti/confetti.dart';
 import 'package:flutter/material.dart';
@@ -420,7 +421,7 @@ class _TimerModePageState extends State<TimerModePage> with TickerProviderStateM
           if (isLastSession) {
             // All sessions completed - mark task as complete and show congratulations
             // Mark the task as completed (sets timeSpent = estimatedTime and status = completed)
-            TaskData.markTaskAsCompleted(_currentFullTask.id);
+            TaskData.completeTask(_currentFullTask.id);
             _currentFullTask.timeSpent = _currentFullTask.estimatedTime;
             // Call completedTask() for task-related badges when full task is done
             UserStats().completedTask();
