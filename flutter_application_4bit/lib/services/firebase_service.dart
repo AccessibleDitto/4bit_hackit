@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'user_stats_service.dart';
 import '../models/task_models.dart';
 
@@ -23,6 +24,28 @@ class FirebaseService {
   User? get currentUser => _auth.currentUser;
   String? get currentUserEmail => _auth.currentUser?.email;
 
+  Future<void> _ensureAuthenticated() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final userEmail = prefs.getString('user_email');
+      
+      if (userEmail != null && userEmail.isNotEmpty) {
+        _currentEmailUser = userEmail;
+        return;
+      }
+      
+      _currentEmailUser = 'user@gmail.com';
+    } catch (e) {
+      _currentEmailUser = 'user@gmail.com';
+    }
+  }
+  
+  String? get effectiveUserId {
+    return _currentEmailUser;
+  }
+  
+  String? _currentEmailUser;
+
   // Collections
   static const String tasksCollection = 'tasks';
   static const String userStatsCollection = 'userStats';
@@ -33,13 +56,10 @@ class FirebaseService {
   Future<void> createUserWithGmailId(String email, String password) async {
     try {
       String emailAsId = email; 
-      
-      // Check if user document already exists and clean it up if needed
       final docRef = _firestore.collection('users').doc(emailAsId);
       final existingDoc = await docRef.get();
       
       if (existingDoc.exists) {
-        debugPrint('User document already exists for $email, cleaning up...');
         // Delete existing user stats collection
         final statsQuery = await docRef.collection(userStatsCollection).get();
         for (final doc in statsQuery.docs) {
@@ -47,7 +67,6 @@ class FirebaseService {
         }
         // Delete the main user document
         await docRef.delete();
-        debugPrint('Cleaned up existing user data for $email');
       }
       
       // Create fresh user document
@@ -60,16 +79,37 @@ class FirebaseService {
         'registrationMethod': 'gmail_based_id',
       });
             
-      // Initialize user stats with email-based ID
+      // consolidated user stats 
       await docRef.collection(userStatsCollection).doc('stats').set({
         'pomodorosCompleted': 0,
         'totalFocusTimeMinutes': 0,
+        'todayFocusTimeMinutes': 0,
+        'weekFocusTimeMinutes': 0,
+        'monthFocusTimeMinutes': 0,
+        'totalFocusTime': '0m',
+        
+        // steak, activity
         'streakDays': 0,
+        'lastActiveDate': null,
+        
+        // badge, achievemnt
         'earnedBadges': [],
+        'totalBadges': 0,
+        'totalAchievements': 0,
+        
+        // tasks
+        'totalTasks': 0,
+        'completedTasks': 0,
+        'inProgressTasks': 0,
+        'todayCompletedTasks': 0,
+        'priorityTasksCompleted': 0,
+        'totalFocusTimeFromTasks': 0,
+        'todayFocusTimeFromTasks': 0,
+        
         'createdAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
       });
       
-      debugPrint('Successfully created fresh user account for $email');
     } catch (e) {
       debugPrint('Error creating user with Gmail ID: $e');
       rethrow;
@@ -78,10 +118,8 @@ class FirebaseService {
 
   Future<void> clearAuthState() async {
     try {
-      // Sign out from Firebase Auth if there's an active session
       if (_auth.currentUser != null) {
         await _auth.signOut();
-        debugPrint('Cleared Firebase Auth state');
       }
     } catch (e) {
       debugPrint('Error clearing auth state: $e');
@@ -132,7 +170,6 @@ class FirebaseService {
         users.add(userData);
       }
       
-      debugPrint('Retrieved ${users.length} users from Firestore');
       return users;
       
     } catch (e) {
@@ -143,7 +180,6 @@ class FirebaseService {
 
   Future<UserCredential?> signUpWithEmailPassword(String email, String password) async {
     try {
-      debugPrint('Attempting to create user with email: $email');
       UserCredential userCredential = await _auth.createUserWithEmailAndPassword(
         email: email,
         password: password,
@@ -157,15 +193,9 @@ class FirebaseService {
         },
       );
       
-      debugPrint('User created successfully: ${userCredential.user?.uid}');
-      // Create initial user data in Firestore
       await _createUserProfile(userCredential.user!, email);
-      
       return userCredential;
     } on FirebaseAuthException catch (e) {
-      debugPrint('Sign up error code: ${e.code}');
-      debugPrint('Sign up error message: ${e.message}');
-      
       switch (e.code) {
         case 'network-request-failed':
           throw FirebaseAuthException(
@@ -196,7 +226,6 @@ class FirebaseService {
           rethrow;
       }
     } catch (e) {
-      debugPrint('Unexpected error during sign up: $e');
       throw FirebaseAuthException(code: 'unknown', message: 'An unexpected error occurred: $e');
     }
   }
@@ -209,10 +238,6 @@ class FirebaseService {
       );
       return userCredential;
     } on FirebaseAuthException catch (e) {
-      debugPrint('Sign in error code: ${e.code}');
-      debugPrint('Sign in error message: ${e.message}');
-      
-      // Handle specific error codes
       switch (e.code) {
         case 'network-request-failed':
           throw FirebaseAuthException(
@@ -259,13 +284,35 @@ class FirebaseService {
         'lastLoginAt': FieldValue.serverTimestamp(),
       });
 
-      // Initialize user stats
+      // consolidated user stats
       await _firestore.collection('users').doc(user.uid).collection(userStatsCollection).doc('stats').set({
         'pomodorosCompleted': 0,
         'totalFocusTimeMinutes': 0,
+        'todayFocusTimeMinutes': 0,
+        'weekFocusTimeMinutes': 0,
+        'monthFocusTimeMinutes': 0,
+        'totalFocusTime': '0m',
+        
+        // streak, activity
         'streakDays': 0,
+        'lastActiveDate': null,
+
+        // badges, achievements 
         'earnedBadges': [],
+        'totalBadges': 0,
+        'totalAchievements': 0,
+        
+        // task stats
+        'totalTasks': 0,
+        'completedTasks': 0,
+        'inProgressTasks': 0,
+        'todayCompletedTasks': 0,
+        'priorityTasksCompleted': 0,
+        'totalFocusTimeFromTasks': 0,
+        'todayFocusTimeFromTasks': 0,
+        
         'createdAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
       });
     } catch (e) {
       debugPrint('Error creating user profile: $e');
@@ -282,16 +329,12 @@ class FirebaseService {
       if (currentUserId == null && userEmail == null) {
         throw Exception('No authenticated user found. Please sign in again.');
       }
-      // For Firebase Auth users
       if (currentUserId != null) {
-        debugPrint('Deleting Firebase Auth user data for UID: $currentUserId');
         await _deleteUserData(currentUserId);
-        // Delete the Firebase Auth user account
         await _auth.currentUser?.delete();
       } 
       // Fallback 
       else if (userEmail != null) {
-        debugPrint('Deleting user data for email: $userEmail');
         await _deleteUserData(userEmail);
       }
       
@@ -303,7 +346,6 @@ class FirebaseService {
 
   Future<void> deleteGmailBasedAccount(String email) async {
     try {
-      debugPrint('Deleting Gmail-based account for email: $email');
       await _deleteUserData(email);
     } catch (e) {
       debugPrint('Error deleting Gmail-based account: $e');
@@ -353,40 +395,21 @@ class FirebaseService {
   // Save task to Firebase
   Future<void> saveTask(Task task) async {
     try {
-      if (userId == null) throw Exception('User not authenticated');
+      await _ensureAuthenticated();
+      
+      final userDoc = effectiveUserId;
+      if (userDoc == null) throw Exception('No user identifier available');
+      
+      // tasks model
+      final taskData = task.toJson();
       
       await _firestore
           .collection('users')
-          .doc(userId)
+          .doc(userDoc)
           .collection(tasksCollection)
           .doc(task.id)
-          .set({
-        'id': task.id,
-        'title': task.title,
-        'description': task.description,
-        'estimatedTime': task.estimatedTime,
-        'timeSpent': task.timeSpent,
-        'dueDate': task.dueDate?.toIso8601String(),
-        'scheduledFor': task.scheduledFor?.toIso8601String(),
-        'timePreference': task.timePreference.name,
-        'status': task.status.name,
-        'priority': task.priority.name,
-        'progressPercentage': task.progressPercentage,
-        'projectId': task.projectId,
-        'tags': task.tags,
-        'energyRequired': task.energyRequired.name,
-        'dependencies': task.dependencies,
-        'location': task.location,
-        'isRecurring': task.isRecurring,
-        'recurrencePattern': task.recurrencePattern,
-        'createdBy': task.createdBy,
-        'createdAt': FieldValue.serverTimestamp(),
-        'updatedAt': FieldValue.serverTimestamp(),
-      });
+          .set(taskData);
       
-      debugPrint('Task saved to Firebase: ${task.title}');
-      
-      // Update user task statistics
       await _updateUserTaskStats();
     } catch (e) {
       debugPrint('Error saving task to Firebase: $e');
@@ -397,16 +420,18 @@ class FirebaseService {
   // Update user task statistics
   Future<void> _updateUserTaskStats() async {
     try {
-      if (userId == null) return;
+      await _ensureAuthenticated();
+      
+      final userDoc = effectiveUserId;
+      if (userDoc == null) return;
       
       // Get all tasks for the user
       final tasksSnapshot = await _firestore
           .collection('users')
-          .doc(userId)
+          .doc(userDoc)
           .collection(tasksCollection)
           .get();
 
-      // Calculate statistics
       int totalTasks = tasksSnapshot.docs.length;
       int completedTasks = 0;
       int inProgressTasks = 0;
@@ -439,7 +464,7 @@ class FirebaseService {
       // Update user stats
       await _firestore
           .collection('users')
-          .doc(userId)
+          .doc(userDoc)
           .collection(userStatsCollection)
           .doc('stats')
           .update({
@@ -452,7 +477,6 @@ class FirebaseService {
         'lastUpdated': FieldValue.serverTimestamp(),
       });
       
-      debugPrint('Updated user task statistics: $totalTasks total, $completedTasks completed');
     } catch (e) {
       debugPrint('Error updating user task stats: $e');
     }
@@ -461,56 +485,30 @@ class FirebaseService {
   // Load all tasks from Firebase
   Future<List<Task>> loadTasks() async {
     try {
-      if (userId == null) throw Exception('User not authenticated');
+      await _ensureAuthenticated();
+      
+      final userDoc = effectiveUserId;
+      if (userDoc == null) throw Exception('No user identifier available');
       
       final querySnapshot = await _firestore
           .collection('users')
-          .doc(userId)
+          .doc(userDoc)
           .collection(tasksCollection)
           .orderBy('createdAt', descending: false)
           .get();
 
       return querySnapshot.docs.map((doc) {
         final data = doc.data();
-        return Task(
-          id: data['id'] ?? doc.id,
-          title: data['title'] ?? '',
-          description: data['description'],
-          estimatedTime: (data['estimatedTime'] ?? 1.0).toDouble(),
-          timeSpent: (data['timeSpent'] ?? 0.0).toDouble(),
-          dueDate: data['dueDate'] != null ? DateTime.parse(data['dueDate']) : null,
-          scheduledFor: data['scheduledFor'] != null ? DateTime.parse(data['scheduledFor']) : null,
-          timePreference: TimePreference.values.firstWhere(
-            (e) => e.name == data['timePreference'],
-            orElse: () => TimePreference.flexible,
-          ),
-          status: TaskStatus.values.firstWhere(
-            (e) => e.name == data['status'],
-            orElse: () => TaskStatus.notStarted,
-          ),
-          priority: Priority.values.firstWhere(
-            (e) => e.name == data['priority'],
-            orElse: () => Priority.medium,
-          ),
-          progressPercentage: data['progressPercentage']?.toDouble(),
-          projectId: data['projectId'],
-          tags: List<String>.from(data['tags'] ?? []),
-          energyRequired: EnergyLevel.values.firstWhere(
-            (e) => e.name == data['energyRequired'],
-            orElse: () => EnergyLevel.medium,
-          ),
-          dependencies: List<String>.from(data['dependencies'] ?? []),
-          location: data['location'],
-          isRecurring: data['isRecurring'] ?? false,
-          recurrencePattern: data['recurrencePattern'],
-          createdBy: data['createdBy'],
-          createdAt: data['createdAt'] is Timestamp 
-              ? (data['createdAt'] as Timestamp).toDate()
-              : DateTime.now(),
-          updatedAt: data['updatedAt'] is Timestamp 
-              ? (data['updatedAt'] as Timestamp).toDate()
-              : DateTime.now(),
-        );
+        
+        if (data['createdAt'] is Timestamp) {
+          data['createdAt'] = (data['createdAt'] as Timestamp).toDate().toIso8601String();
+        }
+        if (data['updatedAt'] is Timestamp) {
+          data['updatedAt'] = (data['updatedAt'] as Timestamp).toDate().toIso8601String();
+        }
+        
+        // use task model
+        return Task.fromJson(data);
       }).toList();
     } catch (e) {
       debugPrint('Error loading tasks: $e');
@@ -521,11 +519,14 @@ class FirebaseService {
   // Update task completion status
   Future<void> updateTaskCompletion(String taskId, TaskStatus newStatus) async {
     try {
-      if (userId == null) throw Exception('User not authenticated');
+      await _ensureAuthenticated();
+      
+      final userDoc = effectiveUserId;
+      if (userDoc == null) throw Exception('No user identifier available');
       
       await _firestore
           .collection('users')
-          .doc(userId)
+          .doc(userDoc)
           .collection(tasksCollection)
           .doc(taskId)
           .update({
@@ -545,7 +546,10 @@ class FirebaseService {
   // Update task progress
   Future<void> updateTaskProgress(String taskId, double timeSpent, {double? progressPercentage}) async {
     try {
-      if (userId == null) throw Exception('User not authenticated');
+      await _ensureAuthenticated();
+      
+      final userDoc = effectiveUserId;
+      if (userDoc == null) throw Exception('No user identifier available');
       
       Map<String, dynamic> updates = {
         'timeSpent': timeSpent,
@@ -558,7 +562,7 @@ class FirebaseService {
       
       await _firestore
           .collection('users')
-          .doc(userId)
+          .doc(userDoc)
           .collection(tasksCollection)
           .doc(taskId)
           .update(updates);
@@ -574,11 +578,14 @@ class FirebaseService {
   // Delete task from Firebase
   Future<void> deleteTask(String taskId) async {
     try {
-      if (userId == null) throw Exception('User not authenticated');
+      await _ensureAuthenticated();
+      
+      final userDoc = effectiveUserId;
+      if (userDoc == null) throw Exception('No user identifier available');
       
       await _firestore
           .collection('users')
-          .doc(userId)
+          .doc(userDoc)
           .collection(tasksCollection)
           .doc(taskId)
           .delete();
@@ -596,23 +603,46 @@ class FirebaseService {
   // Save user stats to Firebase
   Future<void> saveUserStats(UserStats userStats) async {
     try {
-      if (userId == null) throw Exception('User not authenticated');
+      await _ensureAuthenticated();
       
+      final userDoc = effectiveUserId;
+      if (userDoc == null) throw Exception('No user identifier available');
+      
+      // userstats consolidated
       await _firestore
           .collection('users')
-          .doc(userId)
-          .collection(userStatsCollection)
+          .doc(userDoc)
+          .collection('userStats')
           .doc('stats')
           .set({
         'pomodorosCompleted': userStats.pomodorosCompleted,
         'totalFocusTimeMinutes': userStats.totalFocusTimeMinutes,
+        'todayFocusTimeMinutes': userStats.todayFocusTimeMinutes,
+        'weekFocusTimeMinutes': userStats.weekFocusTimeMinutes,
+        'monthFocusTimeMinutes': userStats.monthFocusTimeMinutes,
+        'totalFocusTime': userStats.totalFocusTime,
+        
+        // steak, activity 
         'streakDays': userStats.streakDays,
         'lastActiveDate': userStats.lastActiveDate?.millisecondsSinceEpoch,
+        
+        // badges, achievements
         'earnedBadges': userStats.earnedBadges,
+        'totalBadges': userStats.earnedBadges.length,
+        'totalAchievements': userStats.recentAchievements.length,
+        
+        // tasks stats
+        'totalTasks': userStats.tasksCompleted, // Use existing data
+        'completedTasks': userStats.tasksCompleted,
+        // task manager handle
+        'inProgressTasks': 0, 
+        'todayCompletedTasks': 0, 
+        'priorityTasksCompleted': 0, 
+        
+        'createdAt': FieldValue.serverTimestamp(),
         'updatedAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
       
-      debugPrint('User stats saved to Firebase successfully');
     } catch (e) {
       debugPrint('Error saving user stats: $e');
       rethrow;
@@ -622,17 +652,21 @@ class FirebaseService {
   // Load user stats from Firebase
   Future<Map<String, dynamic>?> loadUserStats() async {
     try {
-      if (userId == null) throw Exception('User not authenticated');
+      await _ensureAuthenticated();
+      
+      final userDoc = effectiveUserId;
+      if (userDoc == null) throw Exception('No user identifier available');
       
       final doc = await _firestore
           .collection('users')
-          .doc(userId)
-          .collection(userStatsCollection)
+          .doc(userDoc)
+          .collection('userStats')
           .doc('stats')
           .get();
 
       if (doc.exists) {
-        return doc.data();
+        final data = doc.data()!;
+        return data;
       }
       return null;
     } catch (e) {
@@ -641,16 +675,144 @@ class FirebaseService {
     }
   }
 
-  // ========== ACHIEVEMENTS MANAGEMENT ==========
+  // ========== CONSOLIDATED STATS MANAGEMENT ==========
   
+  Future<void> saveTaskStats(Map<String, dynamic> taskStats) async {
+    try {
+      await _ensureAuthenticated();
+      
+      final userDoc = effectiveUserId;
+      if (userDoc == null) throw Exception('No user identifier available');
+      
+      // save task stats to consolidated userStats doc
+      await _firestore
+          .collection('users')
+          .doc(userDoc)
+          .collection('userStats')
+          .doc('stats')
+          .update({
+        // Task Statistics
+        'totalTasks': taskStats['totalTasks'] ?? 0,
+        'completedTasks': taskStats['completedTasks'] ?? 0,
+        'inProgressTasks': taskStats['inProgressTasks'] ?? 0,
+        'priorityTasksCompleted': taskStats['priorityTasksCompleted'] ?? 0,
+        'todayCompletedTasks': taskStats['todayCompletedTasks'] ?? 0,
+        
+        // Focus time from consolidated tasks
+        'totalFocusTimeFromTasks': taskStats['totalFocusTimeFromTasks'] ?? 0,
+        'todayFocusTimeFromTasks': taskStats['todayFocusTimeFromTasks'] ?? 0,
+        
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+      
+    } catch (e) {
+      debugPrint('Error saving task stats to userStats: $e');
+      rethrow;
+    }
+  }
+
+  // consolidated userStats 
+  Future<Map<String, dynamic>?> loadTaskStats() async {
+    try {
+      await _ensureAuthenticated();
+      
+      final userDoc = effectiveUserId;
+      if (userDoc == null) throw Exception('No user identifier available');
+      
+      // from userStats doc
+      final doc = await _firestore
+          .collection('users')
+          .doc(userDoc)
+          .collection('userStats')
+          .doc('stats')
+          .get();
+
+      if (doc.exists) {
+        final data = doc.data()!;
+        return {
+          'totalTasks': data['totalTasks'] ?? 0,
+          'completedTasks': data['completedTasks'] ?? 0,
+          'inProgressTasks': data['inProgressTasks'] ?? 0,
+          'priorityTasksCompleted': data['priorityTasksCompleted'] ?? 0,
+          'todayCompletedTasks': data['todayCompletedTasks'] ?? 0,
+          'totalFocusTimeFromTasks': data['totalFocusTimeFromTasks'] ?? 0,
+          'todayFocusTimeFromTasks': data['todayFocusTimeFromTasks'] ?? 0,
+        };
+      }
+      return null;
+    } catch (e) {
+      debugPrint('Error loading task stats from userStats: $e');
+      return null;
+    }
+  }
+
+  // ========== COMBINE HELPER ==========
+  
+  // combine task and user stats structure
+  Future<void> migrateToConsolidatedStructure() async {
+    try {
+      await _ensureAuthenticated();
+      
+      final userDoc = effectiveUserId;
+      if (userDoc == null) throw Exception('No user identifier available');
+      
+      // Check if old taskStats collection exists
+      final taskStatsDoc = await _firestore
+          .collection('users')
+          .doc(userDoc)
+          .collection('taskStats')
+          .doc('stats')
+          .get();
+      
+      if (taskStatsDoc.exists) {
+        final taskStatsData = taskStatsDoc.data()!;
+        
+        // Merge taskStats into userStats
+        await _firestore
+            .collection('users')
+            .doc(userDoc)
+            .collection('userStats')
+            .doc('stats')
+            .update({
+          'totalTasks': taskStatsData['totalTasks'] ?? 0,
+          'completedTasks': taskStatsData['completedTasks'] ?? 0,
+          'inProgressTasks': taskStatsData['inProgressTasks'] ?? 0,
+          'priorityTasksCompleted': taskStatsData['priorityTasksCompleted'] ?? 0,
+          'todayCompletedTasks': taskStatsData['todayCompletedTasks'] ?? 0,
+          'totalFocusTimeFromTasks': taskStatsData['totalFocusTimeFromTasks'] ?? 0,
+          'todayFocusTimeFromTasks': taskStatsData['todayFocusTimeFromTasks'] ?? 0,
+          'migrationComplete': true,
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
+        
+        // Delete the old taskStats collection
+        await _firestore
+            .collection('users')
+            .doc(userDoc)
+            .collection('taskStats')
+            .doc('stats')
+            .delete();
+        
+        debugPrint('Successfully migrated taskStats to consolidated userStats structure');
+      }
+    } catch (e) {
+      debugPrint('Error during migration: $e');
+    }
+  }
+
+  // ========== ACHIEVEMENTS MANAGEMENT ==========
+
   // Save achievement to Firebase
   Future<void> saveAchievement(Achievement achievement) async {
     try {
-      if (userId == null) throw Exception('User not authenticated');
+      await _ensureAuthenticated();
+      
+      final userDoc = effectiveUserId;
+      if (userDoc == null) throw Exception('No user identifier available');
       
       await _firestore
           .collection('users')
-          .doc(userId)
+          .doc(userDoc)
           .collection(achievementsCollection)
           .add({
         'emoji': achievement.emoji,
@@ -660,9 +822,76 @@ class FirebaseService {
         'createdAt': FieldValue.serverTimestamp(),
       });
       
-      debugPrint('Achievement saved to Firebase: ${achievement.title}');
     } catch (e) {
       debugPrint('Error saving achievement: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> updateBadges(List<String> earnedBadges) async {
+    try {
+      await _ensureAuthenticated();
+      
+      final userDoc = effectiveUserId;
+      if (userDoc == null) throw Exception('No user identifier available');
+      
+      await _firestore
+          .collection('users')
+          .doc(userDoc)
+          .collection('userStats')
+          .doc('stats')
+          .update({
+        'earnedBadges': earnedBadges,
+        'totalBadges': earnedBadges.length,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+      
+    } catch (e) {
+      // Try to create the document if it doesn't exist
+      try {
+        final userDoc = effectiveUserId;
+        if (userDoc == null) throw Exception('No user identifier available');
+        
+        await _firestore
+            .collection('users')
+            .doc(userDoc)
+            .collection('userStats')
+            .doc('stats')
+            .set({
+          'earnedBadges': earnedBadges,
+          'totalBadges': earnedBadges.length,
+          'createdAt': FieldValue.serverTimestamp(),
+          'updatedAt': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+        
+      } catch (createError) {
+        debugPrint('Error creating userStats document: $createError');
+        rethrow;
+      }
+    }
+  }
+
+  Future<void> updatePomodoroCount(int pomodoroCount, int totalFocusTime, int streakDays) async {
+    try {
+      await _ensureAuthenticated();
+      
+      final userDoc = effectiveUserId;
+      if (userDoc == null) throw Exception('No user identifier available');
+      
+      await _firestore
+          .collection('users')
+          .doc(userDoc)
+          .collection('userStats')
+          .doc('stats')
+          .update({
+        'pomodorosCompleted': pomodoroCount,
+        'totalFocusTimeMinutes': totalFocusTime,
+        'streakDays': streakDays,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+      
+    } catch (e) {
+      debugPrint('Error updating pomodoro stats: $e');
       rethrow;
     }
   }
@@ -670,17 +899,20 @@ class FirebaseService {
   // Load achievements from Firebase
   Future<List<Achievement>> loadAchievements() async {
     try {
-      if (userId == null) throw Exception('User not authenticated');
+      await _ensureAuthenticated();
+      
+      final userDoc = effectiveUserId;
+      if (userDoc == null) throw Exception('No user identifier available');
       
       final querySnapshot = await _firestore
           .collection('users')
-          .doc(userId)
+          .doc(userDoc)
           .collection(achievementsCollection)
           .orderBy('timestamp', descending: true)
           .limit(10)
           .get();
 
-      return querySnapshot.docs.map((doc) {
+      final achievements = querySnapshot.docs.map((doc) {
         final data = doc.data();
         return Achievement(
           emoji: data['emoji'] ?? '🏆',
@@ -689,10 +921,64 @@ class FirebaseService {
           timestamp: DateTime.fromMillisecondsSinceEpoch(data['timestamp'] ?? 0),
         );
       }).toList();
+      
+      return achievements;
     } catch (e) {
       debugPrint('Error loading achievements: $e');
       return [];
     }
+  }
+  // Get Firebase sync status
+  Map<String, dynamic> getSyncStatus() {
+    return {
+      'isConnected': userId != null,
+      'userId': userId,
+      'userEmail': currentUserEmail,
+      'lastSyncTime': DateTime.now().toIso8601String(),
+      'collections': {
+        'userStats': userStatsCollection,
+        'achievements': achievementsCollection,
+        'taskStats': 'taskStats',
+        'tasks': tasksCollection,
+      }
+    };
+  }
+
+  Future<Map<String, dynamic>> testFirebaseIntegration() async {
+    final results = <String, dynamic>{};
+    
+    try {
+      await testFirestoreConnection();
+      results['connectionTest'] = 'SUCCESS';
+      
+      final testStats = {
+        'pomodorosCompleted': 999,
+        'totalFocusTimeMinutes': 999,
+        'streakDays': 999,
+        'testTimestamp': DateTime.now().millisecondsSinceEpoch,
+      };
+      
+      await _ensureAuthenticated();
+      final userDoc = effectiveUserId;
+      
+      if (userDoc != null) {
+        await _firestore.collection('users').doc(userDoc).collection('test').doc('stats').set(testStats);
+        final loadedStats = await _firestore.collection('users').doc(userDoc).collection('test').doc('stats').get();
+        
+        results['statsTest'] = loadedStats.exists ? 'SUCCESS' : 'FAILED';
+        results['testData'] = loadedStats.data();
+        
+        // Clean up test data
+        await _firestore.collection('users').doc(userDoc).collection('test').doc('stats').delete();
+      } else {
+        results['statsTest'] = 'SKIPPED - No user identifier available';
+      }
+      
+    } catch (e) {
+      results['error'] = e.toString();
+    }
+    
+    return results;
   }
 
   // ========== PROJECT MANAGEMENT ==========
@@ -700,21 +986,20 @@ class FirebaseService {
   // Save project to Firebase
   Future<void> saveProject(Project project) async {
     try {
-      if (userId == null) throw Exception('User not authenticated');
+      await _ensureAuthenticated();
+      
+      final userDoc = effectiveUserId;
+      if (userDoc == null) throw Exception('No user identifier available');
+      
+      // project model
+      final projectData = project.toJson();
       
       await _firestore
           .collection('users')
-          .doc(userId)
+          .doc(userDoc)
           .collection(projectsCollection)
           .doc(project.id)
-          .set({
-        'id': project.id,
-        'name': project.name,
-        'color': project.color.value,
-        'description': project.description,
-        'createdAt': FieldValue.serverTimestamp(),
-        'updatedAt': FieldValue.serverTimestamp(),
-      });
+          .set(projectData);
     } catch (e) {
       debugPrint('Error saving project: $e');
       rethrow;
@@ -724,28 +1009,29 @@ class FirebaseService {
   // Load projects from Firebase
   Future<List<Project>> loadProjects() async {
     try {
-      if (userId == null) throw Exception('User not authenticated');
+      await _ensureAuthenticated();
+      
+      final userDoc = effectiveUserId;
+      if (userDoc == null) throw Exception('No user identifier available');
       
       final querySnapshot = await _firestore
           .collection('users')
-          .doc(userId)
+          .doc(userDoc)
           .collection(projectsCollection)
           .get();
 
       return querySnapshot.docs.map((doc) {
         final data = doc.data();
-        return Project(
-          id: data['id'] ?? doc.id,
-          name: data['name'] ?? '',
-          color: Color(data['color'] ?? Colors.blue.value),
-          description: data['description'],
-          createdAt: data['createdAt'] is Timestamp 
-              ? (data['createdAt'] as Timestamp).toDate()
-              : DateTime.now(),
-          updatedAt: data['updatedAt'] is Timestamp 
-              ? (data['updatedAt'] as Timestamp).toDate()
-              : DateTime.now(),
-        );
+        
+        // Handle Firestore Timestamp fields by converting them to ISO strings
+        if (data['createdAt'] is Timestamp) {
+          data['createdAt'] = (data['createdAt'] as Timestamp).toDate().toIso8601String();
+        }
+        if (data['updatedAt'] is Timestamp) {
+          data['updatedAt'] = (data['updatedAt'] as Timestamp).toDate().toIso8601String();
+        }
+
+        return Project.fromJson(data);
       }).toList();
     } catch (e) {
       debugPrint('Error loading projects: $e');
@@ -823,13 +1109,6 @@ class FirebaseService {
         return data;
       }).toList();
 
-      debugPrint('Successfully loaded data for Gmail user: $email');
-      debugPrint('- Tasks: ${tasks.length}');
-      debugPrint('- Achievements: ${achievements.length}');
-      debugPrint('- Projects: ${projects.length}');
-      debugPrint('- User Stats: ${userStats != null ? "Found" : "Not found"}');
-      debugPrint('- User Data: ${userData != null ? "Found" : "Not found"}');
-
       return {
         'tasks': tasks,
         'userStats': userStats,
@@ -851,32 +1130,18 @@ class FirebaseService {
     String? gender,
   }) async {
     try {
-      debugPrint('Updating user profile for: $email');
-      
       final userDoc = _firestore.collection('users').doc(email);
       
-      // Build update data map
       Map<String, dynamic> updateData = {
         'lastUpdatedAt': FieldValue.serverTimestamp(),
       };
       
-      if (name != null) {
-        updateData['name'] = name;
-      }
+      if (name != null) updateData['name'] = name;
+      if (username != null) updateData['username'] = username;
+      if (gender != null) updateData['gender'] = gender;
       
-      if (username != null) {
-        updateData['username'] = username;
-      }
-      
-      if (gender != null) {
-        updateData['gender'] = gender;
-      }
-      
-      // Update the user document
       await userDoc.update(updateData);
       
-      debugPrint('Successfully updated user profile for: $email');
-      debugPrint('Updated fields: ${updateData.keys.join(', ')}');
     } catch (e) {
       debugPrint('Error updating user profile: $e');
       rethrow;
