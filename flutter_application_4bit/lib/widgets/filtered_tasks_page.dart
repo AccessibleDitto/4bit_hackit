@@ -11,6 +11,8 @@ class FilteredTasksPage extends StatefulWidget {
   final List<Task> tasks;
   final Color? accentColor;
   final String? projectName;
+  final Function(Task) saveTask;
+  final Function(String) deleteTask;
 
   const FilteredTasksPage({
     Key? key,
@@ -18,6 +20,8 @@ class FilteredTasksPage extends StatefulWidget {
     required this.tasks,
     this.accentColor,
     this.projectName,
+    required this.saveTask,
+    required this.deleteTask,
   }) : super(key: key);
 
   @override
@@ -84,12 +88,17 @@ class _FilteredTasksPageState extends State<FilteredTasksPage> {
       task: task,
       projects: projects,
       onTaskUpdate: (updatedTask) {
-        saveTask(updatedTask);  // Use your existing saveTask function
+        widget.saveTask(updatedTask);  // Use your existing saveTask function
+        setState(() {}); // Refresh the UI
+      },
+      onTaskDelete: (taskId) {
+        widget.deleteTask(taskId);  // Use the new deleteTask function
         setState(() {}); // Refresh the UI
       },
     ),
   );
 }
+
 
   Widget _buildTaskCard(Task task) {
     final isOverdue = task.isOverdue;

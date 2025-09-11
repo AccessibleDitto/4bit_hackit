@@ -72,7 +72,8 @@ class _DateTimePickerButtonState extends State<DateTimePickerButton> {
   }
 
   Color _getButtonColor() {
-    return dateOptions[widget.selectedDateType]?.color ?? const Color(0xFF71717A);
+    return dateOptions[widget.selectedDateType]?.color ??
+        const Color(0xFF71717A);
   }
 
   String _formatDate(DateTime date) {
@@ -83,7 +84,8 @@ class _DateTimePickerButtonState extends State<DateTimePickerButton> {
 
     if (selectedDay == today && widget.selectedDateType == 'Today') {
       return 'Today';
-    } else if (selectedDay == tomorrow && widget.selectedDateType == 'Tomorrow') {
+    } else if (selectedDay == tomorrow &&
+        widget.selectedDateType == 'Tomorrow') {
       return 'Tomorrow';
     } else if (widget.selectedDateType == 'Later this week') {
       return 'Later this week';
@@ -94,8 +96,18 @@ class _DateTimePickerButtonState extends State<DateTimePickerButton> {
     } else {
       // Custom date format: "5 Sep"
       List<String> months = [
-        'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-        'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+        'Jan',
+        'Feb',
+        'Mar',
+        'Apr',
+        'May',
+        'Jun',
+        'Jul',
+        'Aug',
+        'Sep',
+        'Oct',
+        'Nov',
+        'Dec',
       ];
       return '${date.day} ${months[date.month - 1]}';
     }
@@ -104,7 +116,7 @@ class _DateTimePickerButtonState extends State<DateTimePickerButton> {
   DateTime _getDateForOption(String option) {
     DateTime now = DateTime.now();
     DateTime today = DateTime(now.year, now.month, now.day);
-    
+
     switch (option) {
       case 'Today':
         return today;
@@ -143,7 +155,7 @@ class _DateTimePickerButtonState extends State<DateTimePickerButton> {
         ),
       ),
     );
-    
+
     if (selectedTime != null) {
       setState(() {
         tempSelectedTime = selectedTime;
@@ -226,348 +238,201 @@ class _DateTimePickerButtonState extends State<DateTimePickerButton> {
                 ),
               ),
               Expanded(
-  child: SingleChildScrollView(
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        // Quick date options
-        Container(
-  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-  child: Column(
-    children: [
-      'Today',
-      'Tomorrow',
-      'Later this week',
-      'This weekend',
-      'Next week',
-      'No Date',
-    ].map((option) => _QuickDateOption(
-          option: dateOptions[option]!,
-          isSelected: tempSelectedDateType == option,
-          onTap: () {
-            setModalState(() {
-              tempSelectedDateType = option;
-              
-              if (option == 'No Date') {
-                tempSelectedDate = null;
-                tempSelectedTime = null;
-                showTimePicker = false;
-              } else {
-                // Update the date according to the option
-                tempSelectedDate = _getDateForOption(option);
+                child: SingleChildScrollView(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      // Quick date options
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 8,
+                        ),
+                        child: Column(
+                          children:
+                              [
+                                    'Today',
+                                    'Tomorrow',
+                                    'Later this week',
+                                    'This weekend',
+                                    'Next week',
+                                    'No Date',
+                                  ]
+                                  .map(
+                                    (option) => _QuickDateOption(
+                                      option: dateOptions[option]!,
+                                      isSelected:
+                                          tempSelectedDateType == option,
+                                      onTap: () {
+                                        setModalState(() {
+                                          tempSelectedDateType = option;
 
-                // Important: manually reset the CalendarDatePicker's initialDate
-                // by simply assigning tempSelectedDate
-              }
-            });
-          },
-        )).toList(),
-  ),
-),
+                                          if (option == 'No Date') {
+                                            tempSelectedDate = null;
+                                            tempSelectedTime = null;
+                                            showTimePicker = false;
+                                          } else {
+                                            // Update the date according to the option
+                                            tempSelectedDate =
+                                                _getDateForOption(option);
 
-        Container(
-          height: 1,
-          color: const Color(0xFF71717A).withOpacity(0.3),
-          margin: const EdgeInsets.symmetric(vertical: 8),
-        ),
-
-        if (tempSelectedDate != null) ...[
-          // Calendar section with fixed height
-          Container(
-  height: 400,
-  child: CalendarDatePicker(
-    key: ValueKey(tempSelectedDate), // <-- Add this line
-    initialDate: tempSelectedDate ?? DateTime.now(),
-    firstDate: DateTime.now().subtract(const Duration(days: 365)),
-    lastDate: DateTime.now().add(const Duration(days: 365 * 2)),
-    onDateChanged: (date) {
-      setModalState(() {
-        tempSelectedDate = date;
-        tempSelectedDateType = 'Custom';
-      });
-    },
-  ),
-),
-
-          // Time picker section
-          Container(
-            padding: const EdgeInsets.all(16),
-            child: GestureDetector(
-              onTap: () {
-                Navigator.pop(context);
-                _showTimePicker();
-              },
-              child: Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-                decoration: BoxDecoration(
-                  border: Border.all(
-                    color: const Color(0xFF71717A).withOpacity(0.3),
-                    width: 1,
-                  ),
-                  borderRadius: BorderRadius.circular(8),
-                  color: tempSelectedTime != null
-                      ? const Color(0xFF9333EA).withOpacity(0.1)
-                      : const Color(0xFF27272A).withOpacity(0.5),
-                ),
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.access_time,
-                      color: tempSelectedTime != null
-                          ? const Color(0xFF9333EA)
-                          : const Color(0xFF71717A),
-                    ),
-                    const SizedBox(width: 12),
-                    Text(
-                      tempSelectedTime != null
-                          ? 'Time: ${tempSelectedTime!.format(context)}'
-                          : 'Add time',
-                      style: GoogleFonts.inter(
-                        color: tempSelectedTime != null
-                            ? const Color(0xFF9333EA)
-                            : const Color(0xFF71717A),
-                        fontSize: 16,
-                        fontWeight: tempSelectedTime != null
-                            ? FontWeight.w500
-                            : FontWeight.normal,
-                      ),
-                    ),
-                    const Spacer(),
-                    if (tempSelectedTime != null)
-                      GestureDetector(
-                        onTap: () {
-                          setModalState(() {
-                            tempSelectedTime = null;
-                          });
-                        },
-                        child: const Icon(
-                          Icons.close,
-                          color: Color(0xFF71717A),
+                                            // Important: manually reset the CalendarDatePicker's initialDate
+                                            // by simply assigning tempSelectedDate
+                                          }
+                                        });
+                                      },
+                                    ),
+                                  )
+                                  .toList(),
                         ),
                       ),
-                  ],
+
+                      Container(
+                        height: 1,
+                        color: const Color(0xFF71717A).withOpacity(0.3),
+                        margin: const EdgeInsets.symmetric(vertical: 8),
+                      ),
+
+                      if (tempSelectedDate != null) ...[
+                        // Calendar section with fixed height
+                        Container(
+                          height: 400,
+                          child: Theme(
+                            data: Theme.of(context).copyWith(
+                              colorScheme: ColorScheme.dark(
+                                primary: Colors
+                                    .deepPurple, // Selected day / header background
+                                onPrimary: Colors
+                                    .white, // Text on selected day / header
+                                // surface:
+                                //     Colors.grey[200]!, // Background of calendar
+                                onSurface: const Color(0xFF71717A), // Default text color
+                              ),
+                            ),
+                            child: CalendarDatePicker(
+                              key: ValueKey(
+                                tempSelectedDate,
+                              ), // <-- Add this line
+                              initialDate: tempSelectedDate ?? DateTime.now(),
+                              firstDate: DateTime.now().subtract(
+                                const Duration(days: 365),
+                              ),
+                              lastDate: DateTime.now().add(
+                                const Duration(days: 365 * 2),
+                              ),
+                              onDateChanged: (date) {
+                                setModalState(() {
+                                  tempSelectedDate = date;
+                                  tempSelectedDateType = 'Custom';
+                                });
+                              },
+                            ),
+                          ),
+                        ),
+
+                        // Time picker section
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          child: GestureDetector(
+                            onTap: () {
+                              Navigator.pop(context);
+                              _showTimePicker();
+                            },
+                            child: Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.symmetric(
+                                vertical: 12,
+                                horizontal: 16,
+                              ),
+                              decoration: BoxDecoration(
+                                border: Border.all(
+                                  color: const Color(
+                                    0xFF71717A,
+                                  ).withOpacity(0.3),
+                                  width: 1,
+                                ),
+                                borderRadius: BorderRadius.circular(8),
+                                color: tempSelectedTime != null
+                                    ? const Color(0xFF9333EA).withOpacity(0.1)
+                                    : const Color(0xFF27272A).withOpacity(0.5),
+                              ),
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    Icons.access_time,
+                                    color: tempSelectedTime != null
+                                        ? const Color(0xFF9333EA)
+                                        : const Color(0xFF71717A),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Text(
+                                    tempSelectedTime != null
+                                        ? 'Time: ${tempSelectedTime!.format(context)}'
+                                        : 'Add time',
+                                    style: GoogleFonts.inter(
+                                      color: tempSelectedTime != null
+                                          ? const Color(0xFF9333EA)
+                                          : const Color(0xFF71717A),
+                                      fontSize: 16,
+                                      fontWeight: tempSelectedTime != null
+                                          ? FontWeight.w500
+                                          : FontWeight.normal,
+                                    ),
+                                  ),
+                                  const Spacer(),
+                                  if (tempSelectedTime != null)
+                                    GestureDetector(
+                                      onTap: () {
+                                        setModalState(() {
+                                          tempSelectedTime = null;
+                                        });
+                                      },
+                                      child: const Icon(
+                                        Icons.close,
+                                        color: Color(0xFF71717A),
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ] else ...[
+                        // Show message if no date selected
+                        Container(
+                          height: 400,
+                          color: const Color(0xFF18181B),
+                          child: Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.event_busy,
+                                  size: 64,
+                                  color: const Color(0xFF71717A),
+                                ),
+                                const SizedBox(height: 16),
+                                Text(
+                                  'No due date set',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 18,
+                                    color: const Color(0xFFA1A1AA),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
                 ),
               ),
-            ),
-          ),
-        ] else ...[
-          // Show message if no date selected
-          Container(
-            height: 400,
-            color: const Color(0xFF18181B),
-            child: Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.event_busy, size: 64, color: const Color(0xFF71717A)),
-                  const SizedBox(height: 16),
-                  Text(
-                    'No due date set',
-                    style: GoogleFonts.inter(fontSize: 18, color: const Color(0xFFA1A1AA)),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ],
-    ),
-  ),
-),
             ],
           ),
         ),
       ),
     );
-
-
-    //           Expanded(
-    //             child: SingleChildScrollView(
-    //               child: Column(
-    //                 crossAxisAlignment: CrossAxisAlignment.stretch,
-    //                 children: [
-    //                   // Quick date options
-    //                   Container(
-    //                     padding: const EdgeInsets.symmetric(
-    //                       horizontal: 16,
-    //                       vertical: 8,
-    //                     ),
-    //                     child: Column(
-    //                       children: [
-    //                         'Today',
-    //                         'Tomorrow',
-    //                         'Later this week',
-    //                         'This weekend',
-    //                         'Next week',
-    //                         'No Date',
-    //                       ].map((option) => _QuickDateOption(
-    //                         option: dateOptions[option]!,
-    //                         isSelected: tempSelectedDateType == option,
-    //                         onTap: () {
-    //                           setModalState(() {
-    //                             tempSelectedDateType = option;
-    //                             if (option == 'No Date') {
-    //                               tempSelectedDate = null;
-    //                               tempSelectedTime = null;
-    //                               showTimePicker = false;
-    //                             } else {
-    //                               tempSelectedDate = _getDateForOption(option);
-    //                               // This will update the CalendarDatePicker's initialDate
-    //                             }
-    //                           });
-    //                         },
-    //                       )).toList(),
-    //                     ),
-    //                   ),
-
-    //                   Container(
-    //                     height: 1,
-    //                     color: const Color(0xFF71717A).withValues(alpha: 0.3),
-    //                     margin: const EdgeInsets.symmetric(vertical: 8),
-    //                   ),
-
-    //                   // Calendar section
-    //                   if (tempSelectedDate != null) ...[
-    //                     Theme(
-    //                       data: Theme.of(context).copyWith(
-    //                         // Override calendar theme to use dark colors
-    //                         colorScheme: Theme.of(context).colorScheme.copyWith(
-    //                           surface: const Color(0xFF18181B), // Dark surface
-    //                           onSurface: Colors.white, // White text
-    //                           primary: const Color(0xFF9333EA), // Purple accent
-    //                           onPrimary: Colors.white,
-    //                         ),
-    //                         // Override text theme for calendar
-    //                         textTheme: GoogleFonts.interTextTheme().apply(
-    //                           bodyColor: Colors.white,
-    //                           displayColor: Colors.white,
-    //                         ),
-    //                       ),
-    //                       child: Expanded(
-    //                         // decoration: const BoxDecoration(
-    //                         //   color: Color(0xFF18181B), // Ensure dark background
-    //                         // ),
-    //                         child: CalendarDatePicker(
-    //                           // key: ValueKey(tempSelectedDate), // <--- force rebuild on date chang
-    //                           initialDate: tempSelectedDate ?? DateTime.now(),
-    //                           firstDate: DateTime.now().subtract(
-    //                             const Duration(days: 365),
-    //                           ),
-    //                           lastDate: DateTime.now().add(
-    //                             const Duration(days: 365 * 2),
-    //                           ),
-    //                           onDateChanged: (date) {
-    //                             setModalState(() {
-    //                               tempSelectedDate = date;
-    //                               tempSelectedDateType = 'Custom';
-    //                             });
-    //                           },
-    //                         ),
-    //                       ),
-    //                     ),
-
-    //                     // Time section
-    //                     Container(
-    //                       padding: const EdgeInsets.all(16),
-    //                       child: GestureDetector(
-    //                         onTap: () {
-    //                           Navigator.pop(context);
-    //                           _showTimePicker();
-    //                         },
-    //                         child: Container(
-    //                           width: double.infinity,
-    //                           padding: const EdgeInsets.symmetric(
-    //                             vertical: 12,
-    //                             horizontal: 16,
-    //                           ),
-    //                           decoration: BoxDecoration(
-    //                             border: Border.all(
-    //                               color: const Color(0xFF71717A).withValues(alpha: 0.3),
-    //                               width: 1,
-    //                             ),
-    //                             borderRadius: BorderRadius.circular(8),
-    //                             color: tempSelectedTime != null
-    //                                 ? const Color(0xFF9333EA).withValues(alpha: 0.1)
-    //                                 : const Color(0xFF27272A).withValues(alpha: 0.5),
-    //                           ),
-    //                           child: Row(
-    //                             children: [
-    //                               Icon(
-    //                                 Icons.access_time,
-    //                                 color: tempSelectedTime != null
-    //                                     ? const Color(0xFF9333EA)
-    //                                     : const Color(0xFF71717A),
-    //                               ),
-    //                               const SizedBox(width: 12),
-    //                               Text(
-    //                                 tempSelectedTime != null
-    //                                     ? 'Time: ${tempSelectedTime!.format(context)}'
-    //                                     : 'Add time',
-    //                                 style: GoogleFonts.inter(
-    //                                   color: tempSelectedTime != null
-    //                                       ? const Color(0xFF9333EA)
-    //                                       : const Color(0xFF71717A),
-    //                                   fontSize: 16,
-    //                                   fontWeight: tempSelectedTime != null
-    //                                       ? FontWeight.w500
-    //                                       : FontWeight.normal,
-    //                                 ),
-    //                               ),
-    //                               const Spacer(),
-    //                               if (tempSelectedTime != null)
-    //                                 GestureDetector(
-    //                                   onTap: () {
-    //                                     setModalState(() {
-    //                                       tempSelectedTime = null;
-    //                                     });
-    //                                   },
-    //                                   child: const Icon(
-    //                                     Icons.close,
-    //                                     color: Color(0xFF71717A),
-    //                                   ),
-    //                                 ),
-    //                             ],
-    //                           ),
-    //                         ),
-    //                       ),
-    //                     ),
-    //                   ] else ...[
-    //                     // Show message when no date is selected
-    //                     Container(
-    //                       height: 400,
-    //                       color: const Color(0xFF18181B), // Dark background
-    //                       child: Center(
-    //                         child: Column(
-    //                           mainAxisAlignment: MainAxisAlignment.center,
-    //                           children: [
-    //                             Icon(
-    //                               Icons.event_busy,
-    //                               size: 64,
-    //                               color: const Color(0xFF71717A),
-    //                             ),
-    //                             const SizedBox(height: 16),
-    //                             Text(
-    //                               'No due date set',
-    //                               style: GoogleFonts.inter(
-    //                                 fontSize: 18,
-    //                                 color: const Color(0xFFA1A1AA),
-    //                               ),
-    //                             ),
-    //                           ],
-    //                         ),
-    //                       ),
-    //                     ),
-    //                   ],
-    //                 ],
-    //               ),
-    //             ),
-    //           ),
-    //         ],
-    //       ),
-    //     ),
-    //   ),
-    // );
   }
 
   @override
@@ -578,7 +443,7 @@ class _DateTimePickerButtonState extends State<DateTimePickerButton> {
       onPressed: _showDateTimePicker,
       icon: Icon(Icons.calendar_today, color: buttonColor),
       label: Text(
-        _getButtonText(), 
+        _getButtonText(),
         style: GoogleFonts.inter(
           color: buttonColor,
           fontWeight: FontWeight.w500,
@@ -589,9 +454,7 @@ class _DateTimePickerButtonState extends State<DateTimePickerButton> {
         alignment: Alignment.centerLeft,
         side: BorderSide(color: buttonColor.withValues(alpha: 0.5)),
         backgroundColor: const Color(0xFF27272A).withValues(alpha: 0.3),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(8),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
       ),
     );
   }
@@ -631,8 +494,8 @@ class _QuickDateOption extends StatelessWidget {
                 : const Color(0xFF27272A).withValues(alpha: 0.5),
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
-              color: isSelected 
-                  ? option.color.withValues(alpha: 0.8) 
+              color: isSelected
+                  ? option.color.withValues(alpha: 0.8)
                   : const Color(0xFF71717A).withValues(alpha: 0.3),
               width: isSelected ? 2 : 1,
             ),
@@ -865,7 +728,7 @@ class _TimePickerSpinnerState extends State<TimePickerSpinner> {
           Text(
             ' : ',
             style: GoogleFonts.inter(
-              fontSize: 32, 
+              fontSize: 32,
               fontWeight: FontWeight.bold,
               color: Colors.white,
             ),

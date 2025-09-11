@@ -64,7 +64,7 @@ class TasksPage extends StatefulWidget {
 String formatTime(double hours) {
   if (hours == 0) return '0h';
   int wholeHours = hours.floor();
-  int minutes = ((hours - wholeHours) * 60).floor();
+  int minutes = ((hours - wholeHours) * 60).ceil();
   
   // Handle 60 minutes = 1 hour conversion
   if (minutes == 60) {
@@ -84,6 +84,26 @@ String formatTime(double hours) {
 String _formatTime(double hours) {
   return formatTime(hours);
 }
+
+ // Function to update the whole task and save it
+void saveTask(Task updatedTask) {
+  int index = tasks.indexWhere((task) => task.id == updatedTask.id);
+  if (index != -1) {
+    tasks[index] = updatedTask;
+    // Can add Firebase saving logic here later on
+    // For now, just update the local list
+  }
+}
+
+void deleteTask(String taskId) {
+  int index = tasks.indexWhere((task) => task.id == taskId);
+  if (index != -1) {
+    tasks.removeAt(index);
+    // Can add Firebase deletion logic here later on
+    // For now, just remove from the local list
+  }
+}
+
 
 // Top-level task data for access from other files
 List<Project> projects = [
@@ -174,16 +194,6 @@ List<Task> tasks = [
 
 // Getter function to expose tasks for other files
 List<Task> getTasksList() => tasks;
-
-// Function to update the whole task and save it
-void saveTask(Task updatedTask) {
-  int index = tasks.indexWhere((task) => task.id == updatedTask.id);
-  if (index != -1) {
-    tasks[index] = updatedTask;
-    // Can add Firebase saving logic here later on
-    // For now, just update the local list
-  }
-}
 
 // Function to update a task's timeSpent by ID
 void updateTaskTimeSpent(String taskId, double additionalTimeSpent) {
@@ -286,8 +296,20 @@ class _TasksPageState extends State<TasksPage> {
     task.status != TaskStatus.completed).toList();
 
   double _calculateTotalTime(List<Task> taskList) {
-    return taskList.fold(0.0, (sum, task) => sum + task.estimatedTime);
+    // return taskList.fold(0.0, (sum, task) => sum + task.estimatedTime);
+    return taskList.fold(0.0, (sum, task) => sum + task.remainingTime);
   }
+
+  // Function to update the whole task and save it
+void _saveTaskWithUpdateState(Task updatedTask) {
+  saveTask(updatedTask);
+  setState(() {}); // Refresh the UI
+}
+
+void _deleteTaskWithUpdateState(String taskId) {
+  deleteTask(taskId);
+  setState(() {}); // Refresh the UI
+}
 
   void _toggleAddMenu() {
     setState(() {
@@ -322,6 +344,8 @@ class _TasksPageState extends State<TasksPage> {
           tasks: taskList,
           accentColor: accentColor,
           projectName: projectName,
+          saveTask: _saveTaskWithUpdateState,
+          deleteTask: _deleteTaskWithUpdateState,
         ),
       ),
     );

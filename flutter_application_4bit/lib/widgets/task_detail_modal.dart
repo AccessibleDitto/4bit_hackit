@@ -6,12 +6,14 @@ class TaskDetailModal extends StatefulWidget {
   final Task task;
   final List<Project> projects;
   final Function(Task) onTaskUpdate;
+  final Function(String) onTaskDelete;
 
   const TaskDetailModal({
     super.key,
     required this.task,
     required this.projects,
     required this.onTaskUpdate,
+    required this.onTaskDelete,
   });
 
   @override
@@ -97,6 +99,80 @@ class _TaskDetailModalState extends State<TaskDetailModal> {
     } catch (e) {
       return null;
     }
+  }
+  
+  void _deleteTask() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          backgroundColor: const Color(0xFF27272A),
+          title: Text(
+            'Delete Task',
+            style: GoogleFonts.inter(
+              color: Colors.white,
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          content: Text(
+            'Are you sure you want to delete "${_currentTask.title}"? This action cannot be undone.',
+            style: GoogleFonts.inter(
+              color: const Color(0xFFA1A1AA),
+              fontSize: 14,
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text(
+                'Cancel',
+                style: GoogleFonts.inter(
+                  color: const Color(0xFF71717A),
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop(); // Close dialog
+                Navigator.of(context).pop(); // Close modal
+                
+                if (widget.onTaskDelete != null) {
+                  widget.onTaskDelete!(_currentTask.id);
+                }
+                
+                // Show deletion confirmation
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Task "${_currentTask.title}" deleted'),
+                    duration: const Duration(seconds: 3),
+                    backgroundColor: const Color(0xFFEF4444),
+                    action: SnackBarAction(
+                      label: 'Undo',
+                      textColor: Colors.white,
+                      onPressed: () {
+                        // Re-add the task (this would need to be implemented in your main app)
+                        widget.onTaskUpdate(_currentTask);
+                      },
+                    ),
+                  ),
+                );
+              },
+              child: Text(
+                'Delete',
+                style: GoogleFonts.inter(
+                  color: const Color(0xFFEF4444),
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   void _saveChanges() {
@@ -296,6 +372,14 @@ class _TaskDetailModalState extends State<TaskDetailModal> {
                         ),
                       ),
                     ),
+                    if (widget.onTaskDelete != null)
+                      IconButton(
+                        onPressed: _deleteTask,
+                        icon: const Icon(
+                          Icons.delete_outline,
+                          color: Color(0xFFEF4444),
+                        ),
+                      ),
                     IconButton(
                       onPressed: () {
                         if (_isEditing) {
