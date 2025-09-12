@@ -195,6 +195,9 @@ List<Task> tasks = [
 // Getter function to expose tasks for other files
 List<Task> getTasksList() => tasks;
 
+// Getter function to expose projects for other files
+List<Project> getProjectsList() => projects;
+
 // Function to update a task's timeSpent by ID
 void updateTaskTimeSpent(String taskId, double additionalTimeSpent) {
   int index = tasks.indexWhere((task) => task.id == taskId);
