@@ -8,6 +8,15 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'dart:async';
 
+//imports for NFC and App Limiter
+import 'dart:async';
+import 'dart:developer';
+import 'package:app_limiter/app_limiter.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:nfc_manager/nfc_manager.dart';
+
+
 // Import the modular files
 import 'models/timer_models.dart';
 import 'tasks_updated.dart' as TaskData show getTasksList, updateTaskTimeSpent, startTask, completeTask;
@@ -35,6 +44,13 @@ class _TimerModePageState extends State<TimerModePage> with TickerProviderStateM
   late AudioPlayer _audioPlayer;
   late VoidCallback _settingsListener;
   late VoidCallback _timerModeListener;
+  String _platformVersion = 'Unknown';
+  final _appLimiterPlugin = AppLimiter();
+  String _nfcStatus = 'NFC Status: Unknown';
+  String _readData = 'No data read yet';
+  bool _isReading = false;
+  bool _isNFCAvailable = false;
+  bool _isLocked = false;
 
   final GlobalTimerService _globalTimer = GlobalTimerService();
 
@@ -54,6 +70,177 @@ class _TimerModePageState extends State<TimerModePage> with TickerProviderStateM
   final int _selectedIndex = 0;
 
   dynamic _currentFullTask; // Track the currently selected full task with timeSpent
+
+  final TextEditingController _writeController = TextEditingController();
+
+  // App blocker
+  Future<void> initPlatformState() async {
+    String platformVersion;
+    try {
+      platformVersion =
+          await _appLimiterPlugin.getPlatformVersion() ??
+          'Unknown platform version';
+    } on PlatformException {
+      platformVersion = 'Failed to get platform version.';
+    }
+
+    if (!mounted) return;
+
+    setState(() {
+      _platformVersion = platformVersion;
+    });
+  }
+  Future<bool> checkAndroidPermission() async {
+    try {
+      final result = await _appLimiterPlugin.isAndroidPermissionAllowed();
+      log(result.toString(), name: 'Permission Status');
+      return result;
+    } catch (e) {
+      debugPrint(e.toString());
+      rethrow;
+    }
+  }
+  Future<void> requestAndroidPermission() async {
+    try {
+      await _appLimiterPlugin.requestAndroidPermission();
+    } catch (e) {
+      debugPrint(e.toString());
+      rethrow;
+    }
+  }
+
+  Future<void> blockAndroidApps() async {
+    try {
+      if (_isLocked) {
+        debugPrint("Apps are already blocked");
+        return;
+      }
+      await _appLimiterPlugin.blocAndroidApp();
+      setState(() {
+        _isLocked = true;
+      });
+    
+    } catch (e) {
+      debugPrint(e.toString());
+      rethrow;
+    }
+  }
+
+  Future<void> unBlockAndroidApps() async {
+    try {
+      if (!_isLocked) {
+        debugPrint("Apps are already unblocked");
+        return;
+      }
+      await _appLimiterPlugin.unblocAndroidApp();
+      setState(() {
+        _isLocked = false;
+      });
+    
+    } catch (e) {
+      debugPrint(e.toString());
+      rethrow;
+    }
+  }
+
+  //nfc
+  Future<void> _checkNFCAvailability() async {
+    bool isAvailable = await NfcManager.instance.isAvailable();
+    setState(() {
+      _isNFCAvailable = isAvailable;
+      _nfcStatus = isAvailable ? 'NFC Status: Available' : 'NFC Status: Not Available';
+    });
+  }
+
+  Future<void> _startReading(context) async {
+    if (!_isNFCAvailable) {
+      debugPrint("NFC is not available on this device");
+      return;
+    }
+
+    setState(() {
+      _isReading = true;
+      _readData = 'Waiting for NFC tag...';
+    });
+
+    try {
+      NfcManager.instance.startSession(onDiscovered: (NfcTag tag) async {
+        try {
+          // Try to read NDEF data
+          var ndef = Ndef.from(tag);
+          if (ndef == null) {
+            if (mounted) {
+              setState(() {
+                _readData = 'Tag is not NDEF formatted or not readable';
+                _isReading = false;
+              });
+            }
+            return;
+          }
+
+          NdefMessage? ndefMessage = await ndef.read();
+
+          String data = '';
+          for (NdefRecord record in ndefMessage.records) {
+            if (record.typeNameFormat == NdefTypeNameFormat.nfcWellknown) {
+              if (record.type.length == 1 && record.type[0] == 0x54) {
+                // Text Record
+                List<int> payload = record.payload;
+                if (payload.isNotEmpty) {
+                  int languageLength = payload[0] & 0x3F;
+                  String text = String.fromCharCodes(payload.sublist(1 + languageLength));
+                  data += text;
+                }
+              } else if (record.type.length == 1 && record.type[0] == 0x55) {
+                // URI Record
+                List<int> payload = record.payload;
+                if (payload.isNotEmpty) {
+                  String uri = String.fromCharCodes(payload.sublist(1));
+                  data += uri;
+                }
+              }
+            }
+          }
+
+          if (mounted) {
+            setState(() {
+              _readData = data.isNotEmpty ? data : 'No readable text data found';
+              _isReading = false;
+            });
+          }
+
+          NfcManager.instance.stopSession();
+
+          // Check if the NFC tag contains "lock" command
+          debugPrint("Read data: $_readData");
+          if (data == "lock") {
+            debugPrint("Locking/Unlocking apps");
+            if (!_isLocked) {
+              await blockAndroidApps();
+              Navigator.pop(context); // Close the modal
+            } else {
+              await unBlockAndroidApps();
+              Navigator.pop(context); // Close the modal
+            }
+          }
+        } catch (e) {
+          if (mounted) {
+            setState(() {
+              _readData = 'Error reading tag: $e';
+              _isReading = false;
+            });
+          }
+          NfcManager.instance.stopSession(errorMessage: 'Error reading tag');
+        }
+      });
+    } catch (e) {
+      setState(() {
+        _readData = 'Error starting NFC session: $e';
+        _isReading = false;
+      });
+    }
+  }
+
 
   void _showTaskSelectionModal() {
     // Filter out completed tasks
@@ -262,6 +449,43 @@ class _TimerModePageState extends State<TimerModePage> with TickerProviderStateM
   }
 
   void _showModeModal(String title, String description, bool currentValue, Function(bool) onChanged) {
+    if (title  == 'Strict Mode Settings') {
+      if(checkAndroidPermission() == false){
+        showModalBottomSheet(context: context, builder: (context) => Container(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+            Text("Permissions not Granted", style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 16),
+            Text("Enable Usage Stats and Overlay Access to use Strict Mode."),
+            const SizedBox(height: 24),
+            ],
+          ),
+        ));
+      }
+      else{
+        _startReading(context);
+        var mode = _isLocked ? "Disable" : "Enable";
+        showModalBottomSheet(context: context, builder: (context) => Container(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+            Text("$mode Strict Mode", style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 16),
+            Text("Scan your NFC tag to $mode strict mode."),
+            const SizedBox(height: 24),
+            ],
+          ),
+        ));
+      }
+
+
+    }
+    else{
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(
@@ -288,6 +512,7 @@ class _TimerModePageState extends State<TimerModePage> with TickerProviderStateM
         ),
       ),
     );
+    }
   }
 
   Future<void> _loadTimerModeFromPrefs() async {
@@ -375,6 +600,8 @@ class _TimerModePageState extends State<TimerModePage> with TickerProviderStateM
   @override
   void initState() {
     super.initState();
+    _checkNFCAvailability();
+    initPlatformState();
     _confettiController = ConfettiController(duration: const Duration(seconds: 2));
     _progressAnimationController = AnimationController(
       duration: const Duration(milliseconds: 950),
@@ -451,13 +678,14 @@ class _TimerModePageState extends State<TimerModePage> with TickerProviderStateM
   void dispose() {
   PomodoroSettings.instance.removeListener(_settingsListener);
   PomodoroSettings.instance.removeListener(_timerModeListener);
-    _confettiController.dispose();
-    _progressAnimationController.dispose();
-    _progressNotifier.dispose();
-    _audioPlayer.dispose();
-    _globalTimer.onTick = null;
-    _globalTimer.onComplete = null;
-    super.dispose();
+  _confettiController.dispose();
+  _writeController.dispose();
+  _progressAnimationController.dispose();
+  _progressNotifier.dispose();
+  _audioPlayer.dispose();
+  _globalTimer.onTick = null;
+  _globalTimer.onComplete = null;
+  super.dispose();
   }
 
   @override
