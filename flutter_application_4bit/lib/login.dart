@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart'; // Import Flutter Material widgets and themes
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'models/task_models.dart'; // Import custom Task model
 // Initialize Firestore instance
 
 final db = FirebaseFirestore.instance; // Initialize Firestore instance
@@ -14,6 +15,91 @@ class LoginPage extends StatefulWidget {
 
 // State class that holds data and logic for the LoginPage widget
 class _LoginPageState extends State<LoginPage> {
+  List<Task> tasks = [
+  Task(
+    id: '1',
+    title: 'Complete Flutter app',
+    description: 'Finish implementing the remaining features for the mobile application',
+    estimatedTime: 3.0,
+    timeSpent: 2.999,
+    dueDate: DateTime.now(),
+    status: TaskStatus.inProgress,
+    priority: Priority.high,
+    projectId: '1',
+    createdAt: DateTime.now().subtract(Duration(days: 2)),
+    updatedAt: DateTime.now().subtract(Duration(hours: 1)),
+  ),
+  Task(
+    id: '2',
+    title: 'Review code',
+    description: 'Code review for the new authentication module',
+    estimatedTime: 1.0,
+    timeSpent: 0.5,
+    // scheduledFor: DateTime.now().add(Duration(hours: 2)),
+    status: TaskStatus.notStarted,
+    priority: Priority.medium,
+    projectId: '1',
+    createdAt: DateTime.now().subtract(Duration(days: 1)),
+    updatedAt: DateTime.now().subtract(Duration(minutes: 30)),
+  ),
+  Task(
+    id: '3',
+    title: 'Meeting with team',
+    description: 'Weekly standup meeting to discuss project progress',
+    estimatedTime: 1.5,
+    timeSpent: 1.5,
+    dueDate: DateTime.now().add(Duration(days: 1)),
+    status: TaskStatus.completed,
+    priority: Priority.high,
+    projectId: '2',
+    createdAt: DateTime.now().subtract(Duration(days: 3)),
+    updatedAt: DateTime.now().subtract(Duration(hours: 2)),
+  ),
+  Task(
+    id: '4',
+    title: 'Write documentation',
+    description: 'Create user documentation for the new features',
+    estimatedTime: 2.0,
+    timeSpent: 2.0,
+    dueDate: DateTime.now().add(Duration(days: 2)),
+    status: TaskStatus.completed,
+    priority: Priority.low,
+    projectId: '2',
+    createdAt: DateTime.now().subtract(Duration(days: 4)),
+    updatedAt: DateTime.now().subtract(Duration(hours: 3)),
+  ),
+  Task(
+    id: '5',
+    title: 'Fix bug #123',
+    description: 'Critical bug affecting user login functionality',
+    estimatedTime: 1.0,
+    timeSpent: 0.0,
+    dueDate: DateTime.now().add(Duration(days: 3)),
+    status: TaskStatus.notStarted,
+    priority: Priority.urgent,
+    projectId: '3',
+    createdAt: DateTime.now().subtract(Duration(days: 1)),
+    updatedAt: DateTime.now().subtract(Duration(minutes: 15)),
+  ),
+];
+Future<List<Task>> loadTasksFromFirebase(String username) async {
+  List<Task> loadedTasks = [];
+  final querySnapshot = await db.collection('users').doc(username).collection('tasks').get();
+  for (var doc in querySnapshot.docs) {
+    loadedTasks.add(Task.fromJson(doc.data()));
+  }
+  debugPrint('Loaded ${loadedTasks.length} tasks from Firebase for user $username');
+  return loadedTasks;
+}
+Future<void> addTask(Task newTask,String username ) async {
+  await db
+      .collection('users')
+      .doc(username)
+      .collection('tasks')
+      .doc(newTask.id)
+      .set(newTask.toJson());
+  debugPrint('Added task ${newTask.title} for user $username');
+}
   // Global key to uniquely identify the Form widget and allow form validation/saving
   final _formKey = GlobalKey<FormState>();
 
@@ -25,70 +111,12 @@ class _LoginPageState extends State<LoginPage> {
   bool _obscureText = true;
 
   // Function to handle login button press
-  void _login() {
-    // Validate the form fields
-    if (_formKey.currentState!.validate()) {
-      // Save the form fields (triggers onSaved for each field)
-      _formKey.currentState!.save();
-      db.collection('users').doc(_email).set({// Save email and password to Firestore
-        'password': _password,
-      }).then(
-        (value) =>       showDialog(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: const Text('Login Info'),
-          content: Text('Email: $_email\nPassword: $_password'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context), // Close the dialog
-              child: const Text('OK'),
-            ),
-          ],
-        ),
-      ), // Print success message on successful addition
-      ).catchError(
-        (error) => print("Failed to add user: $error"));
-      // Show a dialog displaying the entered email and password
-
-    }
-  }
-  void _forgetPassword() {
-    // Logic to handle password reset or forget password functionality
-    db.collection('users').doc(_email).get().then((doc) {
-      if (doc.exists) {
-        // If the user exists, show a dialog with the email
-        showDialog(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: const Text('Forgot Password'),
-            content: Text(doc.data()?["password"] ?? 'No password set for this user.'),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context), // Close the dialog
-                child: const Text('OK'),
-              ),
-            ],
-          ),
-        );
-      } else {
-        // If the user does not exist, show an error message
-        showDialog(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: const Text('Error'),
-            content: const Text('User does not exist. Please sign up first.'),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context), // Close the dialog
-                child: const Text('OK'),
-              ),
-            ],
-          ),
-        );
+  void addAllTasks() {
+    for (var task in tasks) {
+        debugPrint(task.title);
+        addTask(task, "test@gmail.com");
       }
-    });
   }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -96,84 +124,26 @@ class _LoginPageState extends State<LoginPage> {
       body: Center(
         child: Padding(
           padding: const EdgeInsets.all(24.0), // Add padding around the form
-          child: Form(
-            key: _formKey, // Connect form with the global key for validation
-            child: Column(
-              mainAxisSize: MainAxisSize.max, // Column takes only as much space as needed
+          child: Column(// give me test buttons to add tasks from a task list and get stuff 
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                // Add a text box above the text fields
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: Text(
-                    'Join xxx Today \u{1F464}',
-                    style: TextStyle(
-                      fontSize: 20, // Font size for the text
-                      color: Colors.blue, // Text color
-                      fontWeight: FontWeight.bold, // Make the text bold
-                      ),
-                    textAlign: TextAlign.left,
-                  ),
+                ElevatedButton(
+                  onPressed: () async {
+                    tasks = await loadTasksFromFirebase('test@gmail.com');
+                    setState(() {}); // Refresh the UI
+                  },
+                  child: const Text('Load Tasks from Firebase'),
                 ),
-                const SizedBox(height: 24), // Space between text and fields
-
-                // Email input field
-                TextFormField(
-                  decoration: const InputDecoration(
-                    labelText: 'Email', // Label above the field
-                    border: OutlineInputBorder(), // Outline border
-                  ),
-                  keyboardType: TextInputType.emailAddress, // Email-specific keyboard
-                  validator: (value) =>
-                      value == null || value.isEmpty ? 'Enter your email' : null, // Validation
-                  onSaved: (value) => _email = value ?? '', // Save input to _email
+                const SizedBox(height: 16),
+                ElevatedButton(
+                  onPressed: () {
+                      addAllTasks();
+                  },
+                  child: const Text('Add First Task to Firebase'),
                 ),
-                const SizedBox(height: 16), // Space between fields
-
-                // Password input field
-                TextFormField(
-                  decoration: InputDecoration(
-                    labelText: 'Password', // Label above the field
-                    border: const OutlineInputBorder(),
-                    // Add an eye icon to toggle visibility
-                    suffixIcon: IconButton(
-                      icon: Icon(
-                        _obscureText ? Icons.visibility : Icons.visibility_off,
-                      ),
-                      onPressed: () {
-                        setState(() {
-                          // Toggle password visibility and update UI
-                          _obscureText = !_obscureText;
-                        });
-                      },
-                    ),
-                  ),
-                  obscureText: _obscureText, // Hide text when true
-                  validator: (value) =>
-                      value == null || value.isEmpty ? 'Enter your password' : null, // Validation
-                  onSaved: (value) => _password = value ?? '', // Save input to _password
-                ),
-                const SizedBox(height: 24), // Space before button
-
-                // Full-width login button
-                SizedBox(
-                  width: double.infinity, // Button stretches full width
-                  child: ElevatedButton(
-                    onPressed: _login, // Call _login function when pressed
-                    child: const Text('Login'), // Button label
-                  ),
-                ),
-                const SizedBox(height: 16), // Space before forget password button
-                // Full-width forget password button
-                SizedBox(
-                  width: double.infinity, // Button stretches full width
-                  child: ElevatedButton(
-                    onPressed: _forgetPassword, // Call _forgetPassword function when pressed
-                    child: const Text('Forget Password'), // Button label
-                  ),
-                ),
-              ],
-            ),
-          ),
+              ]
+             
+          )
         ),
       ),
     );
