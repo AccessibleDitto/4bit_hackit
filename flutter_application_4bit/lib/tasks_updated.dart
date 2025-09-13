@@ -3,8 +3,12 @@ import 'package:flutter_application_4bit/widgets/date_selection_task.dart';
 import 'package:flutter_application_4bit/widgets/navigation_widgets.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_application_4bit/widgets/filtered_tasks_page.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'models/task_models.dart';
-
+import 'package:firebase_core/firebase_core.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'firebase_options.dart';
+final db = FirebaseFirestore.instance; // Initialize Firestore instance
 // enum Priority { low, medium, high, urgent }
 
 // enum TaskStatus { 
@@ -59,7 +63,7 @@ import 'models/task_models.dart';
 class TasksPage extends StatefulWidget {
   @override
   _TasksPageState createState() => _TasksPageState();
-}
+  }
 
 String formatTime(double hours) {
   if (hours == 0) return '0h';
@@ -192,14 +196,62 @@ List<Task> tasks = [
   ),
 ];
 
+Future<List<Task>> loadTasksFromFirebase() async {
+  List<Task> loadedTasks = [];
+  final prefs = await SharedPreferences.getInstance();
+  final username = prefs.getString('current_user_email') ?? '';
+  final querySnapshot = await db.collection('users').doc(username).collection('tasks').get();
+  for (var doc in querySnapshot.docs) {
+    loadedTasks.add(Task.fromJson(doc.data()));
+  }
+  debugPrint('Loaded ${loadedTasks.length} tasks from Firebase for user $username');
+  return loadedTasks;
+}
+Future<void> addTask(Task newTask) async {
+  final prefs = await SharedPreferences.getInstance();
+  final username = prefs.getString('current_user_email') ?? '';
+  await db
+      .collection('users')
+      .doc(username)
+      .collection('tasks')
+      .doc(newTask.id)
+      .set(newTask.toJson());
+  debugPrint('Added task ${newTask.title} for user $username');
+}
+
+Future<void> editTask(Task updatedTask) async {
+  final prefs = await SharedPreferences.getInstance();
+  final username = prefs.getString('current_user_email') ?? '';
+  await db
+      .collection('users')
+      .doc(username)
+      .collection('tasks')
+      .doc(updatedTask.id)
+      .update(updatedTask.toJson());
+  debugPrint('Edited task ${updatedTask.title} for user $username');
+}
+
+Future<void> deleteTaskFromFirebase(String taskId) async {
+  final prefs = await SharedPreferences.getInstance();
+  final username = prefs.getString('current_user_email') ?? '';
+  await db
+      .collection('users')
+      .doc(username)
+      .collection('tasks')
+      .doc(taskId)
+      .delete();
+  debugPrint('Deleted task $taskId for user $username');
+}
 // Getter function to expose tasks for other files
 List<Task> getTasksList() => tasks;
-
+Future<List<Task>> fetchTasks() async {
+  return await loadTasksFromFirebase();
+}
 // Getter function to expose projects for other files
 List<Project> getProjectsList() => projects;
 
 // Function to update a task's timeSpent by ID
-void updateTaskTimeSpent(String taskId, double additionalTimeSpent) {
+void updateTaskTimeSpent(String taskId, double additionalTimeSpent) async {
   int index = tasks.indexWhere((task) => task.id == taskId);
   if (index != -1) {
     final currentTask = tasks[index];
@@ -218,12 +270,13 @@ void updateTaskTimeSpent(String taskId, double additionalTimeSpent) {
       status: newStatus,
     );
     tasks[index] = updatedTask;
+    await editTask(updatedTask);
     // Can add Firebase saving logic here later
   }
 }
 
 // Function to mark task as completed
-void completeTask(String taskId) {
+void completeTask(String taskId) async {
   int index = tasks.indexWhere((task) => task.id == taskId);
   if (index != -1) {
     final currentTask = tasks[index];
@@ -232,11 +285,12 @@ void completeTask(String taskId) {
       timeSpent: currentTask.estimatedTime, // Set to full estimated time
     );
     tasks[index] = updatedTask;
+    await editTask(updatedTask);
   }
 }
 
 // Function to start task (change from notStarted to inProgress)
-void startTask(String taskId) {
+void startTask(String taskId) async {
   int index = tasks.indexWhere((task) => task.id == taskId);
   if (index != -1) {
     final currentTask = tasks[index];
@@ -245,11 +299,31 @@ void startTask(String taskId) {
         status: TaskStatus.inProgress,
       );
       tasks[index] = updatedTask;
+      await editTask(updatedTask);
     }
   }
 }
 
 class _TasksPageState extends State<TasksPage> {
+  // Use the global tasks list for compatibility
+  // If you want to make it private, use: List<Task> _tasks = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _refreshTasks();
+  }
+
+  Future<void> _refreshTasks() async {
+    final loadedTasks = await loadTasksFromFirebase();
+    setState(() {
+      tasks
+        ..clear()
+        ..addAll(loadedTasks);
+    });
+  }
+
+
   bool _showAddMenu = false;
   String _searchQuery = '';
   final TextEditingController _searchController = TextEditingController();
@@ -303,26 +377,37 @@ class _TasksPageState extends State<TasksPage> {
     return taskList.fold(0.0, (sum, task) => sum + task.remainingTime);
   }
 
-  // Function to update the whole task and save it
-void _saveTaskWithUpdateState(Task updatedTask) {
-  saveTask(updatedTask);
-  setState(() {}); // Refresh the UI
-}
+//   // Function to update the whole task and save it
+// void _saveTaskWithUpdateState(Task updatedTask) {
+//   editTask(updatedTask); // Save to Firebase
+//   saveTask(updatedTask);
+//   setState(() {}); // Refresh the UI
+// }
 
-void _deleteTaskWithUpdateState(String taskId) {
-  deleteTask(taskId);
-  setState(() {}); // Refresh the UI
-}
+// void _deleteTaskWithUpdateState(String taskId) {
+//   deleteTask(taskId);
+//   deleteTaskFromFirebase(taskId); // Also delete from Firebase
+//   setState(() {}); // Refresh the UI
+// }
+
+  void _addTask(Task newTask) async {
+    await addTask(newTask); // Add to Firebase
+    await _refreshTasks();  // Reload from Firebase
+  }
+
+  void _saveTaskWithUpdateState(Task updatedTask) async {
+    await editTask(updatedTask); // Update in Firebase
+    await _refreshTasks();       // Reload from Firebase
+  }
+
+  void _deleteTaskWithUpdateState(String taskId) async {
+    await deleteTaskFromFirebase(taskId); // Delete from Firebase
+    await _refreshTasks();                // Reload from Firebase
+  }
 
   void _toggleAddMenu() {
     setState(() {
       _showAddMenu = !_showAddMenu;
-    });
-  }
-
-  void _addTask(Task newTask) {
-    setState(() {
-      tasks.add(newTask);
     });
   }
 
