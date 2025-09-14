@@ -1,6 +1,6 @@
 import 'dart:async';
 import '../pomodoro_preferences.dart';
-
+import '../tasks_updated.dart';
 enum GlobalTimerState { idle, running, paused, completed }
 
 class GlobalTimerService {
@@ -29,7 +29,6 @@ class GlobalTimerService {
   bool _isCountdown = true;
   Function()? onTick;
   Function()? onComplete;
-  
   // Session tracking
   int _currentSession = 0;
   int _totalSessions = 0;
@@ -100,6 +99,7 @@ class GlobalTimerService {
     if (_state == GlobalTimerState.running) {
       _state = GlobalTimerState.paused;
       _pausedSeconds = _currentSeconds; // Store current time for resume
+
       _timer?.cancel();
       onTick?.call(); // Trigger UI update
     }

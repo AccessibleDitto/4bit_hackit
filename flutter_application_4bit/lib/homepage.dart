@@ -17,6 +17,10 @@ import 'package:flutter/services.dart';
 import 'package:nfc_manager/nfc_manager.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:firebase_core/firebase_core.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'firebase_options.dart';
+import 'services/firebase_service.dart';
 
 // Import the modular files
 import 'models/timer_models.dart';
@@ -33,6 +37,10 @@ import 'widgets/mode_settings_widgets.dart';
 import 'widgets/navigation_widgets.dart';
 import 'widgets/congratulations_widgets.dart';
 import 'pomodoro_preferences.dart';
+
+
+final FirebaseService firebaseService = FirebaseService();
+final db = FirebaseFirestore.instance;
 
 class TimerModePage extends StatefulWidget {
   const TimerModePage({super.key});
@@ -71,7 +79,7 @@ class _TimerModePageState extends State<TimerModePage> with TickerProviderStateM
   final int _selectedIndex = 0;
 
   dynamic _currentFullTask; // Track the currently selected full task with timeSpent
-
+  List<Task> fullTasks = [];
   final TextEditingController _writeController = TextEditingController();
   Future<void> _checkCurrentState() async {
     final SharedPreferences prefs = await SharedPreferences.getInstance();
@@ -250,9 +258,11 @@ class _TimerModePageState extends State<TimerModePage> with TickerProviderStateM
   }
 
 
-  void _showTaskSelectionModal() {
+  void _showTaskSelectionModal() async {
     // Filter out completed tasks
-    final fullTasks = TaskData.getTasksList();
+    final fullTasks = await firebaseService.loadTasks();
+    setState(() {
+    });
     const colorOrder = [
       Color(0xFF9333EA),
       Color(0xFF10B981),
@@ -381,8 +391,10 @@ class _TimerModePageState extends State<TimerModePage> with TickerProviderStateM
         // In count-up mode, use the current seconds as time spent
         additionalTimeSpentHours = _globalTimer.currentSeconds / 3600.0;
       }
+      bool test = additionalTimeSpentHours > 0;
+      debugPrint("Saving additional time spent: $additionalTimeSpentHours hours $test");
       if (additionalTimeSpentHours > 0) {
-  TaskData.updateTaskTimeSpent(_currentFullTask.id, additionalTimeSpentHours);
+        TaskData.updateTaskTimeSpent(_currentFullTask, additionalTimeSpentHours);
       }
     }
     // Reset session tracking
@@ -392,7 +404,35 @@ class _TimerModePageState extends State<TimerModePage> with TickerProviderStateM
       _isBreakTime = false;
     });
   }
+  void _updateTaskProgressOnPause() {
+    if (_currentFullTask != null && _globalTimer.state == GlobalTimerState.running) {
+      double additionalTimeSpentHours = 0.0;
+      if (_isCountdownMode) {
+        int sessionStartSeconds = _globalTimer.targetSeconds;
+        additionalTimeSpentHours = (sessionStartSeconds - _globalTimer.currentSeconds) / 3600.0;
+      } else {
+        additionalTimeSpentHours = _globalTimer.currentSeconds / 3600.0;
+      }
+      if (additionalTimeSpentHours > 0) {
+        TaskData.updateTaskTimeSpent(_currentFullTask, additionalTimeSpentHours);
+      }
+      _globalTimer.pause();
+    }
 
+  }
+  void _updateTaskProgressOnComplete() {
+    if (_currentFullTask != null) {
+      double additionalTimeSpentHours = 0.0;
+      if (_isCountdownMode) {
+        additionalTimeSpentHours = _globalTimer.targetSeconds / 3600.0;
+      } else {
+        additionalTimeSpentHours = _globalTimer.currentSeconds / 3600.0;
+      }
+      if (additionalTimeSpentHours > 0) {
+        TaskData.updateTaskTimeSpent(_currentFullTask, additionalTimeSpentHours);
+      }
+    }
+  }
   void _checkAndShowBadgePopup() {
     final userStats = UserStats();
     final recentAchievements = userStats.recentAchievements;
@@ -561,15 +601,16 @@ class _TimerModePageState extends State<TimerModePage> with TickerProviderStateM
           // In count-up mode, use the current seconds as time spent
           additionalTimeSpentHours = _globalTimer.currentSeconds / 3600.0;
         }
-        
         // Update the task's timeSpent before switching modes
+        debugPrint("Time to add to task: $additionalTimeSpentHours hours");
         if (additionalTimeSpentHours > 0) {
-          TaskData.updateTaskTimeSpent(_currentFullTask.id, additionalTimeSpentHours);
+          TaskData.updateTaskTimeSpent(_currentFullTask, additionalTimeSpentHours);
           // Update the local task object as well
           _currentFullTask.timeSpent += additionalTimeSpentHours;
           // Update the global timer's session information with new timeSpent
           _globalTimer.updateTaskTimeSpent(_currentFullTask.timeSpent, _currentFullTask.estimatedTime);
         }
+
       }
 
       _isCountdownMode = isCountdown;
@@ -640,6 +681,7 @@ class _TimerModePageState extends State<TimerModePage> with TickerProviderStateM
       });
     };
     _globalTimer.onComplete = () {
+      _updateTaskProgressOnComplete();
       setState(() {
         if (!_isBreakTime && _currentFullTask != null) {
           // Check if this was the last session before advancing
@@ -847,7 +889,7 @@ class _TimerModePageState extends State<TimerModePage> with TickerProviderStateM
                                        (_globalTimer.state == GlobalTimerState.paused ? TimerState.focusPaused : TimerState.idle)),
                             selectedTask: _globalTimer.selectedTask,
                             onStartFocus: _startFocusTimer,
-                            onPause: _globalTimer.pause,
+                            onPause: _updateTaskProgressOnPause,
                             onContinue: _globalTimer.resume,
                             onReset: _resetToHome,
                             onStartBreak: _startBreakTimer,

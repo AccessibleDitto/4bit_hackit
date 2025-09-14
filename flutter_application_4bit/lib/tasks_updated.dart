@@ -244,10 +244,9 @@ Future<List<Task>> fetchTasks() async {
 List<Project> getProjectsList() => projects;
 
 // Function to update a task's timeSpent by ID
-void updateTaskTimeSpent(String taskId, double additionalTimeSpent) async {
-  int index = tasks.indexWhere((task) => task.id == taskId);
-  if (index != -1) {
-    final currentTask = tasks[index];
+void updateTaskTimeSpent(Task task, double additionalTimeSpent) async {
+  debugPrint("Updating task $task with additional time: $additionalTimeSpent hours");
+    final currentTask = task;
     final newTimeSpent = currentTask.timeSpent + additionalTimeSpent;
 
     // Determine new status based on progress
@@ -263,11 +262,10 @@ void updateTaskTimeSpent(String taskId, double additionalTimeSpent) async {
       timeSpent: newTimeSpent,
       status: newStatus,
     );
-    tasks[index] = updatedTask;
     await editTask(updatedTask);
     // Can add Firebase saving logic here later
   }
-}
+
 
 // Function to mark task as completed
 void completeTask(String taskId) async {
