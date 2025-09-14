@@ -15,14 +15,23 @@ class TaskSelector extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final screenHeight = MediaQuery.of(context).size.height;
+    final isSmallScreen = screenHeight < 700;
+    
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        margin: const EdgeInsets.all(24),
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+        margin: EdgeInsets.symmetric(
+          horizontal: isSmallScreen ? 16 : 24,
+          vertical: isSmallScreen ? 4 : 8
+        ),
+        padding: EdgeInsets.symmetric(
+          horizontal: isSmallScreen ? 16 : 20, 
+          vertical: isSmallScreen ? 12 : 16
+        ),
         decoration: BoxDecoration(
           color: const Color(0xFF18181B),
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: const Color(0xFF9333EA).withOpacity(0.2),
             width: 1,
@@ -33,23 +42,23 @@ class TaskSelector extends StatelessWidget {
             Icon(
               Icons.task_alt,
               color: selectedTask == 'Select Task' ? const Color(0xFFA1A1AA) : const Color(0xFF9333EA),
-              size: 20,
+              size: isSmallScreen ? 18 : 20,
             ),
-            const SizedBox(width: 12),
+            SizedBox(width: isSmallScreen ? 10 : 12),
             Expanded(
               child: Text(
                 selectedTask,
                 style: GoogleFonts.inter(
                   color: selectedTask == 'Select Task' ? const Color(0xFFA1A1AA) : Colors.white,
-                  fontSize: 16,
+                  fontSize: isSmallScreen ? 14 : 16,
                   fontWeight: FontWeight.w500,
                 ),
               ),
             ),
-            const Icon(
+            Icon(
               Icons.keyboard_arrow_down,
-              color: Color(0xFF9333EA),
-              size: 24,
+              color: const Color(0xFF9333EA),
+              size: isSmallScreen ? 20 : 24,
             ),
           ],
         ),
@@ -70,26 +79,29 @@ class TaskItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final screenHeight = MediaQuery.of(context).size.height;
+    final isSmallScreen = screenHeight < 700;
+    
     return GestureDetector(
       onTap: () {
         onTap();
         HapticFeedback.selectionClick();
       },
       child: Container(
-        margin: const EdgeInsets.only(bottom: 16),
-        padding: const EdgeInsets.all(20),
+        margin: EdgeInsets.only(bottom: isSmallScreen ? 8 : 16),
+        padding: EdgeInsets.all(isSmallScreen ? 12 : 20),
         decoration: BoxDecoration(
           color: const Color(0xFF27272A),
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: task.color.withOpacity(0.3),
-            width: 2,
+            width: 1,
           ),
           boxShadow: [
             BoxShadow(
               color: task.color.withOpacity(0.1),
-              blurRadius: 20,
-              offset: const Offset(0, 5),
+              blurRadius: isSmallScreen ? 10 : 20,
+              offset: const Offset(0, 3),
             ),
           ],
         ),
@@ -97,14 +109,14 @@ class TaskItem extends StatelessWidget {
           children: [
             // Task colour indicator
             Container(
-              width: 12,
-              height: 12,
+              width: isSmallScreen ? 10 : 12,
+              height: isSmallScreen ? 10 : 12,
               decoration: BoxDecoration(
                 color: task.color,
                 shape: BoxShape.circle,
               ),
             ),
-            const SizedBox(width: 16),
+            SizedBox(width: isSmallScreen ? 12 : 16),
             // Task info
             Expanded(
               child: Column(
@@ -114,34 +126,40 @@ class TaskItem extends StatelessWidget {
                     task.title,
                     style: GoogleFonts.inter(
                       color: Colors.white,
-                      fontSize: 16,
+                      fontSize: isSmallScreen ? 14 : 16,
                       fontWeight: FontWeight.w600,
                     ),
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
                   ),
-                  const SizedBox(height: 8),
+                  SizedBox(height: isSmallScreen ? 4 : 8),
                   Row(
                     children: [
                       Icon(
                         Icons.access_time,
                         color: task.color,
-                        size: 16,
+                        size: isSmallScreen ? 14 : 16,
                       ),
-                      const SizedBox(width: 6),
-                      Text(
-                        task.sessionsLeft > 0
-                          ? '${task.sessionsLeft} sessions of ${task.sessions} left'
-                          : 'All sessions completed!',
-                        style: GoogleFonts.inter(
-                          color: const Color(0xFFA1A1AA),
-                          fontSize: 14,
+                      SizedBox(width: isSmallScreen ? 4 : 6),
+                      Expanded(
+                        child: Text(
+                          task.sessionsLeft > 0
+                            ? '${task.sessionsLeft} sessions of ${task.sessions} left'
+                            : 'All sessions completed!',
+                          style: GoogleFonts.inter(
+                            color: const Color(0xFFA1A1AA),
+                            fontSize: isSmallScreen ? 12 : 14,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 1,
                         ),
                       ),
-                      const Spacer(),
+                      SizedBox(width: isSmallScreen ? 4 : 8),
                       Text(
                         'Pomodoro',
                         style: GoogleFonts.inter(
                           color: task.color,
-                          fontSize: 12,
+                          fontSize: isSmallScreen ? 10 : 12,
                           fontWeight: FontWeight.w500,
                         ),
                       ),
@@ -150,19 +168,19 @@ class TaskItem extends StatelessWidget {
                 ],
               ),
             ),
-            const SizedBox(width: 16),
+            SizedBox(width: isSmallScreen ? 8 : 16),
             // Select button
             Container(
-              width: 40,
-              height: 40,
+              width: isSmallScreen ? 32 : 40,
+              height: isSmallScreen ? 32 : 40,
               decoration: BoxDecoration(
                 color: task.color,
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(8),
               ),
-              child: const Icon(
+              child: Icon(
                 Icons.play_arrow,
                 color: Colors.white,
-                size: 20,
+                size: isSmallScreen ? 16 : 20,
               ),
             ),
           ],
@@ -186,8 +204,13 @@ class TaskSelectionModal extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final screenHeight = MediaQuery.of(context).size.height;
+    final isSmallScreen = screenHeight < 700;
+    
     return Container(
-      height: MediaQuery.of(context).size.height * 0.8,
+      height: isSmallScreen 
+          ? screenHeight * 0.55 
+          : screenHeight * 0.8,
       decoration: const BoxDecoration(
         color: Color(0xFF18181B),
         borderRadius: BorderRadius.only(
@@ -199,7 +222,7 @@ class TaskSelectionModal extends StatelessWidget {
         children: [
           // Handle bar
           Container(
-            margin: const EdgeInsets.only(top: 12),
+            margin: EdgeInsets.only(top: isSmallScreen ? 6 : 12),
             width: 40,
             height: 4,
             decoration: BoxDecoration(
@@ -209,7 +232,7 @@ class TaskSelectionModal extends StatelessWidget {
           ),
           // Header
           Padding(
-            padding: const EdgeInsets.all(24),
+            padding: EdgeInsets.all(isSmallScreen ? 8 : 24),
             child: Row(
               children: [
                 Expanded(
@@ -217,7 +240,7 @@ class TaskSelectionModal extends StatelessWidget {
                     'Select Task',
                     style: GoogleFonts.inter(
                       color: Colors.white,
-                      fontSize: 24,
+                      fontSize: isSmallScreen ? 20 : 24,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -245,9 +268,12 @@ class TaskSelectionModal extends StatelessWidget {
           ),
           // Search bar
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24),
+            padding: EdgeInsets.symmetric(horizontal: isSmallScreen ? 2 : 24),
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              padding: EdgeInsets.symmetric(
+                horizontal: 16, 
+                vertical: isSmallScreen ? 8 : 12
+              ),
               decoration: BoxDecoration(
                 color: const Color(0xFF27272A),
                 borderRadius: BorderRadius.circular(16),
@@ -269,7 +295,7 @@ class TaskSelectionModal extends StatelessWidget {
                       'Search tasks...',
                       style: GoogleFonts.inter(
                         color: const Color(0xFFA1A1AA),
-                        fontSize: 16,
+                        fontSize: isSmallScreen ? 14 : 16,
                       ),
                     ),
                   ),
@@ -279,14 +305,14 @@ class TaskSelectionModal extends StatelessWidget {
           ),
           // Available Tasks section
           Padding(
-            padding: const EdgeInsets.all(24),
+            padding: EdgeInsets.all(isSmallScreen ? 8 : 24),
             child: Align(
               alignment: Alignment.centerLeft,
               child: Text(
                 'Available Tasks',
                 style: GoogleFonts.inter(
                   color: const Color(0xFFA1A1AA),
-                  fontSize: 18,
+                  fontSize: isSmallScreen ? 16 : 18,
                   fontWeight: FontWeight.w500,
                 ),
               ),
@@ -295,7 +321,7 @@ class TaskSelectionModal extends StatelessWidget {
           // Task list
           Expanded(
             child: ListView.builder(
-              padding: const EdgeInsets.symmetric(horizontal: 24),
+              padding: EdgeInsets.symmetric(horizontal: isSmallScreen ? 2 : 24),
               physics: const BouncingScrollPhysics(),
               itemCount: tasks.length,
               itemBuilder: (context, index) {

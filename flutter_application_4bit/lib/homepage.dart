@@ -779,43 +779,56 @@ class _TimerModePageState extends State<TimerModePage> with TickerProviderStateM
                             )
                           else
                             // In count-up mode, show timer display without progress circle
-                            Container(
-                              width: 300,
-                              height: 300,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: const Color(0xFF0F0F0F),
-                                border: Border.all(
-                                  color: const Color(0xFF27272A),
-                                  width: 8,
-                                ),
-                              ),
-                              child: Center(
-                                child: Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Text(
-                                      TimerUtils.formatTime(_globalTimer.currentSeconds),
-                                      style: const TextStyle(
-                                        fontSize: 48,
-                                        fontWeight: FontWeight.w600,
-                                        color: Colors.white,
-                                      ),
+                            Builder(
+                              builder: (context) {
+                                final screenHeight = MediaQuery.of(context).size.height;
+                                final isSmallScreen = screenHeight < 700;
+                                final containerSize = isSmallScreen ? 220.0 : 300.0;
+                                
+                                // Use same font size calculation as TimerCircle
+                                final timerFontSize = containerSize * 0.16;
+                                final subtextFontSize = containerSize * 0.053;
+                                
+                                return Container(
+                                  width: containerSize,
+                                  height: containerSize,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    color: const Color(0xFF0F0F0F),
+                                    border: Border.all(
+                                      color: const Color(0xFF27272A),
+                                      width: isSmallScreen ? 6 : 8,
                                     ),
-                                    const SizedBox(height: 8),
-                                    Text(
-                                      _isBreakTime ? 'Break Time' : 'Count Up Mode',
-                                      style: TextStyle(
-                                        fontSize: 16,
-                                        color: Colors.white.withOpacity(0.7),
-                                      ),
+                                  ),
+                                  child: Center(
+                                    child: Column(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Text(
+                                          TimerUtils.formatTime(_globalTimer.currentSeconds),
+                                          style: GoogleFonts.inter(
+                                            fontSize: timerFontSize,
+                                            fontWeight: FontWeight.w300,
+                                            color: Colors.white,
+                                            letterSpacing: -1,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 8),
+                                        Text(
+                                          _isBreakTime ? 'Break Time' : 'Count Up Mode',
+                                          style: GoogleFonts.inter(
+                                            fontSize: subtextFontSize,
+                                            color: Colors.white.withOpacity(0.7),
+                                          ),
+                                        ),
+                                      ],
                                     ),
-                                  ],
-                                ),
-                              ),
+                                  ),
+                                );
+                              }
                             ),
-                          const SizedBox(height: 40),
+                          SizedBox(height: MediaQuery.of(context).size.height < 700 ? 16 : 40),
                           // Action Buttons
                           TimerActionButtons(
                             timerState: _isBreakTime ? TimerState.breakRunning :
