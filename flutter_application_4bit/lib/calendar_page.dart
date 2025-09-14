@@ -521,19 +521,17 @@ class CalendarPageState extends State<CalendarPage> {
         : AppConstants.normalHeightPerMinute;
 
     return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor, // Use theme background
       appBar: AppBar(
         title: Text(
           _getAppBarTitle(), 
           style: TextStyle(
             fontSize: 16,   // 👈 Change this value to adjust title size
             fontWeight: FontWeight.bold, // optional
-            color: Theme.of(context).colorScheme.onSurface, // Use theme text color
           ),
           ),
         automaticallyImplyLeading: false,
-        backgroundColor: Theme.of(context).colorScheme.surface, // Use theme surface color
-        foregroundColor: Theme.of(context).colorScheme.onSurface, // Use theme text color
+        backgroundColor: Colors.blue.shade600,
+        foregroundColor: Colors.white,
         elevation: 2,
         actions: [
           // // Tasks badge
