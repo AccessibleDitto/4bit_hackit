@@ -15,6 +15,7 @@ import 'package:app_limiter/app_limiter.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:nfc_manager/nfc_manager.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 
 // Import the modular files
@@ -72,7 +73,13 @@ class _TimerModePageState extends State<TimerModePage> with TickerProviderStateM
   dynamic _currentFullTask; // Track the currently selected full task with timeSpent
 
   final TextEditingController _writeController = TextEditingController();
-
+  Future<void> _checkCurrentState() async {
+    final SharedPreferences prefs = await SharedPreferences.getInstance();
+    bool? isLocked = prefs.getBool('locked');
+    setState(() {
+      _isLocked = isLocked ?? false;
+    });
+  }
   // App blocker
   Future<void> initPlatformState() async {
     String platformVersion;
@@ -146,13 +153,14 @@ class _TimerModePageState extends State<TimerModePage> with TickerProviderStateM
   //nfc
   Future<void> _checkNFCAvailability() async {
     bool isAvailable = await NfcManager.instance.isAvailable();
+    
     setState(() {
       _isNFCAvailable = isAvailable;
       _nfcStatus = isAvailable ? 'NFC Status: Available' : 'NFC Status: Not Available';
     });
   }
-
   Future<void> _startReading(context) async {
+
     if (!_isNFCAvailable) {
       debugPrint("NFC is not available on this device");
       return;
@@ -607,6 +615,7 @@ class _TimerModePageState extends State<TimerModePage> with TickerProviderStateM
       duration: const Duration(milliseconds: 950),
       vsync: this,
     );
+    _checkCurrentState();
 
   _audioPlayer = AudioPlayer();
 
@@ -675,7 +684,9 @@ class _TimerModePageState extends State<TimerModePage> with TickerProviderStateM
   }
 
   @override
-  void dispose() {
+  void dispose() async {
+  final SharedPreferences prefs = await SharedPreferences.getInstance();
+  prefs.setBool('locked', _isLocked);
   PomodoroSettings.instance.removeListener(_settingsListener);
   PomodoroSettings.instance.removeListener(_timerModeListener);
   _confettiController.dispose();
