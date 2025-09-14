@@ -28,40 +28,38 @@ class TimerCircle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
     final screenHeight = MediaQuery.of(context).size.height;
     
-    final maxCircleSize = screenWidth * 0.7;
-    final availableHeight = screenHeight * 0.4;
-    final circleSize = [maxCircleSize, availableHeight, 300.0].reduce((a, b) => a < b ? a : b);
+    final isSmallScreen = screenHeight < 700;
+    final circleSize = isSmallScreen ? 220.0 : 300.0;
     
     final timerFontSize = circleSize * 0.16;
     final subtextFontSize = circleSize * 0.053;
     
     return SizedBox(
-      width: 300,
-      height: 300,
+      width: circleSize,
+      height: circleSize,
       child: Stack(
         alignment: Alignment.center,
         children: [
           // Outer Circle
           SizedBox(
-            width: 300,
-            height: 300,
+            width: circleSize,
+            height: circleSize,
             child: DecoratedBox(
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 border: Border.all(
                   color: const Color(0xFF27272A),
-                  width: 8,
+                  width: isSmallScreen ? 6 : 8,
                 ),
               ),
             ),
           ),
           // Progress Circle
           SizedBox(
-            width: 300,
-            height: 300,
+            width: circleSize,
+            height: circleSize,
             child: TweenAnimationBuilder<double>(
               duration: const Duration(milliseconds: 800),
               curve: Curves.linear,
@@ -72,7 +70,7 @@ class TimerCircle extends StatelessWidget {
               builder: (context, animatedValue, child) {
                 return CircularProgressIndicator(
                   value: animatedValue,
-                  strokeWidth: 16,
+                  strokeWidth: isSmallScreen ? 12 : 16,
                   backgroundColor: const Color(0xFF27272A),
                   valueColor: AlwaysStoppedAnimation<Color>(
                     TimerUtils.getProgressColor(isBreakTime),
@@ -147,7 +145,11 @@ class SessionIndicator extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
-    final circleSize = screenWidth * 0.7;
+    final screenHeight = MediaQuery.of(context).size.height;
+    
+    // Responsive sizing
+    final isSmallScreen = screenHeight < 700;
+    final circleSize = isSmallScreen ? 220.0 : (screenWidth * 0.7);
     
     // Calculate session number (represented by dot) sizes and spacing
     final dotSize = circleSize * 0.04;
@@ -156,9 +158,9 @@ class SessionIndicator extends StatelessWidget {
     final padding = ((screenWidth - totalWidth) / 2).clamp(0.0, double.infinity);
 
     return Container(
-      margin: EdgeInsets.only(bottom: circleSize * 0.133),
+      margin: EdgeInsets.only(bottom: isSmallScreen ? (circleSize * 0.06) : (circleSize * 0.133)),
       width: screenWidth,
-      height: circleSize * 0.06,
+      height: isSmallScreen ? (circleSize * 0.04) : (circleSize * 0.06),
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
         child: Container(
