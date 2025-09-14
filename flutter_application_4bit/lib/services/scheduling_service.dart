@@ -8,7 +8,9 @@ import '../utils/constants.dart';
 class SchedulingService {
   static const String _groqApiUrl =
       'https://api.groq.com/openai/v1/chat/completions';
-  static const String _model = 'qwen/qwen3-32b';
+      // TODO: CHANGE BACK TO QWEN TOMORROW
+  static const String _model = 'llama-3.3-70b-versatile'; 
+  // static const String _model = 'qwen/qwen3-32b';
 
   Future<SchedulingResult> scheduleUnscheduledTasks({
     required List<Task> unscheduledTasks,
