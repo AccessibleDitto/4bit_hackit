@@ -5,7 +5,7 @@ import '../utils/constants.dart';
 
 class ChatService {
   static const String _groqApiUrl = 'https://api.groq.com/openai/v1/chat/completions';
-  static const String _model = 'llama-3.3-70b-versatile';
+  static const String _model = 'llama-3.1-8b-instant';
   
   final List<Map<String, String>> _conversationHistory = [];
   

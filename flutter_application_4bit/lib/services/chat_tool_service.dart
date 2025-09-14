@@ -74,74 +74,177 @@ class ChatToolCallingService {
   final List<ChatHistoryEntry> _chatHistory = [];
   static const int MAX_HISTORY_ENTRIES = 10;
   static const int MAX_CONTEXT_TOKENS = 2000;
+  // Future<ChatResponse> processNaturalLanguage(String userInput) async {
+  //   try {
+  //     final toolCall = await _determineToolFromNaturalLanguage(userInput);
+  //     ChatResponse response;
+
+  //     switch (toolCall.tool) {
+  //       case 'create_task':
+  //         response = await _createTask(toolCall);
+  //         break;
+  //       case 'create_event':
+  //         response = await _createEvent(toolCall);
+  //         break;
+  //       case 'schedule_tasks':
+  //         response = await _scheduleTasks(toolCall);
+  //         break;
+  //       case 'get_tasks':
+  //         response = await _getTasks(toolCall);
+  //         break;
+  //       case 'get_events':
+  //         response = await _getEvents(toolCall);
+  //         break;
+  //       case 'update_task':
+  //         response = await _updateTask(toolCall);
+  //         break;
+  //       case 'update_event': // NEW
+  //         response = await _updateEvent(toolCall);
+  //         break;
+  //       case 'find_task_to_update': // NEW
+  //         response = await _findTaskToUpdate(toolCall);
+  //         break;
+  //       case 'find_event_to_update': // NEW
+  //         response = await _findEventToUpdate(toolCall);
+  //         break;
+  //       case 'delete_task':
+  //         response = await _deleteTask(toolCall);
+  //         break;
+  //       case 'delete_event':
+  //         response = await _deleteEvent(toolCall);
+  //         break;
+  //       case 'get_calendar_summary':
+  //         response = await _getCalendarSummary(toolCall);
+  //         break;
+  //       case 'reschedule_task':
+  //         response = await _rescheduleTask(toolCall);
+  //         break;
+  //       case 'clarify_before_action':
+  //         final claimedText = toolCall.parameters['claimedText'] ?? '';
+  //         return ChatResponse(
+  //           text:
+  //               "I detected a message that claims an action was performed but I did not run any tool. "
+  //               "I will NOT perform changes without your confirmation.\n\n"
+  //               "Assistant claimed:\n$claimedText\n\n"
+  //               "Do you want me to perform this action now? Reply 'yes' to proceed or 'no' to cancel.",
+  //           success: false,
+  //           caption: "Action requires confirmation",
+  //         );
+  //       default:
+  //         response = ChatResponse(
+  //           text:
+  //               "I couldn't understand that request. Please try asking about tasks, events, or scheduling.",
+  //           success: false,
+  //           caption: toolCall.caption,
+  //         );
+  //     }
+
+  //     // NEW: Add to history after processing
+  //     addToHistory(userInput, response);
+  //     return response;
+  //   } catch (e) {
+  //     final errorResponse = ChatResponse(
+  //       text: "Sorry, I encountered an error: $e",
+  //       success: false,
+  //       caption: "Error occurred",
+  //     );
+  //     addToHistory(userInput, errorResponse);
+  //     return errorResponse;
+  //   }
+  // }
+
+  // Helper method to execute tool calls
+  Future<ChatResponse> _executeToolCall(ToolCall toolCall) async {
+    ChatResponse response;
+
+    switch (toolCall.tool) {
+      case 'create_task':
+        response = await _createTask(toolCall);
+        break;
+      case 'find_task_to_update':
+        response = await _findTaskToUpdate(toolCall);
+        break;
+      case 'update_task':
+        response = await _updateTask(toolCall);
+        break;
+      // case 'create_task':
+      //   response = await _createTask(toolCall);
+      //   break;
+      case 'create_event':
+        response = await _createEvent(toolCall);
+        break;
+      case 'schedule_tasks':
+        response = await _scheduleTasks(toolCall);
+        break;
+      case 'get_tasks':
+        response = await _getTasks(toolCall);
+        break;
+      case 'get_events':
+        response = await _getEvents(toolCall);
+        break;
+      // case 'update_task':
+      //   response = await _updateTask(toolCall);
+      //   break;
+      case 'update_event': // NEW
+        response = await _updateEvent(toolCall);
+        break;
+      // case 'find_task_to_update': // NEW
+      //   response = await _findTaskToUpdate(toolCall);
+      //   break;
+      case 'find_event_to_update': // NEW
+        response = await _findEventToUpdate(toolCall);
+        break;
+      case 'delete_task':
+        response = await _deleteTask(toolCall);
+        break;
+      case 'delete_event':
+        response = await _deleteEvent(toolCall);
+        break;
+      case 'get_calendar_summary':
+        response = await _getCalendarSummary(toolCall);
+        break;
+      case 'reschedule_task':
+        response = await _rescheduleTask(toolCall);
+        break;
+      case 'clarify_before_action':
+        final claimedText = toolCall.parameters['claimedText'] ?? '';
+        return ChatResponse(
+          text:
+              "I detected a message that claims an action was performed but I did not run any tool. "
+              "I will NOT perform changes without your confirmation.\n\n"
+              "Assistant claimed:\n$claimedText\n\n"
+              "Do you want me to perform this action now? Reply 'yes' to proceed or 'no' to cancel.",
+          success: false,
+          caption: "Action requires confirmation",
+        );
+      default:
+        response = ChatResponse(
+          text:
+              "I couldn't understand that request. Please try asking about tasks, events, or scheduling.",
+          success: false,
+          caption: toolCall.caption,
+        );
+    }
+
+    return response;
+  }
+
   Future<ChatResponse> processNaturalLanguage(String userInput) async {
     try {
       final toolCall = await _determineToolFromNaturalLanguage(userInput);
-      ChatResponse response;
 
-      switch (toolCall.tool) {
-        case 'create_task':
-          response = await _createTask(toolCall);
-          break;
-        case 'create_event':
-          response = await _createEvent(toolCall);
-          break;
-        case 'schedule_tasks':
-          response = await _scheduleTasks(toolCall);
-          break;
-        case 'get_tasks':
-          response = await _getTasks(toolCall);
-          break;
-        case 'get_events':
-          response = await _getEvents(toolCall);
-          break;
-        case 'update_task':
-          response = await _updateTask(toolCall);
-          break;
-        case 'update_event': // NEW
-          response = await _updateEvent(toolCall);
-          break;
-        case 'find_task_to_update': // NEW
-          response = await _findTaskToUpdate(toolCall);
-          break;
-        case 'find_event_to_update': // NEW
-          response = await _findEventToUpdate(toolCall);
-          break;
-        case 'delete_task':
-          response = await _deleteTask(toolCall);
-          break;
-        case 'delete_event':
-          response = await _deleteEvent(toolCall);
-          break;
-        case 'get_calendar_summary':
-          response = await _getCalendarSummary(toolCall);
-          break;
-        case 'reschedule_task':
-          response = await _rescheduleTask(toolCall);
-          break;
-        case 'clarify_before_action':
-          final claimedText = toolCall.parameters['claimedText'] ?? '';
-          return ChatResponse(
-            text:
-                "I detected a message that claims an action was performed but I did not run any tool. "
-                "I will NOT perform changes without your confirmation.\n\n"
-                "Assistant claimed:\n$claimedText\n\n"
-                "Do you want me to perform this action now? Reply 'yes' to proceed or 'no' to cancel.",
-            success: false,
-            caption: "Action requires confirmation",
-          );
-        default:
-          response = ChatResponse(
-            text:
-                "I couldn't understand that request. Please try asking about tasks, events, or scheduling.",
-            success: false,
-            caption: toolCall.caption,
-          );
+      // ADDED: Extra validation to catch text responses
+      if (toolCall.tool == 'clarify_before_action') {
+        print('⚠️ Model returned clarify_before_action - forcing correct tool');
+        final forcedToolCall = _forceCorrectToolCall(
+          userInput,
+          toolCall.parameters['claimedText'] ?? '',
+        );
+        return await _executeToolCall(forcedToolCall);
       }
 
-      // NEW: Add to history after processing
-      addToHistory(userInput, response);
-      return response;
+      print('Executing tool: ${toolCall.tool}');
+      return await _executeToolCall(toolCall);
     } catch (e) {
       final errorResponse = ChatResponse(
         text: "Sorry, I encountered an error: $e",
@@ -171,51 +274,51 @@ class ChatToolCallingService {
   }
 
   String _buildContextualPrompt(String currentInput) {
-    if (_chatHistory.isEmpty) return currentInput;
+  if (_chatHistory.isEmpty) return currentInput;
 
-    final contextParts = <String>[];
-    int estimatedTokens = 0;
+  final contextParts = <String>[];
+  int estimatedTokens = 0;
 
-    final recentSuccessful = _chatHistory
-        .where((entry) => entry.success && entry.toolUsed != null)
-        .take(3)
-        .toList();
-
-    for (final entry in recentSuccessful.reversed) {
-      final contextSnippet =
-          "User recently: \"${entry.userMessage}\" -> Used ${entry.toolUsed}";
-      if (estimatedTokens + contextSnippet.length * 0.75 < MAX_CONTEXT_TOKENS) {
-        contextParts.insert(0, contextSnippet);
-        estimatedTokens += (contextSnippet.length * 0.75).round();
-      }
+  // Get the last few interactions
+  final recentEntries = _chatHistory.take(3).toList().reversed.toList();
+  print(recentEntries);
+  
+  for (final entry in recentEntries) {
+    final contextSnippet = "Previous: User said \"${entry.userMessage}\" -> Assistant used ${entry.toolUsed} ${entry.success ? 'successfully' : 'failed'}";
+    if (estimatedTokens + contextSnippet.length * 0.75 < MAX_CONTEXT_TOKENS) {
+      contextParts.add(contextSnippet);
+      estimatedTokens += (contextSnippet.length * 0.75).round();
     }
-
-    final lastEntry = _chatHistory.last;
-    final lastExchange =
-        "Previous: User said \"${lastEntry.userMessage}\" -> I ${lastEntry.success ? 'successfully' : 'failed to'} ${lastEntry.toolUsed ?? 'respond'}";
-
-    if (estimatedTokens + lastExchange.length * 0.75 < MAX_CONTEXT_TOKENS) {
-      contextParts.add(lastExchange);
-    }
-
-    if (contextParts.isEmpty) return currentInput;
-    return "${contextParts.join('. ')}.\n\nCurrent request: $currentInput";
   }
+
+  // IMPORTANT: Check if last action was find_task_to_update or find_event_to_update
+  if (_chatHistory.isNotEmpty) {
+    final lastEntry = _chatHistory.last;
+    if (lastEntry.toolUsed == 'find_task_to_update' && lastEntry.success) {
+      contextParts.add("CONTEXT: User just found tasks and now wants to update one of them.");
+    } else if (lastEntry.toolUsed == 'find_event_to_update' && lastEntry.success) {
+      contextParts.add("CONTEXT: User just found events and now wants to update one of them.");
+    }
+  }
+
+  if (contextParts.isEmpty) return currentInput;
+  return "${contextParts.join(' ')}\n\nCurrent request: $currentInput";
+}
 
   List<ChatHistoryEntry> getChatHistory() => List.from(_chatHistory);
   void clearChatHistory() => _chatHistory.clear();
 
-  String getRecentActionsSummary() {
-    final recentActions = _chatHistory
-        .where((entry) => entry.success && entry.toolUsed != null)
-        .take(5)
-        .map((entry) => "• ${entry.toolUsed}: ${entry.userMessage}")
-        .join('\n');
+  // String getRecentActionsSummary() {
+  //   final recentActions = _chatHistory
+  //       .where((entry) => entry.success && entry.toolUsed != null)
+  //       .take(5)
+  //       .map((entry) => "• ${entry.toolUsed}: ${entry.userMessage}")
+  //       .join('\n');
 
-    return recentActions.isEmpty
-        ? "No recent actions"
-        : "Recent actions:\n$recentActions";
-  }
+  //   return recentActions.isEmpty
+  //       ? "No recent actions"
+  //       : "Recent actions:\n$recentActions";
+  // }
 
   // STEP 4: Add these 4 NEW tools to your tools array in _determineToolFromNaturalLanguage
   // Add them after your existing "reschedule_task" tool:
@@ -384,43 +487,43 @@ class ChatToolCallingService {
           },
         },
       },
-      {
-        "type": "function",
-        "function": {
-          "name": "update_task",
-          "description": "Update an existing task",
-          "parameters": {
-            "type": "object",
-            "properties": {
-              "taskId": {"type": "string", "description": "Task ID to update"},
-              "title": {"type": "string"},
-              "status": {
-                "type": "string",
-                "enum": [
-                  "notStarted",
-                  "inProgress",
-                  "completed",
-                  "cancelled",
-                  "blocked",
-                ],
-              },
-              "priority": {
-                "type": "string",
-                "enum": ["low", "medium", "high", "urgent"],
-              },
-              "scheduledFor": {
-                "type": "string",
-                "description": "New scheduled time",
-              },
-              "progressPercentage": {
-                "type": "number",
-                "description": "Progress from 0 to 1",
-              },
-            },
-            "required": ["taskId"],
-          },
-        },
-      },
+      // {
+      //   "type": "function",
+      //   "function": {
+      //     "name": "update_task",
+      //     "description": "Update an existing task",
+      //     "parameters": {
+      //       "type": "object",
+      //       "properties": {
+      //         "taskId": {"type": "string", "description": "Task ID to update"},
+      //         "title": {"type": "string"},
+      //         "status": {
+      //           "type": "string",
+      //           "enum": [
+      //             "notStarted",
+      //             "inProgress",
+      //             "completed",
+      //             "cancelled",
+      //             "blocked",
+      //           ],
+      //         },
+      //         "priority": {
+      //           "type": "string",
+      //           "enum": ["low", "medium", "high", "urgent"],
+      //         },
+      //         "scheduledFor": {
+      //           "type": "string",
+      //           "description": "New scheduled time",
+      //         },
+      //         "progressPercentage": {
+      //           "type": "number",
+      //           "description": "Progress from 0 to 1",
+      //         },
+      //       },
+      //       "required": ["taskId"],
+      //     },
+      //   },
+      // },
       {
         "type": "function",
         "function": {
@@ -493,149 +596,161 @@ class ChatToolCallingService {
           },
         },
       },
-      {
-        "type": "function",
-        "function": {
-          "name": "update_event",
-          "description": "Update an existing calendar event",
-          "parameters": {
-            "type": "object",
-            "properties": {
-              "eventTitle": {
-                "type": "string",
-                "description":
-                    "Current event title or partial title to find event",
-              },
-              "newTitle": {"type": "string", "description": "New event title"},
-              "newDescription": {
-                "type": "string",
-                "description": "New event description",
-              },
-              "newStartTime": {
-                "type": "string",
-                "description": "New start time in ISO format",
-              },
-              "newEndTime": {
-                "type": "string",
-                "description": "New end time in ISO format",
-              },
-              "newPriority": {
-                "type": "string",
-                "enum": ["low", "medium", "high", "urgent"],
-                "description": "New priority level",
-              },
-              "newProject": {
-                "type": "string",
-                "description": "New project name",
-              },
-            },
-            "required": ["eventTitle"],
-          },
-        },
-      },
-      {
-        "type": "function",
-        "function": {
-          "name": "find_task_to_update",
-          "description":
-              "Find and suggest tasks to update based on partial information",
-          "parameters": {
-            "type": "object",
-            "properties": {
-              "searchTerm": {
-                "type": "string",
-                "description":
-                    "Partial task title or description to search for",
-              },
-              "status": {
-                "type": "string",
-                "enum": [
-                  "notStarted",
-                  "inProgress",
-                  "completed",
-                  "cancelled",
-                  "blocked",
-                ],
-                "description": "Filter by status",
-              },
-              "priority": {
-                "type": "string",
-                "enum": ["low", "medium", "high", "urgent"],
-                "description": "Filter by priority",
-              },
-            },
-            "required": ["searchTerm"],
-          },
-        },
-      },
-      {
-        "type": "function",
-        "function": {
-          "name": "find_event_to_update",
-          "description":
-              "Find and suggest events to update based on partial information",
-          "parameters": {
-            "type": "object",
-            "properties": {
-              "searchTerm": {
-                "type": "string",
-                "description":
-                    "Partial event title or description to search for",
-              },
-              "date": {
-                "type": "string",
-                "description": "Filter by specific date",
-              },
-              "project": {"type": "string", "description": "Filter by project"},
-            },
-            "required": ["searchTerm"],
-          },
-        },
-      },
+      // {
+      //   "type": "function",
+      //   "function": {
+      //     "name": "update_event",
+      //     "description": "Update an existing calendar event",
+      //     "parameters": {
+      //       "type": "object",
+      //       "properties": {
+      //         "eventTitle": {
+      //           "type": "string",
+      //           "description":
+      //               "Current event title or partial title to find event",
+      //         },
+      //         "newTitle": {"type": "string", "description": "New event title"},
+      //         "newDescription": {
+      //           "type": "string",
+      //           "description": "New event description",
+      //         },
+      //         "newStartTime": {
+      //           "type": "string",
+      //           "description": "New start time in ISO format",
+      //         },
+      //         "newEndTime": {
+      //           "type": "string",
+      //           "description": "New end time in ISO format",
+      //         },
+      //         "newPriority": {
+      //           "type": "string",
+      //           "enum": ["low", "medium", "high", "urgent"],
+      //           "description": "New priority level",
+      //         },
+      //         "newProject": {
+      //           "type": "string",
+      //           "description": "New project name",
+      //         },
+      //       },
+      //       "required": ["eventTitle"],
+      //     },
+      //   },
+      // },
+      // {
+      //   "type": "function",
+      //   "function": {
+      //     "name": "find_task_to_update",
+      //     "description":
+      //         "Find and suggest tasks to update based on partial information",
+      //     "parameters": {
+      //       "type": "object",
+      //       "properties": {
+      //         "searchTerm": {
+      //           "type": "string",
+      //           "description":
+      //               "Partial task title or description to search for",
+      //         },
+      //         "status": {
+      //           "type": "string",
+      //           "enum": [
+      //             "notStarted",
+      //             "inProgress",
+      //             "completed",
+      //             "cancelled",
+      //             "blocked",
+      //           ],
+      //           "description": "Filter by status",
+      //         },
+      //         "priority": {
+      //           "type": "string",
+      //           "enum": ["low", "medium", "high", "urgent"],
+      //           "description": "Filter by priority",
+      //         },
+      //       },
+      //       "required": ["searchTerm"],
+      //     },
+      //   },
+      // },
+      // {
+      //   "type": "function",
+      //   "function": {
+      //     "name": "find_event_to_update",
+      //     "description":
+      //         "Find and suggest events to update based on partial information",
+      //     "parameters": {
+      //       "type": "object",
+      //       "properties": {
+      //         "searchTerm": {
+      //           "type": "string",
+      //           "description":
+      //               "Partial event title or description to search for",
+      //         },
+      //         "date": {
+      //           "type": "string",
+      //           "description": "Filter by specific date",
+      //         },
+      //         "project": {"type": "string", "description": "Filter by project"},
+      //       },
+      //       "required": ["searchTerm"],
+      //     },
+      //   },
+      // },
     ];
 
     final isoNow = DateTime.now().toIso8601String();
 
-    // STEP 5: Update your system prompt in _determineToolFromNaturalLanguage
-    // Replace the existing system content with:
-    String systemPrompt =
-        '''You are a calendar and task management assistant. 
-Today's date/time is $isoNow. Try not to schedule events before today's date/time unless requested by the user.
+    //  final isoNow = DateTime.now().toIso8601String();
 
+    // ENHANCED: Even more explicit system prompt
+    String systemPrompt = '''You are a function-calling assistant for calendar and task management.
 Based on the user's input, determine the appropriate tool to call. Always call exactly one function that best matches the user's intent.
+
+WORKFLOW RULES:
+- If the previous action was "find_task_to_update" and user provides update details, call "update_task" with the task information
+- If the previous action was "find_event_to_update" and user provides update details, call "update_event" with the event information
+- For initial update requests without specific task/event identified, use "find_task_to_update" or "find_event_to_update"
 
 IMPORTANT CONTEXT RULES:
 - If the user says "update it" or "change that" or uses pronouns, refer to the recent context to understand what they mean
 - If they mention "the task" or "the event" without specifics, use recent successful tool calls to infer what they're referring to  
 - For ambiguous requests, prioritize the most recent successful action as the likely subject
 
+PATTERN RECOGNITION:
+- "update it to high priority" after finding tasks → call update_task
+- "change that to tomorrow" after finding events → call update_event  
+- "mark it as completed" after finding tasks → call update_task
+- "reschedule that to 3pm" after finding events → call update_event
+
 CRITICAL TOOL-CALL RULES:
 - If you intend to perform any action (create / update / delete / reschedule / schedule), you MUST return exactly one function/tool call using the provided tools schema. Do NOT produce assistant-visible text that claims the action was performed.
 - If you return a tool call, DO NOT include assistant text describing the result in the same response. The platform will run the tool and produce the final text after execution.
 - If you are uncertain which tool or parameters to use, ask a clarifying question (assistant text only). Never assert that a change was made if you haven't returned a tool call.
 
-Example: 'Creating a task named "Buy groceries"...' or 'Updating the presentation task...' ''';
+Example: 'Creating a task named "Buy groceries"...' or 'Updating the presentation task...';
 
-    // STEP 6: Update your request body to use contextual input:
-    final contextualInput = _buildContextualPrompt(input); // ADD THIS LINE
+
+ALWAYS call functions, never return plain text. Current date/time: $isoNow''';
+
+
+    final contextualInput = _buildContextualPrompt(input);
 
     final requestBody = {
       "model": "deepseek-r1-distill-llama-70b",
       "messages": [
-        {
-          "role": "system",
-          "content": systemPrompt,
-        }, // Use the new system prompt
-        {
-          "role": "user",
-          "content": contextualInput,
-        }, // Use contextual input instead of just input
+        {"role": "system", "content": systemPrompt},
+            ...buildFullConversationHistory(),
+        {"role": "user", "content": contextualInput},
       ],
       "tools": tools,
-      "tool_choice": "auto",
-      "temperature": 0.1,
-      "max_tokens": 1000, // ADD THIS to limit response tokens
+      "tool_choice": "required", // Force tool usage
+      "temperature": 0.0, // Make it more deterministic
+      "max_tokens": 500, // Limit response to reduce chance of text generation
     };
+
+    print('=== TOOL CALLING DEBUG ===');
+    print('User input: $input');
+    print('Contextual input: $contextualInput');
+
     final response = await http.post(
       Uri.parse(apiUrl),
       headers: {
@@ -646,140 +761,374 @@ Example: 'Creating a task named "Buy groceries"...' or 'Updating the presentatio
     );
 
     if (response.statusCode != 200) {
+      print('API Error: ${response.statusCode} - ${response.body}');
       throw Exception('API Error: ${response.statusCode}');
     }
+
     final data = jsonDecode(response.body);
+    print('Full API response: ${jsonEncode(data)}');
+
     final message = data['choices'][0]['message'];
+    print('Message content: ${message['content']}');
+    print('Tool calls: ${message['tool_calls']}');
 
-    // normalize
-    final assistantContent = (message['content'] ?? '').toString();
-    final toolCalls = (message['tool_calls'] ?? []);
+    final toolCalls = message['tool_calls'] ?? [];
 
-    if (toolCalls == null || toolCalls.isEmpty) {
-      // If assistant text includes an action claim, do NOT surface it as a success.
-      final lowered = assistantContent.toLowerCase();
-      final actionWords = [
-        'updated',
-        'changed',
-        'created',
-        'deleted',
-        'rescheduled',
-        'scheduled',
-        'added',
-        'removed',
-        'marked',
-        'completed',
-      ];
+    if (toolCalls.isEmpty) {
+      print('❌ NO TOOL CALLS FOUND - Using fallback parsing');
 
-      final claimsAction = actionWords.any((w) => lowered.contains(w));
+      // Check if there's any text content that suggests an action
+      final content = message['content']?.toString() ?? '';
+      if (content.isNotEmpty) {
+        print('Model returned text instead of tool call: $content');
 
-      if (claimsAction) {
-        // return a special ToolCall which the main switch can intercept and ask for confirmation
-        return ToolCall(
-          tool: 'clarify_before_action',
-          parameters: {'claimedText': assistantContent},
-        );
+        // Force the correct tool call based on the input
+        return _forceCorrectToolCall(input, content);
       }
 
-      // Otherwise fallback to current parser
       return _parseNaturalLanguageFallback(input);
     }
 
-    // If we have tool_calls, parse the first one as before
-    final toolCall = message['tool_calls'][0];
+    print('✅ Tool call found: ${toolCalls[0]['function']['name']}');
+
+    final toolCall = toolCalls[0];
     final functionName = toolCall['function']['name'];
     final arguments = jsonDecode(toolCall['function']['arguments']);
+
+    print('Function: $functionName');
+    print('Arguments: $arguments');
 
     return ToolCall(tool: functionName, parameters: arguments);
   }
 
-  // STEP 7: Replace your existing _parseNaturalLanguageFallback method:
-  ToolCall _parseNaturalLanguageFallback(String input) {
+List<Map<String, dynamic>> buildFullConversationHistory() {
+  final messages = <Map<String, dynamic>>[];
+  
+  // Get last 3 entries
+  final recentEntries = _chatHistory.length <= 3 
+    ? _chatHistory 
+    : _chatHistory.sublist(_chatHistory.length - 3);
+  
+  for (final entry in recentEntries) {
+    messages.add({"role": "user", "content": entry.userMessage});
+    messages.add({"role": "assistant", "content": entry.assistantResponse});
+  }
+  
+  return messages;
+}
+  // NEW: Force the correct tool call when model returns text instead
+  ToolCall _forceCorrectToolCall(String input, String modelResponse) {
     final lowerInput = input.toLowerCase();
+    final lowerResponse = modelResponse.toLowerCase();
 
-    // Check for contextual references
-    if ((lowerInput.contains('update it') ||
-            lowerInput.contains('change that') ||
-            lowerInput.contains('modify it')) &&
-        _chatHistory.isNotEmpty) {
-      final lastSuccessful = _chatHistory.reversed.firstWhere(
-        (entry) =>
-            entry.success &&
-            (entry.toolUsed == 'create_task' ||
-                entry.toolUsed == 'create_event'),
-        orElse: () => _chatHistory.last,
-      );
+    print('Forcing tool call for input: $input');
+    print('Model tried to respond with: $modelResponse');
 
-      if (lastSuccessful.toolUsed == 'create_task') {
+    // If the model claims it updated something, force the correct update flow
+    if (lowerResponse.contains('updated') ||
+        lowerResponse.contains('changed')) {
+      if (lowerInput.contains('it') || lowerInput.contains('that')) {
+        // Contextual reference - find what to update from history
+        if (_chatHistory.isNotEmpty) {
+          final lastSuccessful = _chatHistory.reversed.firstWhere(
+            (entry) =>
+                entry.success &&
+                (entry.toolUsed == 'create_task' ||
+                    entry.toolUsed == 'create_event'),
+            orElse: () => _chatHistory.last,
+          );
+
+          if (lastSuccessful.toolUsed == 'create_task') {
+            final taskName = _extractTaskNameFromHistory(
+              lastSuccessful.userMessage,
+            );
+            print('Forcing find_task_to_update with searchTerm: $taskName');
+            return ToolCall(
+              tool: 'find_task_to_update',
+              parameters: {'searchTerm': taskName},
+            );
+          } else if (lastSuccessful.toolUsed == 'create_event') {
+            final eventName = _extractEventNameFromHistory(
+              lastSuccessful.userMessage,
+            );
+            print('Forcing find_event_to_update with searchTerm: $eventName');
+            return ToolCall(
+              tool: 'find_event_to_update',
+              parameters: {'searchTerm': eventName},
+            );
+          }
+        }
+      }
+
+      // Direct update command
+      if (lowerInput.contains('task')) {
+        final searchTerm = _extractTaskNameFromInput(input);
+        print('Forcing find_task_to_update with searchTerm: $searchTerm');
         return ToolCall(
           tool: 'find_task_to_update',
-          parameters: {
-            'searchTerm': _extractTaskNameFromHistory(
-              lastSuccessful.userMessage,
-            ),
-          },
-        );
-      } else if (lastSuccessful.toolUsed == 'create_event') {
-        return ToolCall(
-          tool: 'find_event_to_update',
-          parameters: {
-            'searchTerm': _extractEventNameFromHistory(
-              lastSuccessful.userMessage,
-            ),
-          },
+          parameters: {'searchTerm': searchTerm},
         );
       }
     }
 
-    if (lowerInput.contains('update') && lowerInput.contains('task')) {
-      return ToolCall(
-        tool: 'update_task',
-        parameters: _extractUpdateTaskParams(input),
+    // If model claims it created something, force creation
+    if (lowerResponse.contains('created')) {
+      if (lowerInput.contains('task')) {
+        print('Forcing create_task');
+        return ToolCall(
+          tool: 'create_task',
+          parameters: _extractTaskParams(input),
+        );
+      } else if (lowerInput.contains('event')) {
+        print('Forcing create_event');
+        return ToolCall(
+          tool: 'create_event',
+          parameters: _extractEventParams(input),
+        );
+      }
+    }
+
+    // If model claims it scheduled something
+    if (lowerResponse.contains('scheduled')) {
+      print('Forcing schedule_tasks');
+      return ToolCall(tool: 'schedule_tasks', parameters: {});
+    }
+
+    // Fallback to parsing the input
+    print('Using fallback parsing');
+    return _parseNaturalLanguageFallback(input);
+  }
+
+  // STEP 7: Replace your existing _parseNaturalLanguageFallback method:
+  // ENHANCED: Better fallback parsing with context awareness
+  ToolCall _parseNaturalLanguageFallback(String input) {
+  final lowerInput = input.toLowerCase();
+
+  // CHECK WORKFLOW CONTEXT FIRST
+  if (_chatHistory.isNotEmpty) {
+    final lastEntry = _chatHistory.last;
+    
+    // If last action was find_task_to_update, and user provides update info
+    if (lastEntry.toolUsed == 'find_task_to_update' && lastEntry.success) {
+      if (_containsUpdateInstructions(input)) {
+        // Extract task identifier from the last response
+        final taskInfo = _extractTaskFromLastResponse(lastEntry.assistantResponse);
+        return ToolCall(
+          tool: 'update_task',
+          parameters: _buildUpdateTaskParams(input, taskInfo),
+        );
+      }
+    }
+    
+    // If last action was find_event_to_update, and user provides update info  
+    if (lastEntry.toolUsed == 'find_event_to_update' && lastEntry.success) {
+      if (_containsUpdateInstructions(input)) {
+        final eventInfo = _extractEventFromLastResponse(lastEntry.assistantResponse);
+        return ToolCall(
+          tool: 'update_event', 
+          parameters: _buildUpdateEventParams(input, eventInfo),
+        );
+      }
+    }
+
+    // Handle contextual references like "update it", "change that"
+    if (lowerInput.contains(RegExp(r'\b(update|change|modify|edit)\s+(it|that|this)\b'))) {
+      final lastSuccessful = _chatHistory.reversed.firstWhere(
+        (entry) => entry.success && entry.toolUsed != null,
+        orElse: () => _chatHistory.last,
       );
-    } else if (lowerInput.contains('update') &&
-        (lowerInput.contains('event') || lowerInput.contains('meeting'))) {
-      return ToolCall(
-        tool: 'update_event',
-        parameters: _extractUpdateEventParams(input),
-      );
-    } else if (lowerInput.contains('find') && lowerInput.contains('task')) {
+
+      if (lastSuccessful.toolUsed == 'create_task' || 
+          lastSuccessful.toolUsed == 'get_tasks' ||
+          lowerInput.contains('task')) {
+        final taskName = _extractTaskNameFromHistory(lastSuccessful.userMessage);
+        return ToolCall(
+          tool: 'find_task_to_update',
+          parameters: {'searchTerm': taskName},
+        );
+      } else if (lastSuccessful.toolUsed == 'create_event' || 
+                 lastSuccessful.toolUsed == 'get_events' ||
+                 lowerInput.contains('event')) {
+        final eventName = _extractEventNameFromHistory(lastSuccessful.userMessage);
+        return ToolCall(
+          tool: 'find_event_to_update',
+          parameters: {'searchTerm': eventName},
+        );
+      }
+    }
+  }
+
+  
+
+  // Continue with existing logic for new requests...
+  if (lowerInput.contains(RegExp(r'\b(update|change|modify|edit)\b'))) {
+    if (lowerInput.contains('task')) {
+      final searchTerm = _extractQuotedText(input) ?? _extractTaskNameFromInput(input) ?? 'task';
       return ToolCall(
         tool: 'find_task_to_update',
-        parameters: {'searchTerm': _extractQuotedText(input) ?? 'task'},
+        parameters: {'searchTerm': searchTerm},
       );
-    } else if (lowerInput.contains('find') && lowerInput.contains('event')) {
+    } else if (lowerInput.contains(RegExp(r'\b(event|meeting|appointment)\b'))) {
+      final searchTerm = _extractQuotedText(input) ?? _extractEventNameFromInput(input) ?? 'event';
       return ToolCall(
         tool: 'find_event_to_update',
-        parameters: {'searchTerm': _extractQuotedText(input) ?? 'event'},
+        parameters: {'searchTerm': searchTerm},
       );
-    } else if (lowerInput.contains('create') && lowerInput.contains('task')) {
-      return ToolCall(
-        tool: 'create_task',
-        parameters: _extractTaskParams(input),
-      );
+    }
+  }
+
+  // Rest of existing logic...
+  if (lowerInput.contains('create') && lowerInput.contains('task')) {
+    return ToolCall(tool: 'create_task', parameters: _extractTaskParams(input));
     } else if (lowerInput.contains('create') &&
-        (lowerInput.contains('event') || lowerInput.contains('meeting'))) {
+        lowerInput.contains(RegExp(r'\b(event|meeting|appointment)\b'))) {
       return ToolCall(
         tool: 'create_event',
         parameters: _extractEventParams(input),
       );
     } else if (lowerInput.contains('schedule')) {
       return ToolCall(tool: 'schedule_tasks', parameters: {});
-    } else if (lowerInput.contains('show') ||
-        lowerInput.contains('get') ||
-        lowerInput.contains('list')) {
+    } else if (lowerInput.contains(RegExp(r'\b(show|get|list|find)\b'))) {
       if (lowerInput.contains('task')) {
         return ToolCall(tool: 'get_tasks', parameters: {});
       } else {
         return ToolCall(tool: 'get_events', parameters: {});
       }
-    } else if (lowerInput.contains('summary') ||
-        lowerInput.contains('overview')) {
+    } else if (lowerInput.contains(RegExp(r'\b(summary|overview)\b'))) {
       return ToolCall(tool: 'get_calendar_summary', parameters: {});
     } else {
       return ToolCall(tool: 'get_calendar_summary', parameters: {});
     }
   }
+
+  // 4. NEW HELPER METHODS for workflow automation:
+
+bool _containsUpdateInstructions(String input) {
+  final lowerInput = input.toLowerCase();
+  
+  final updatePatterns = [
+    // Priority changes
+    RegExp(r'\b(high|low|medium|urgent)\s+priority\b'),
+    RegExp(r'\bpriority\s+to\s+(high|low|medium|urgent)\b'),
+    RegExp(r'\bmake\s+it\s+(high|low|medium|urgent)\b'),
+    
+    // Status changes  
+    RegExp(r'\b(completed?|finished?|done)\b'),
+    RegExp(r'\b(in\s+progress|started?|working)\b'),
+    RegExp(r'\b(blocked?|cancelled?)\b'),
+    RegExp(r'\bmark\s+(it|that)\s+as\s+\w+\b'),
+    
+    // Time/date changes
+    RegExp(r'\b(tomorrow|today|next\s+\w+)\b'),
+    RegExp(r'\b\d{1,2}:\d{2}\b'), // Time like 3:30
+    RegExp(r'\b(morning|afternoon|evening)\b'),
+    RegExp(r'\breschedule\s+(it|that)\b'),
+    
+    // General update indicators
+    RegExp(r'\bchange\s+(it|that)\s+to\b'),
+    RegExp(r'\bupdate\s+(it|that)\s+to\b'),
+    RegExp(r'\bset\s+(it|that)\s+to\b'),
+  ];
+  
+  return updatePatterns.any((pattern) => pattern.hasMatch(lowerInput));
+}
+Map<String, String> _extractTaskFromLastResponse(String response) {
+  // Parse the assistant's last response to extract task info
+  // Look for patterns like "• Task Name (ID: abc123, Status: notStarted, Priority: high)"
+  
+  final taskPattern = RegExp(r'•\s*(.+?)\s*\(ID:\s*(\w+),\s*Status:\s*(\w+),\s*Priority:\s*(\w+)\)');
+  final match = taskPattern.firstMatch(response);
+  
+  if (match != null) {
+    return {
+      'title': match.group(1)?.trim() ?? '',
+      'id': match.group(2) ?? '',
+      'status': match.group(3) ?? '',
+      'priority': match.group(4) ?? '',
+    };
+  }
+  
+  // Fallback: just extract the first task title mentioned
+  final simplePattern = RegExp(r'•\s*(.+?)(?:\s*\(|$)');
+  final simpleMatch = simplePattern.firstMatch(response);
+  return {
+    'title': simpleMatch?.group(1)?.trim() ?? '',
+  };
+}
+
+Map<String, String> _extractEventFromLastResponse(String response) {
+  // Similar logic for events
+  final eventPattern = RegExp(r'•\s*(.+?)\s*\(([^)]+)\)');
+  final match = eventPattern.firstMatch(response);
+  
+  if (match != null) {
+    return {
+      'title': match.group(1)?.trim() ?? '',
+      'details': match.group(2) ?? '',
+    };
+  }
+  
+  final simplePattern = RegExp(r'•\s*(.+?)(?:\s*\(|$)');
+  final simpleMatch = simplePattern.firstMatch(response);
+  return {
+    'title': simpleMatch?.group(1)?.trim() ?? '',
+  };
+}
+
+Map<String, dynamic> _buildUpdateTaskParams(String input, Map<String, String> taskInfo) {
+  final params = <String, dynamic>{};
+  final lowerInput = input.toLowerCase();
+  
+  // Use the task ID if available, otherwise use title for searching
+  if (taskInfo['id']?.isNotEmpty == true) {
+    params['taskId'] = taskInfo['id'];
+  } else if (taskInfo['title']?.isNotEmpty == true) {
+    params['taskTitle'] = taskInfo['title'];
+  }
+  
+  // Extract what to update
+  if (lowerInput.contains(RegExp(r'\b(high|urgent)\s+priority\b')) || 
+    lowerInput.contains(RegExp(r'\bpriority\s+to\s+(high|urgent)\b'))) {
+    params['priority'] = 'high';
+  } else if (lowerInput.contains(RegExp(r'\blow\s+priority\b'))) {
+    params['priority'] = 'low';
+  } else if (lowerInput.contains(RegExp(r'\bmedium\s+priority\b'))) {
+    params['priority'] = 'medium';
+  }
+  
+  if (lowerInput.contains(RegExp(r'\b(completed?|finished?|done)\b'))) {
+    params['status'] = 'completed';
+  } else if (lowerInput.contains(RegExp(r'\bin\s+progress\b'))) {
+    params['status'] = 'inProgress';
+  } else if (lowerInput.contains(RegExp(r'\bblocked?\b'))) {
+    params['status'] = 'blocked';
+  }
+  
+  // Extract time changes
+  if (lowerInput.contains('tomorrow')) {
+    final tomorrow = DateTime.now().add(Duration(days: 1));
+    params['scheduledFor'] = tomorrow.toIso8601String();
+  }
+  
+  return params;
+}
+
+Map<String, dynamic> _buildUpdateEventParams(String input, Map<String, String> eventInfo) {
+  final params = <String, dynamic>{};
+  final lowerInput = input.toLowerCase();
+  
+  if (eventInfo['title']?.isNotEmpty == true) {
+    params['eventTitle'] = eventInfo['title'];
+  }
+  
+  // Similar logic for events...
+  if (lowerInput.contains('tomorrow')) {
+    final tomorrow = DateTime.now().add(Duration(days: 1));
+    params['newStartTime'] = tomorrow.toIso8601String();
+  }
+  
+  return params;
+}
 
   Map<String, dynamic> _extractTaskParams(String input) {
     // Simple extraction logic - could be enhanced with NLP
@@ -826,23 +1175,23 @@ Example: 'Creating a task named "Buy groceries"...' or 'Updating the presentatio
     }
 
     if (input.toLowerCase().contains('complete')) {
-      params['newStatus'] = 'completed';
+      params['status'] = 'completed';
     } else if (input.toLowerCase().contains('in progress') ||
         input.toLowerCase().contains('working')) {
-      params['newStatus'] = 'inProgress';
+      params['status'] = 'inProgress';
     } else if (input.toLowerCase().contains('block')) {
-      params['newStatus'] = 'blocked';
+      params['status'] = 'blocked';
     } else if (input.toLowerCase().contains('cancel')) {
-      params['newStatus'] = 'cancelled';
+      params['status'] = 'cancelled';
     }
 
     if (input.toLowerCase().contains('high priority') ||
         input.toLowerCase().contains('urgent')) {
-      params['newPriority'] = 'high';
+      params['priority'] = 'high';
     } else if (input.toLowerCase().contains('low priority')) {
-      params['newPriority'] = 'low';
+      params['priority'] = 'low';
     } else if (input.toLowerCase().contains('medium priority')) {
-      params['newPriority'] = 'medium';
+      params['priority'] = 'medium';
     }
 
     return params;
@@ -856,6 +1205,25 @@ Example: 'Creating a task named "Buy groceries"...' or 'Updating the presentatio
       params['eventTitle'] = titleMatch.group(1)?.trim();
     }
     return params;
+  }
+
+  String _extractTaskNameFromInput(String input) {
+    // Look for patterns like "update Review code task" or "change the Review code task"
+    final taskPattern = RegExp(
+      r'\b(?:update|change|modify|edit)\s+(?:the\s+)?(.+?)(?:\s+task)?$',
+      caseSensitive: false,
+    );
+    final match = taskPattern.firstMatch(input);
+    return match?.group(1)?.trim() ?? 'task';
+  }
+
+  String _extractEventNameFromInput(String input) {
+    final eventPattern = RegExp(
+      r'\b(?:update|change|modify|edit)\s+(?:the\s+)?(.+?)(?:\s+(?:event|meeting))?$',
+      caseSensitive: false,
+    );
+    final match = eventPattern.firstMatch(input);
+    return match?.group(1)?.trim() ?? 'event';
   }
 
   // Tool implementation methods
@@ -891,7 +1259,8 @@ Example: 'Creating a task named "Buy groceries"...' or 'Updating the presentatio
       );
 
       // Save task using your existing system
-      tasks_source.tasks.add(task);
+      // tasks_source.tasks.add(task);
+      tasks_source.addTask(task);
 
       // If scheduled, add to calendar
       if (task.scheduledFor != null) {
@@ -1094,7 +1463,8 @@ Example: 'Creating a task named "Buy groceries"...' or 'Updating the presentatio
         (t) => t.id == taskId,
       );
 
-      tasks_source.tasks.removeWhere((t) => t.id == taskId);
+      // tasks_source.tasks.removeWhere((t) => t.id == taskId);
+      tasks_source.deleteTask(taskId);
       _taskService.syncTasksToCalendar(_eventController);
       _refreshCallback();
 

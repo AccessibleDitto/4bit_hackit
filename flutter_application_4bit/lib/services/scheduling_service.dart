@@ -112,7 +112,7 @@ REASONING FORMAT (use pipe | instead of newlines to separate sections):
 
 IMPORTANT: Use | (pipe) characters instead of newlines in the reasoning field to avoid JSON parsing errors.
 
-Ensure no conflicts with existing events, respect task dependencies and constraints, and schedule within next 30 days unless specified otherwise.
+Ensure NO CONFLICTS with existing events, respect task dependencies and constraints, and schedule within next 30 days unless specified otherwise.
 
 Task Schema for schedule array:
 {

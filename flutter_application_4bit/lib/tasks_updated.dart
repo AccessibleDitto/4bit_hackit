@@ -382,7 +382,7 @@ class _TasksPageState extends State<TasksPage> {
   List<Task> get scheduledTasks => filteredTasks
       .where(
         (task) =>
-            task.scheduledFor != null && task.status != TaskStatus.completed,
+            task.dueDate != null && task.status != TaskStatus.completed,
       )
       .toList();
 

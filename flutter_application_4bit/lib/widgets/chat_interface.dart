@@ -7,7 +7,7 @@ class ChatInterface extends StatefulWidget {
   final bool isVisible;
   final VoidCallback onClose;
   final ChatToolCallingService? toolService;
-  
+
   const ChatInterface({
     Key? key,
     required this.isVisible,
@@ -38,20 +38,16 @@ class _ChatInterfaceState extends State<ChatInterface> {
 
   void _loadHistoryFromToolService() {
     if (widget.toolService == null) return;
-    
+
     final history = widget.toolService!.getChatHistory();
     for (final entry in history) {
-      _messages.add(ChatMessage(
-        text: entry.userMessage,
-        isUserMessage: true,
-      ));
-      
-      _messages.add(ChatMessage(
-        text: entry.assistantResponse,
-        isUserMessage: false,
-      ));
+      _messages.add(ChatMessage(text: entry.userMessage, isUserMessage: true));
+
+      _messages.add(
+        ChatMessage(text: entry.assistantResponse, isUserMessage: false),
+      );
     }
-    
+
     if (mounted && _messages.isNotEmpty) {
       setState(() {});
       _scrollToBottomWithDelay(const Duration(milliseconds: 100));
@@ -60,12 +56,9 @@ class _ChatInterfaceState extends State<ChatInterface> {
 
   void _handleChatSubmitted(String text) async {
     if (text.trim().isEmpty) return;
-    
+
     _textController.clear();
-    ChatMessage message = ChatMessage(
-      text: text,
-      isUserMessage: true,
-    );
+    ChatMessage message = ChatMessage(text: text, isUserMessage: true);
     setState(() {
       _messages.add(message);
     });
@@ -82,11 +75,13 @@ class _ChatInterfaceState extends State<ChatInterface> {
     try {
       String response = '';
       Widget? responseWidget;
-      
+
       // Try tool calling first if service is available
       if (widget.toolService != null) {
-        final toolResponse = await widget.toolService!.processNaturalLanguage(text);
-        
+        final toolResponse = await widget.toolService!.processNaturalLanguage(
+          text,
+        );
+
         if (toolResponse.success) {
           response = toolResponse.text;
           responseWidget = _buildResponseWidget(toolResponse);
@@ -100,7 +95,7 @@ class _ChatInterfaceState extends State<ChatInterface> {
         _chatService.addUserMessage(text);
         response = await _chatService.sendMessage();
       }
-      
+
       if (response.isNotEmpty) {
         _chatService.addAssistantMessage(response);
 
@@ -152,10 +147,7 @@ class _ChatInterfaceState extends State<ChatInterface> {
         // Main text
         Padding(
           padding: const EdgeInsets.symmetric(vertical: 2.0),
-          child: Text(
-            response.text,
-            style: const TextStyle(fontSize: 16),
-          ),
+          child: Text(response.text, style: const TextStyle(fontSize: 16)),
         ),
 
         // Optional widgets
@@ -163,7 +155,8 @@ class _ChatInterfaceState extends State<ChatInterface> {
         if (response.eventWidget != null) response.eventWidget!,
         if (response.taskListWidget != null) response.taskListWidget!,
         if (response.eventListWidget != null) response.eventListWidget!,
-        if (response.schedulingResultWidget != null) response.schedulingResultWidget!,
+        if (response.schedulingResultWidget != null)
+          response.schedulingResultWidget!,
         if (response.summaryWidget != null) response.summaryWidget!,
       ],
     );
@@ -240,7 +233,7 @@ class _ChatInterfaceState extends State<ChatInterface> {
               ),
             ],
           ),
-          
+
           // Contextual suggestions based on recent history
           if (widget.toolService != null) _buildContextualSuggestions(),
         ],
@@ -347,7 +340,11 @@ class _ChatInterfaceState extends State<ChatInterface> {
     return chips;
   }
 
-  Widget _buildQuickActionChip(String label, IconData icon, VoidCallback onTap) {
+  Widget _buildQuickActionChip(
+    String label,
+    IconData icon,
+    VoidCallback onTap,
+  ) {
     return ActionChip(
       avatar: Icon(icon, size: 16),
       label: Text(label, style: const TextStyle(fontSize: 12)),
@@ -358,7 +355,11 @@ class _ChatInterfaceState extends State<ChatInterface> {
     );
   }
 
-  Widget _buildSmallActionChip(String label, IconData icon, VoidCallback onTap) {
+  Widget _buildSmallActionChip(
+    String label,
+    IconData icon,
+    VoidCallback onTap,
+  ) {
     return ActionChip(
       avatar: Icon(icon, size: 14),
       label: Text(label, style: const TextStyle(fontSize: 11)),
@@ -405,41 +406,44 @@ class _ChatInterfaceState extends State<ChatInterface> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'AI Calendar Assistant',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.blue.shade800,
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'AI Calendar Assistant',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.blue.shade800,
+                        ),
                       ),
-                    ),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        if (widget.toolService != null)
-                          Text(
-                            'Enhanced with tool calling',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.blue.shade600,
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (widget.toolService != null)
+                            Text(
+                              'Enhanced with tool calling',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.blue.shade600,
+                              ),
                             ),
-                          ),
-                        if (widget.toolService != null && _messages.isNotEmpty) ...[
-                          // Text(" • ", style: TextStyle(color: Colors.blue.shade600)),
-                          Text(
-                            '${(_messages.length / 2).ceil()} exchanges',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.blueGrey.shade600,
+                          if (widget.toolService != null &&
+                              _messages.isNotEmpty) ...[
+                            // Text(" • ", style: TextStyle(color: Colors.blue.shade600)),
+                            Text(
+                              '${(_messages.length / 2).ceil()} exchanges',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.blueGrey.shade600,
+                              ),
                             ),
-                          ),
+                          ],
                         ],
-                      ],
-                    ),
-                  ],
+                      ),
+                    ],
+                  ),
                 ),
                 Row(
                   children: [
@@ -480,45 +484,44 @@ class _ChatInterfaceState extends State<ChatInterface> {
                               ],
                             ),
                           ),
-                          const PopupMenuItem<String>(
-                            value: 'set_reminder',
-                            child: Row(
-                              children: [
-                                Icon(Icons.alarm, size: 18),
-                                SizedBox(width: 8),
-                                Text('Set reminder'),
-                              ],
-                            ),
-                          ),
+                          // const PopupMenuItem<String>(
+                          //   value: 'set_reminder',
+                          //   child: Row(
+                          //     children: [
+                          //       Icon(Icons.alarm, size: 18),
+                          //       SizedBox(width: 8),
+                          //       Text('Set reminder'),
+                          //     ],
+                          //   ),
+                          // ),
                         ],
-                        icon: Icon(
-                          Icons.flash_on,
-                          color: Colors.blue.shade800,
-                        ),
+                        icon: Icon(Icons.flash_on, color: Colors.blue.shade800),
                         tooltip: 'Quick actions',
                       ),
-                    if (_messages.isNotEmpty)
-                      IconButton(
-                        onPressed: () {
-                          if (widget.toolService != null) {
-                            showDialog(
-                              context: context,
-                              builder: (context) => AlertDialog(
-                                title: const Text('Recent Actions'),
-                                content: Text(widget.toolService!.getRecentActionsSummary()),
-                                actions: [
-                                  TextButton(
-                                    onPressed: () => Navigator.pop(context),
-                                    child: const Text('Close'),
-                                  ),
-                                ],
-                              ),
-                            );
-                          }
-                        },
-                        icon: Icon(Icons.history, color: Colors.blue.shade800),
-                        tooltip: 'View recent actions',
-                      ),
+                    // if (_messages.isNotEmpty)
+                    //   IconButton(
+                    //     onPressed: () {
+                    //       if (widget.toolService != null) {
+                    //         showDialog(
+                    //           context: context,
+                    //           builder: (context) => AlertDialog(
+                    //             title: const Text('Recent Actions'),
+                    //             content: Text(
+                    //               widget.toolService!.getRecentActionsSummary(),
+                    //             ),
+                    //             actions: [
+                    //               TextButton(
+                    //                 onPressed: () => Navigator.pop(context),
+                    //                 child: const Text('Close'),
+                    //               ),
+                    //             ],
+                    //           ),
+                    //         );
+                    //       }
+                    //     },
+                    //     icon: Icon(Icons.history, color: Colors.blue.shade800),
+                    //     tooltip: 'View recent actions',
+                    //   ),
                     IconButton(
                       onPressed: _clearChat,
                       icon: Icon(Icons.delete, color: Colors.blue.shade800),
@@ -534,7 +537,7 @@ class _ChatInterfaceState extends State<ChatInterface> {
               ],
             ),
           ),
-          
+
           // Chat messages
           Expanded(
             child: ListView.builder(
@@ -544,7 +547,10 @@ class _ChatInterfaceState extends State<ChatInterface> {
               itemBuilder: (_, int index) {
                 if (index == _messages.length && _isLoading) {
                   return Container(
-                    margin: const EdgeInsets.symmetric(vertical: 10.0, horizontal: 16.0),
+                    margin: const EdgeInsets.symmetric(
+                      vertical: 10.0,
+                      horizontal: 16.0,
+                    ),
                     child: Row(
                       children: [
                         const SizedBox(
@@ -554,12 +560,11 @@ class _ChatInterfaceState extends State<ChatInterface> {
                         ),
                         const SizedBox(width: 12),
                         Text(
-                          widget.toolService != null 
-                            ? 'AI is processing your request...'
-                            : 'AI is thinking...',
-                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: Colors.grey[600],
-                          ),
+                          widget.toolService != null
+                              ? 'AI is processing your request...'
+                              : 'AI is thinking...',
+                          style: Theme.of(context).textTheme.bodyMedium
+                              ?.copyWith(color: Colors.grey[600]),
                         ),
                       ],
                     ),
@@ -569,7 +574,7 @@ class _ChatInterfaceState extends State<ChatInterface> {
               },
             ),
           ),
-          
+
           // Chat input
           const Divider(height: 1.0),
           Container(
@@ -581,12 +586,15 @@ class _ChatInterfaceState extends State<ChatInterface> {
                     controller: _textController,
                     maxLines: null,
                     decoration: InputDecoration(
-                      hintText: widget.toolService != null 
-                        ? (_messages.isEmpty 
-                            ? 'Ask me to create tasks, schedule events, or manage your calendar...'
-                            : 'Continue our conversation...')
-                        : 'Ask about your calendar or anything else...',
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+                      hintText: widget.toolService != null
+                          ? (_messages.isEmpty
+                                ? 'Ask me to create tasks, schedule events, or manage your calendar...'
+                                : 'Continue our conversation...')
+                          : 'Ask about your calendar or anything else...',
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16.0,
+                        vertical: 12.0,
+                      ),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(20),
                         borderSide: BorderSide(color: Colors.grey.shade300),
@@ -607,7 +615,9 @@ class _ChatInterfaceState extends State<ChatInterface> {
                 const SizedBox(width: 8),
                 Container(
                   decoration: BoxDecoration(
-                    color: _isLoading ? Colors.grey.shade300 : Colors.blue.shade600,
+                    color: _isLoading
+                        ? Colors.grey.shade300
+                        : Colors.blue.shade600,
                     shape: BoxShape.circle,
                   ),
                   child: IconButton(
@@ -615,7 +625,9 @@ class _ChatInterfaceState extends State<ChatInterface> {
                       _isLoading ? Icons.hourglass_empty : Icons.send,
                       color: Colors.white,
                     ),
-                    onPressed: _isLoading ? null : () => _handleChatSubmitted(_textController.text),
+                    onPressed: _isLoading
+                        ? null
+                        : () => _handleChatSubmitted(_textController.text),
                   ),
                 ),
               ],
@@ -639,11 +651,11 @@ class _ChatInterfaceState extends State<ChatInterface> {
       case 'view_today':
         message = 'Show me today\'s agenda';
         break;
-      case 'set_reminder':
-        message = 'Help me set a reminder';
-        break;
+      // case 'set_reminder':
+      //   message = 'Help me set a reminder';
+      //   break;
     }
-    
+
     if (message.isNotEmpty) {
       _textController.text = message;
       _handleChatSubmitted(message);
@@ -684,9 +696,14 @@ class EnhancedChatMessage extends ChatMessage {
           ],
           Expanded(
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
+              padding: const EdgeInsets.symmetric(
+                horizontal: 12.0,
+                vertical: 8.0,
+              ),
               decoration: BoxDecoration(
-                color: isUserMessage ? Colors.blue.shade600 : Colors.grey.shade200,
+                color: isUserMessage
+                    ? Colors.blue.shade600
+                    : Colors.grey.shade200,
                 borderRadius: BorderRadius.only(
                   topLeft: const Radius.circular(12),
                   topRight: const Radius.circular(12),
@@ -704,10 +721,7 @@ class EnhancedChatMessage extends ChatMessage {
                       fontSize: 14,
                     ),
                   ),
-                  if (widget != null) ...[
-                    const SizedBox(height: 8),
-                    widget!,
-                  ],
+                  if (widget != null) ...[const SizedBox(height: 8), widget!],
                 ],
               ),
             ),
@@ -718,11 +732,7 @@ class EnhancedChatMessage extends ChatMessage {
               child: CircleAvatar(
                 backgroundColor: Colors.grey.shade600,
                 radius: 16,
-                child: const Icon(
-                  Icons.person,
-                  color: Colors.white,
-                  size: 16,
-                ),
+                child: const Icon(Icons.person, color: Colors.white, size: 16),
               ),
             ),
           ],
