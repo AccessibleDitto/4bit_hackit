@@ -43,7 +43,7 @@ class GlobalTimerService {
   int get currentSession => _currentSession;
   int get totalSessions => _totalSessions;
   String get selectedTask => _selectedTask;
-
+  int get pausedSeconds => _pausedSeconds;
   void setState(GlobalTimerState newState) {
     _state = newState;
   }

@@ -385,8 +385,8 @@ class _TimerModePageState extends State<TimerModePage> with TickerProviderStateM
       double additionalTimeSpentHours = 0.0;
       if (_isCountdownMode) {
         // In countdown mode, calculate time spent in current session
-        int sessionStartSeconds = _globalTimer.targetSeconds;
-        additionalTimeSpentHours = (sessionStartSeconds - _globalTimer.currentSeconds) / 3600.0;
+        int sessionStartSeconds = _globalTimer.currentSeconds;
+        additionalTimeSpentHours = (sessionStartSeconds-_globalTimer.pausedSeconds)/ 3600.0;
       } else {
         // In count-up mode, use the current seconds as time spent
         additionalTimeSpentHours = _globalTimer.currentSeconds / 3600.0;
@@ -413,8 +413,9 @@ class _TimerModePageState extends State<TimerModePage> with TickerProviderStateM
       _isBreakTime = false;
     });
   }
-  void _updateTaskProgressOnPause() {
+  void _updateTaskProgressOnPause() async {
     if (_currentFullTask != null && _globalTimer.state == GlobalTimerState.running) {
+      _globalTimer.pause();
       double additionalTimeSpentHours = 0.0;
       if (_isCountdownMode) {
         int sessionStartSeconds = _globalTimer.targetSeconds;
@@ -425,8 +426,17 @@ class _TimerModePageState extends State<TimerModePage> with TickerProviderStateM
       if (additionalTimeSpentHours > 0) {
         debugPrint("Pausing, saving additional time spent: $additionalTimeSpentHours hours");
         TaskData.updateTaskTimeSpent(_currentFullTask, additionalTimeSpentHours);
+        String taskid =  _currentFullTask.id;
+        final fullTasks = await firebaseService.loadTasks();
+        final fullTask = fullTasks.firstWhere(
+          (t) => t.id == taskid,
+          orElse: () => fullTasks.first, // Fallback to first task if not found
+        );
+        setState(() {
+          _currentFullTask = fullTask;
+        });
       }
-      _globalTimer.pause();
+
     }
 
   }
@@ -749,9 +759,10 @@ class _TimerModePageState extends State<TimerModePage> with TickerProviderStateM
   }
 
   @override
-  void dispose() async {
-  final SharedPreferences prefs = await SharedPreferences.getInstance();
-  prefs.setBool('locked', _isLocked);
+  void dispose() {
+  SharedPreferences.getInstance().then((prefs) {
+    prefs.setBool('locked', _isLocked);
+  });
   PomodoroSettings.instance.removeListener(_settingsListener);
   PomodoroSettings.instance.removeListener(_timerModeListener);
   _confettiController.dispose();

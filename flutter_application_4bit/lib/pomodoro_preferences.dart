@@ -7,8 +7,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 class PomodoroSettings extends ChangeNotifier {
   Future<void> loadFromPrefs() async {
     final prefs = await SharedPreferences.getInstance();
-    // _pomodoroLength = prefs.getInt('pomodoroLength') ?? 25; // this was original time
-    _pomodoroLength = prefs.getInt('pomodoroLength') ?? 1; 
+    _pomodoroLength = prefs.getInt('pomodoroLength') ?? 10; // this was original time
+    // _pomodoroLength = prefs.getInt('pomodoroLength') ?? 1; 
     _isCountdownMode = prefs.getBool('isCountdownMode') ?? true;
     notifyListeners();
   }
@@ -42,8 +42,8 @@ class PomodoroSettings extends ChangeNotifier {
   static final PomodoroSettings instance = PomodoroSettings._internal();
   PomodoroSettings._internal();
 
-  // int _pomodoroLength = 25; // this was original time
-  int _pomodoroLength = 1; 
+  int _pomodoroLength = 10; // this was original time
+  // int _pomodoroLength = 1; 
   int _shortBreakLength = 5;
   int _longBreakLength = 15;
   int _longBreakAfter = 4;
