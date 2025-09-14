@@ -31,7 +31,7 @@ class TimerCircle extends StatelessWidget {
     final screenHeight = MediaQuery.of(context).size.height;
     
     final isSmallScreen = screenHeight < 700;
-    final circleSize = isSmallScreen ? 160.0 : 300.0;
+    final circleSize = isSmallScreen ? 125.0 : 250.0;
     
     final timerFontSize = circleSize * 0.16;
     final subtextFontSize = circleSize * 0.053;
