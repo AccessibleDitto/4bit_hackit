@@ -522,7 +522,7 @@ class _ReportScreenState extends State<ReportScreen> {
 
   Widget _buildStatCard(String value, String label) {
     return Container(
-      height: MediaQuery.of(context).size.height * 0.12,
+      height: MediaQuery.of(context).size.height * 0.15,
       padding: EdgeInsets.all(MediaQuery.of(context).size.width * 0.04),
       decoration: BoxDecoration(
         color: Color(0xFF2D2D2D),
@@ -540,8 +540,9 @@ class _ReportScreenState extends State<ReportScreen> {
               fontWeight: FontWeight.bold,
             ),
           ),
-          SizedBox(height: MediaQuery.of(context).size.height * 0.005),
-          Flexible( // Text to wrap if needed
+          SizedBox(height: 14),
+          Container(
+            height: 30, // Fixed height for description area
             child: Text(
               label,
               style: TextStyle(
