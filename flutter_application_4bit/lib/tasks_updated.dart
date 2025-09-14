@@ -247,7 +247,7 @@ List<Project> getProjectsList() => projects;
 void updateTaskTimeSpent(Task task, double additionalTimeSpent) async {
   debugPrint("Updating task $task with additional time: $additionalTimeSpent hours");
     final currentTask = task;
-    final newTimeSpent = currentTask.timeSpent + additionalTimeSpent;
+    double newTimeSpent = currentTask.timeSpent + additionalTimeSpent;
 
     // Determine new status based on progress
     TaskStatus newStatus = currentTask.status;
@@ -256,6 +256,7 @@ void updateTaskTimeSpent(Task task, double additionalTimeSpent) async {
       newStatus = TaskStatus.inProgress;
     } else if (newTimeSpent >= currentTask.estimatedTime) {
       newStatus = TaskStatus.completed;
+      newTimeSpent = task.estimatedTime;
     }
 
     final updatedTask = currentTask.copyWith(

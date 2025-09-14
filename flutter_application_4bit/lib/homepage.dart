@@ -379,7 +379,7 @@ class _TimerModePageState extends State<TimerModePage> with TickerProviderStateM
     });
   }
 
-  void _resetToHome() {
+  void _resetToHome() async {
     // Save the current session's progress if we have a task selected and timer was running or paused
     if (_currentFullTask != null && (_globalTimer.state == GlobalTimerState.running || _globalTimer.state == GlobalTimerState.paused)) {
       double additionalTimeSpentHours = 0.0;
@@ -395,6 +395,15 @@ class _TimerModePageState extends State<TimerModePage> with TickerProviderStateM
       debugPrint("Saving additional time spent: $additionalTimeSpentHours hours $test");
       if (additionalTimeSpentHours > 0) {
         TaskData.updateTaskTimeSpent(_currentFullTask, additionalTimeSpentHours);
+        String taskid =  _currentFullTask.id;
+        final fullTasks = await firebaseService.loadTasks();
+        final fullTask = fullTasks.firstWhere(
+          (t) => t.id == taskid,
+          orElse: () => fullTasks.first, // Fallback to first task if not found
+        );
+        setState(() {
+          _currentFullTask = fullTask;
+        });
       }
     }
     // Reset session tracking
@@ -414,24 +423,38 @@ class _TimerModePageState extends State<TimerModePage> with TickerProviderStateM
         additionalTimeSpentHours = _globalTimer.currentSeconds / 3600.0;
       }
       if (additionalTimeSpentHours > 0) {
+        debugPrint("Pausing, saving additional time spent: $additionalTimeSpentHours hours");
         TaskData.updateTaskTimeSpent(_currentFullTask, additionalTimeSpentHours);
       }
       _globalTimer.pause();
     }
 
   }
-  void _updateTaskProgressOnComplete() {
+  void _updateTaskProgressOnComplete() async {
     if (_currentFullTask != null) {
       double additionalTimeSpentHours = 0.0;
       if (_isCountdownMode) {
-        additionalTimeSpentHours = _globalTimer.targetSeconds / 3600.0;
+        additionalTimeSpentHours = _globalTimer.focusMinutes / 60.0;
+        debugPrint("Completing, saving additional time spent: $additionalTimeSpentHours hours");
       } else {
         additionalTimeSpentHours = _globalTimer.currentSeconds / 3600.0;
       }
       if (additionalTimeSpentHours > 0) {
         TaskData.updateTaskTimeSpent(_currentFullTask, additionalTimeSpentHours);
+        String taskid =  _currentFullTask.id;
+        final fullTasks = await firebaseService.loadTasks();
+        final fullTask = fullTasks.firstWhere(
+          (t) => t.id == taskid,
+          orElse: () => fullTasks.first, // Fallback to first task if not found
+        );
+        setState(() {
+          _currentFullTask = fullTask;
+        });
       }
     }
+  }  
+  void _updateTaskCompletion() {
+    TaskData.updateTaskTimeSpent(_currentFullTask, 1000);
   }
   void _checkAndShowBadgePopup() {
     final userStats = UserStats();
@@ -744,6 +767,7 @@ class _TimerModePageState extends State<TimerModePage> with TickerProviderStateM
   @override
   Widget build(BuildContext context) {
     if (_globalTimer.state == GlobalTimerState.completed) {
+      _updateTaskCompletion();
       return CongratulationsScreen(
         selectedTask: _globalTimer.selectedTask,
         totalSessions: _globalTimer.totalSessions,

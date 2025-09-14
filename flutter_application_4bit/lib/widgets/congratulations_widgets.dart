@@ -1,6 +1,7 @@
 import 'package:confetti/confetti.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_application_4bit/pomodoro_preferences.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'timer_display_widgets.dart';
 
@@ -195,7 +196,7 @@ class StatsContainer extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
           SessionStat(label: 'Sessions', value: '$totalSessions'),
-          SessionStat(label: 'Focus Time', value: '${totalSessions * 25} min'),
+          SessionStat(label: 'Focus Time', value: '${totalSessions * PomodoroSettings.instance.pomodoroLength} min'),
           SessionStat(label: 'Breaks', value: '${totalSessions - 1}'),
         ],
       ),
