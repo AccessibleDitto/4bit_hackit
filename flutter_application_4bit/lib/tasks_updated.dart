@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_application_4bit/widgets/date_selection_task.dart';
 import 'package:flutter_application_4bit/widgets/navigation_widgets.dart';
+import 'package:flutter_application_4bit/widgets/standard_app_bar.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_application_4bit/widgets/filtered_tasks_page.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -639,37 +640,9 @@ class _TasksPageState extends State<TasksPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFF0F0F0F),
-      appBar: AppBar(
-        backgroundColor: const Color(0xFF0F0F0F),
-        title: Row(
-          children: [
-            Container(
-              width: 30,
-              height: 30,
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFF9333EA), Color(0xFF7C3AED)],
-                ),
-                borderRadius: BorderRadius.circular(6),
-              ),
-              child: const Icon(Icons.timer, color: Colors.white, size: 20),
-            ),
-            const SizedBox(width: 12),
-            Text(
-              'Focusify',
-              style: GoogleFonts.inter(
-                color: Colors.white,
-                fontSize: 20,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          const Icon(Icons.more_vert, color: Colors.white),
-          const SizedBox(width: 16),
-        ],
-        elevation: 0,
+      appBar: const StandardAppBar(
+        title: 'Tasks & Projects',
+        type: AppBarType.standard,
       ),
       body: Container(
         decoration: const BoxDecoration(

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'task_manager.dart';
 import 'firebase_service.dart';
 import '../models/task_models.dart';
+import '../tasks_updated.dart' as TaskData;
 
 class UserStats {
   // Store and calculate in minutes; display in hours + minutes
@@ -96,15 +97,25 @@ class UserStats {
   final FirebaseService _firebaseService = FirebaseService();
 
   // Getters
-  int get pomodorosCompleted => _pomodorosCompleted;
-  int get tasksCompleted => _taskManager.totalTasksCompleted;
+  int get pomodorosCompleted {
+    return TaskData.getTasksList().where((task) => task.status == TaskStatus.completed).length;
+  }
+  
+  int get tasksCompleted {
+    final allTasks = TaskData.getTasksList();
+    return allTasks.where((t) => t.status == TaskStatus.completed).length;
+  }
+  
   int get streakDays => _streakDays;
-  int get totalFocusTimeMinutes => _totalFocusTimeMinutes;
+  int get totalFocusTimeMinutes {
+    return TaskData.getTasksList().fold(0.0, (total, task) => total + task.timeSpent).round();
+  }
   DateTime? get lastActiveDate => _lastActiveDate;
+  
   String get totalFocusTime {
-    final totalMinutes = _totalFocusTimeMinutes + (_taskManager.totalFocusTimeFromTasks);
+    final totalMinutes = TaskData.getTasksList().fold(0.0, (total, task) => total + task.timeSpent);
     final hours = totalMinutes ~/ 60;
-    final minutes = totalMinutes % 60;
+    final minutes = (totalMinutes % 60).round();
     if (hours > 0) {
       return '${hours}h ${minutes}m';
     }
@@ -141,6 +152,7 @@ class UserStats {
         _recentAchievements = await _firebaseService.loadAchievements();
         
         displayFirebaseData();
+        _checkAllBadgesSilent();
       }
       
       await _loadTaskStatsFromFirebase();
@@ -186,27 +198,27 @@ class UserStats {
     _pomodorosCompleted++;
     _totalFocusTimeMinutes += durationMinutes;
     _updateStreak();
-    _checkForNewBadges(); 
+    _checkAllBadges(); 
 
     _firebaseService.updatePomodoroCount(_pomodorosCompleted, _totalFocusTimeMinutes, _streakDays);
     saveToFirebase();
   }
 
   void completedTask() {
-    _checkForTaskBadges();
+    _checkAllBadges();
     saveToFirebase();
   }
 
   void addFocusTime(int minutes) {
     _totalFocusTimeMinutes += minutes;
-    _checkForNewBadges();
+    _checkAllBadges();
     saveToFirebase();
   }
 
   void onTaskCompleted(String taskTitle) {
     _addAchievement('✅', 'Task Completed', 'Completed: $taskTitle');
     _updateStreak();
-    _checkForTaskBadges();
+    _checkAllBadges();
     saveToFirebase();
   }
 
@@ -234,33 +246,47 @@ class UserStats {
     }
   }
 
-  void _checkForNewBadges() {
+  void _checkAllBadgesSilent() {
     final newBadges = <String>[];
     
-    // Pomodoro achievements
-    if (_pomodorosCompleted >= 1 && !_earnedBadges.contains('first_timer')) {
+    if (pomodorosCompleted >= 1 && !_earnedBadges.contains('first_timer')) {
       newBadges.add('first_timer');
-      _addAchievement('🏆', 'First Timer', 'Complete your first pomodoro');
+    }
+    
+    if (pomodorosCompleted >= 50 && !_earnedBadges.contains('time_master')) {
+      newBadges.add('time_master');
+    }
+    
+    if (tasksCompleted >= 1 && !_earnedBadges.contains('first_task')) {
+      newBadges.add('first_task');
+    }
+    
+    if (tasksCompleted >= 25 && !_earnedBadges.contains('task_warrior')) {
+      newBadges.add('task_warrior');
+    }
+    
+    if (tasksCompleted >= 100 && !_earnedBadges.contains('goal_crusher')) {
+      newBadges.add('goal_crusher');
+    }
+    
+    if (totalFocusTimeMinutes >= 600 && !_earnedBadges.contains('focused')) {
+      newBadges.add('focused');
     }
     
     if (_streakDays >= 7 && !_earnedBadges.contains('on_fire')) {
       newBadges.add('on_fire');
-      _addAchievement('🔥', 'On Fire', 'Maintain a 7-day streak');
-    }
-    
-    if (_pomodorosCompleted >= 50 && !_earnedBadges.contains('time_master')) {
-      newBadges.add('time_master');
-      _addAchievement('⏰', 'Time Master', 'Complete 50 pomodoros');
-    }
-    
-    if (_totalFocusTimeMinutes >= 600 && !_earnedBadges.contains('focused')) {
-      newBadges.add('focused');
-      _addAchievement('📚', 'Focused', 'Study for 10 hours total');
     }
     
     if (_streakDays >= 30 && !_earnedBadges.contains('consistency')) {
       newBadges.add('consistency');
-      _addAchievement('💎', 'Consistency', 'Use app for 30 days');
+    }
+    
+    if (_taskManager.todayCompletedTasks >= 10 && !_earnedBadges.contains('task_master_daily')) {
+      newBadges.add('task_master_daily');
+    }
+    
+    if (_taskManager.priorityTasks.isEmpty && _taskManager.tasks.isNotEmpty && !_earnedBadges.contains('priority_master')) {
+      newBadges.add('priority_master');
     }
 
     if (newBadges.isNotEmpty) {
@@ -270,9 +296,21 @@ class UserStats {
     }
   }
 
-  void _checkForTaskBadges() {
+  void _checkAllBadges() {
     final newBadges = <String>[];
-
+    
+    // Pomodoro-based badges
+    if (pomodorosCompleted >= 1 && !_earnedBadges.contains('first_timer')) {
+      newBadges.add('first_timer');
+      _addAchievement('🏆', 'First Timer', 'Complete your first pomodoro');
+    }
+    
+    if (pomodorosCompleted >= 50 && !_earnedBadges.contains('time_master')) {
+      newBadges.add('time_master');
+      _addAchievement('⏰', 'Time Master', 'Complete 50 pomodoros');
+    }
+    
+    // Task-based badges
     if (tasksCompleted >= 1 && !_earnedBadges.contains('first_task')) {
       newBadges.add('first_task');
       _addAchievement('✅', 'First Task', 'Complete your first task');
@@ -287,7 +325,25 @@ class UserStats {
       newBadges.add('goal_crusher');
       _addAchievement('🎯', 'Goal Crusher', 'Complete 100 tasks');
     }
-
+    
+    // Focus time badges
+    if (totalFocusTimeMinutes >= 600 && !_earnedBadges.contains('focused')) {
+      newBadges.add('focused');
+      _addAchievement('📚', 'Focused', 'Study for 10 hours total');
+    }
+    
+    // Streak-based badges
+    if (_streakDays >= 7 && !_earnedBadges.contains('on_fire')) {
+      newBadges.add('on_fire');
+      _addAchievement('🔥', 'On Fire', 'Maintain a 7-day streak');
+    }
+    
+    if (_streakDays >= 30 && !_earnedBadges.contains('consistency')) {
+      newBadges.add('consistency');
+      _addAchievement('💎', 'Consistency', 'Use app for 30 days');
+    }
+    
+    // Special condition badges
     if (_taskManager.todayCompletedTasks >= 10 && !_earnedBadges.contains('task_master_daily')) {
       newBadges.add('task_master_daily');
       _addAchievement('🎯', 'Task Master', 'Completed 10 tasks in one day');
@@ -451,6 +507,66 @@ class UserStats {
     }
     
     return status;
+  }
+
+  // same as report
+  int getCompletedTasksForRange(String range) {
+    final now = DateTime.now();
+    final allTasks = TaskData.getTasksList();
+    
+    if (range == 'today') {
+      return allTasks.where((t) => 
+        t.status == TaskStatus.completed && 
+        t.updatedAt.year == now.year && 
+        t.updatedAt.month == now.month && 
+        t.updatedAt.day == now.day
+      ).length;
+    } else if (range == 'week') {
+      final startOfWeek = now.subtract(Duration(days: now.weekday - 1));
+      return allTasks.where((t) => 
+        t.status == TaskStatus.completed && 
+        t.updatedAt.isAfter(startOfWeek)
+      ).length;
+    } else if (range == 'biweekly') {
+      final startOfBiweek = now.subtract(Duration(days: 13));
+      return allTasks.where((t) => 
+        t.status == TaskStatus.completed && 
+        t.updatedAt.isAfter(startOfBiweek)
+      ).length;
+    } else if (range == 'month') {
+      final startOfMonth = DateTime(now.year, now.month, 1);
+      return allTasks.where((t) => 
+        t.status == TaskStatus.completed && 
+        t.updatedAt.isAfter(startOfMonth)
+      ).length;
+    }
+    return 0;
+  }
+
+  int get totalCompletedTasks {
+    final allTasks = TaskData.getTasksList();
+    return allTasks.where((t) => t.status == TaskStatus.completed).length;
+  }
+
+  int get unifiedTasksCompleted {
+    return totalCompletedTasks;
+  }
+
+  String get unifiedTotalFocusTime {
+    final pomodoroMinutes = _totalFocusTimeMinutes;
+    final taskMinutes = _taskManager.totalFocusTimeFromTasks;
+    final totalMinutes = pomodoroMinutes + taskMinutes;
+    
+    final hours = totalMinutes ~/ 60;
+    final minutes = totalMinutes % 60;
+    if (hours > 0) {
+      return '${hours}h ${minutes}m';
+    }
+    return '${minutes}m';
+  }
+
+  int get unifiedTotalFocusTimeMinutes {
+    return _totalFocusTimeMinutes + _taskManager.totalFocusTimeFromTasks;
   }
 
   void initializeSampleData() {

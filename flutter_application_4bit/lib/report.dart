@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'widgets/navigation_widgets.dart';
+import 'widgets/standard_app_bar.dart';
 import 'tasks_updated.dart' as TaskData;
 import 'models/task_models.dart' show TaskStatus, Project, Task;
 
@@ -300,16 +301,11 @@ class _ReportScreenState extends State<ReportScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Color(0xFF1A1A1A),
-      appBar: AppBar(
+      backgroundColor: const Color(0xFF1A1A1A),
+      appBar: const StandardAppBar(
+        title: 'Report',
+        type: AppBarType.standard,
         backgroundColor: Color(0xFF1A1A1A),
-        elevation: 0,
-        leading: Icon(Icons.timer, color: Color(0xFFFF4757)),
-        title: Text('Report', style: TextStyle(color: Colors.white, fontSize: MediaQuery.of(context).size.width * 0.045)),
-        actions: [
-          Icon(Icons.more_vert, color: Colors.white),
-          SizedBox(width: MediaQuery.of(context).size.width * 0.04),
-        ],
       ),
       body: SafeArea(
         child: Column(
