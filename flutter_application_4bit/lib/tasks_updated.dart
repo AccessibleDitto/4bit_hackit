@@ -9,13 +9,16 @@ import 'models/task_models.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'firebase_options.dart';
-final db = FirebaseFirestore.instance; // Initialize Firestore instance
+import 'services/firebase_service.dart';
+
+final FirebaseService firebaseService = FirebaseService();
+final db = FirebaseFirestore.instance;
 // enum Priority { low, medium, high, urgent }
 
-// enum TaskStatus { 
+// enum TaskStatus {
 //   notStarted,
-//   inProgress, 
-//   completed, 
+//   inProgress,
+//   completed,
 //   cancelled,
 //   blocked
 // }
@@ -46,7 +49,7 @@ final db = FirebaseFirestore.instance; // Initialize Firestore instance
 //         return 'Urgent';
 //     }
 //   }
-  
+
 //   Color get color {
 //     switch (this) {
 //       case Priority.low:
@@ -64,19 +67,19 @@ final db = FirebaseFirestore.instance; // Initialize Firestore instance
 class TasksPage extends StatefulWidget {
   @override
   _TasksPageState createState() => _TasksPageState();
-  }
+}
 
 String formatTime(double hours) {
   if (hours == 0) return '0h';
   int wholeHours = hours.floor();
   int minutes = ((hours - wholeHours) * 60).ceil();
-  
+
   // Handle 60 minutes = 1 hour conversion
   if (minutes == 60) {
     wholeHours += 1;
     minutes = 0;
   }
-  
+
   if (minutes == 0) {
     return '${wholeHours}h';
   } else if (wholeHours == 0) {
@@ -90,7 +93,7 @@ String _formatTime(double hours) {
   return formatTime(hours);
 }
 
- // Function to update the whole task and save it
+// Function to update the whole task and save it
 void saveTask(Task updatedTask) {
   int index = tasks.indexWhere((task) => task.id == updatedTask.id);
   if (index != -1) {
@@ -108,7 +111,6 @@ void deleteTask(String taskId) {
     // For now, just remove from the local list
   }
 }
-
 
 // Top-level task data for access from other files
 List<Project> projects = [
@@ -133,7 +135,8 @@ List<Task> tasks = [
   Task(
     id: '1',
     title: 'Complete Flutter app',
-    description: 'Finish implementing the remaining features for the mobile application',
+    description:
+        'Finish implementing the remaining features for the mobile application',
     estimatedTime: 3.0,
     timeSpent: 2.999,
     dueDate: DateTime.now(),
@@ -198,26 +201,11 @@ List<Task> tasks = [
 ];
 
 Future<List<Task>> loadTasksFromFirebase() async {
-  List<Task> loadedTasks = [];
-  final prefs = await SharedPreferences.getInstance();
-  final username = prefs.getString('current_user_email') ?? '';
-  final querySnapshot = await db.collection('users').doc(username).collection('tasks').get();
-  for (var doc in querySnapshot.docs) {
-    loadedTasks.add(Task.fromJson(doc.data()));
-  }
-  debugPrint('Loaded ${loadedTasks.length} tasks from Firebase for user $username');
-  return loadedTasks;
+  return firebaseService.loadTasks();
 }
+
 Future<void> addTask(Task newTask) async {
-  final prefs = await SharedPreferences.getInstance();
-  final username = prefs.getString('current_user_email') ?? '';
-  await db
-      .collection('users')
-      .doc(username)
-      .collection('tasks')
-      .doc(newTask.id)
-      .set(newTask.toJson());
-  debugPrint('Added task ${newTask.title} for user $username');
+  return firebaseService.addTask(newTask);
 }
 
 Future<void> editTask(Task updatedTask) async {
@@ -230,6 +218,7 @@ Future<void> editTask(Task updatedTask) async {
       .doc(updatedTask.id)
       .update(updatedTask.toJson());
   debugPrint('Edited task ${updatedTask.title} for user $username');
+  firebaseService.updatetask();
 }
 
 Future<void> deleteTaskFromFirebase(String taskId) async {
@@ -242,12 +231,15 @@ Future<void> deleteTaskFromFirebase(String taskId) async {
       .doc(taskId)
       .delete();
   debugPrint('Deleted task $taskId for user $username');
+  firebaseService.updatetask();
 }
+
 // Getter function to expose tasks for other files
 List<Task> getTasksList() => tasks;
 Future<List<Task>> fetchTasks() async {
   return await loadTasksFromFirebase();
 }
+
 // Getter function to expose projects for other files
 List<Project> getProjectsList() => projects;
 
@@ -257,15 +249,16 @@ void updateTaskTimeSpent(String taskId, double additionalTimeSpent) async {
   if (index != -1) {
     final currentTask = tasks[index];
     final newTimeSpent = currentTask.timeSpent + additionalTimeSpent;
-    
+
     // Determine new status based on progress
     TaskStatus newStatus = currentTask.status;
-    if (currentTask.status == TaskStatus.notStarted && additionalTimeSpent > 0) {
+    if (currentTask.status == TaskStatus.notStarted &&
+        additionalTimeSpent > 0) {
       newStatus = TaskStatus.inProgress;
     } else if (newTimeSpent >= currentTask.estimatedTime) {
       newStatus = TaskStatus.completed;
     }
-    
+
     final updatedTask = currentTask.copyWith(
       timeSpent: newTimeSpent,
       status: newStatus,
@@ -296,9 +289,7 @@ void startTask(String taskId) async {
   if (index != -1) {
     final currentTask = tasks[index];
     if (currentTask.status == TaskStatus.notStarted) {
-      final updatedTask = currentTask.copyWith(
-        status: TaskStatus.inProgress,
-      );
+      final updatedTask = currentTask.copyWith(status: TaskStatus.inProgress);
       tasks[index] = updatedTask;
       await editTask(updatedTask);
     }
@@ -324,19 +315,34 @@ class _TasksPageState extends State<TasksPage> {
     });
   }
 
-
   bool _showAddMenu = false;
   String _searchQuery = '';
   final TextEditingController _searchController = TextEditingController();
 
   ProjectStats _getProjectStats(String projectId) {
-    final projectTasks = tasks.where((task) => task.projectId == projectId).toList();
-    final completedTasks = projectTasks.where((task) => task.status == TaskStatus.completed).toList();
-    final activeTasks = projectTasks.where((task) => task.status != TaskStatus.completed && task.status != TaskStatus.cancelled).toList();
-    
-    double totalTimeSpent = projectTasks.fold(0.0, (sum, task) => sum + task.timeSpent);
-    double totalEstimatedTime = projectTasks.fold(0.0, (sum, task) => sum + task.estimatedTime);
-    
+    final projectTasks = tasks
+        .where((task) => task.projectId == projectId)
+        .toList();
+    final completedTasks = projectTasks
+        .where((task) => task.status == TaskStatus.completed)
+        .toList();
+    final activeTasks = projectTasks
+        .where(
+          (task) =>
+              task.status != TaskStatus.completed &&
+              task.status != TaskStatus.cancelled,
+        )
+        .toList();
+
+    double totalTimeSpent = projectTasks.fold(
+      0.0,
+      (sum, task) => sum + task.timeSpent,
+    );
+    double totalEstimatedTime = projectTasks.fold(
+      0.0,
+      (sum, task) => sum + task.estimatedTime,
+    );
+
     return ProjectStats(
       totalTasks: projectTasks.length,
       completedTasks: completedTasks.length,
@@ -348,62 +354,85 @@ class _TasksPageState extends State<TasksPage> {
 
   List<Task> get filteredTasks {
     if (_searchQuery.trim().isEmpty) return tasks;
-    return tasks.where((task) => 
-      task.title.toLowerCase().contains(_searchQuery.toLowerCase())
-    ).toList();
+    return tasks
+        .where(
+          (task) =>
+              task.title.toLowerCase().contains(_searchQuery.toLowerCase()),
+        )
+        .toList();
   }
 
   List<Project> get filteredProjects {
     if (_searchQuery.trim().isEmpty) return projects;
-    return projects.where((project) => 
-      project.name.toLowerCase().contains(_searchQuery.toLowerCase())
-    ).toList();
+    return projects
+        .where(
+          (project) =>
+              project.name.toLowerCase().contains(_searchQuery.toLowerCase()),
+        )
+        .toList();
   }
 
   // Updated to use new Task class properties
-  List<Task> get todayTasks => filteredTasks.where((task) => 
-    task.shouldScheduleToday && task.status != TaskStatus.completed).toList();
-  
-  List<Task> get scheduledTasks => filteredTasks.where((task) => 
-    task.scheduledFor != null && task.status != TaskStatus.completed).toList();
-  
-  List<Task> get allTasks => filteredTasks; // Show all tasks including completed ones
-  
-  List<Task> get priorityTasks => filteredTasks.where((task) => 
-    (task.priority == Priority.high || task.priority == Priority.urgent) && 
-    task.status != TaskStatus.completed).toList();
+  List<Task> get todayTasks => filteredTasks
+      .where(
+        (task) =>
+            task.shouldScheduleToday && task.status != TaskStatus.completed,
+      )
+      .toList();
+
+  List<Task> get scheduledTasks => filteredTasks
+      .where(
+        (task) =>
+            task.scheduledFor != null && task.status != TaskStatus.completed,
+      )
+      .toList();
+
+  List<Task> get allTasks =>
+      filteredTasks; // Show all tasks including completed ones
+
+  List<Task> get priorityTasks => filteredTasks
+      .where(
+        (task) =>
+            (task.priority == Priority.high ||
+                task.priority == Priority.urgent) &&
+            task.status != TaskStatus.completed,
+      )
+      .toList();
 
   double _calculateTotalTime(List<Task> taskList) {
     // return taskList.fold(0.0, (sum, task) => sum + task.estimatedTime);
     return taskList.fold(0.0, (sum, task) => sum + task.remainingTime);
   }
 
-//   // Function to update the whole task and save it
-// void _saveTaskWithUpdateState(Task updatedTask) {
-//   editTask(updatedTask); // Save to Firebase
-//   saveTask(updatedTask);
-//   setState(() {}); // Refresh the UI
-// }
+  //   // Function to update the whole task and save it
+  // void _saveTaskWithUpdateState(Task updatedTask) {
+  //   editTask(updatedTask); // Save to Firebase
+  //   saveTask(updatedTask);
+  //   setState(() {}); // Refresh the UI
+  // }
 
-// void _deleteTaskWithUpdateState(String taskId) {
-//   deleteTask(taskId);
-//   deleteTaskFromFirebase(taskId); // Also delete from Firebase
-//   setState(() {}); // Refresh the UI
-// }
+  // void _deleteTaskWithUpdateState(String taskId) {
+  //   deleteTask(taskId);
+  //   deleteTaskFromFirebase(taskId); // Also delete from Firebase
+  //   setState(() {}); // Refresh the UI
+  // }
 
   void _addTask(Task newTask) async {
     await addTask(newTask); // Add to Firebase
-    await _refreshTasks();  // Reload from Firebase
+    await _refreshTasks(); // Reload from Firebase
+    setState(() {
+      
+    });
   }
 
   void _saveTaskWithUpdateState(Task updatedTask) async {
     await editTask(updatedTask); // Update in Firebase
-    await _refreshTasks();       // Reload from Firebase
+    await _refreshTasks(); // Reload from Firebase
   }
 
   void _deleteTaskWithUpdateState(String taskId) async {
     await deleteTaskFromFirebase(taskId); // Delete from Firebase
-    await _refreshTasks();                // Reload from Firebase
+    await _refreshTasks(); // Reload from Firebase
   }
 
   void _toggleAddMenu() {
@@ -424,7 +453,12 @@ class _TasksPageState extends State<TasksPage> {
     });
   }
 
-  void _navigateToFilteredTasks(String title, List<Task> taskList, Color accentColor, {String? projectName}) {
+  void _navigateToFilteredTasks(
+    String title,
+    List<Task> taskList,
+    Color accentColor, {
+    String? projectName,
+  }) {
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -441,7 +475,9 @@ class _TasksPageState extends State<TasksPage> {
   }
 
   void _navigateToProjectTasks(Project project) {
-    final projectTasks = tasks.where((task) => task.projectId == project.id).toList();
+    final projectTasks = tasks
+        .where((task) => task.projectId == project.id)
+        .toList();
     _navigateToFilteredTasks(
       '${project.name} Tasks',
       projectTasks,
@@ -456,10 +492,8 @@ class _TasksPageState extends State<TasksPage> {
       context: context,
       backgroundColor: const Color(0xFF18181B),
       isScrollControlled: true,
-      builder: (context) => AddTaskSheet(
-        projects: projects,
-        onAddTask: _addTask,
-      ),
+      builder: (context) =>
+          AddTaskSheet(projects: projects, onAddTask: _addTask),
     );
   }
 
@@ -468,9 +502,7 @@ class _TasksPageState extends State<TasksPage> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => AddProjectPage(
-          onAddProject: _addProject,
-        ),
+        builder: (context) => AddProjectPage(onAddProject: _addProject),
       ),
     );
   }
@@ -496,7 +528,7 @@ class _TasksPageState extends State<TasksPage> {
           ),
           const SizedBox(height: 8),
           Text(
-            projects.isEmpty 
+            projects.isEmpty
                 ? 'Create your first project to get started'
                 : 'Try a different search term',
             style: GoogleFonts.inter(
@@ -519,8 +551,8 @@ class _TasksPageState extends State<TasksPage> {
           color: const Color(0xFF27272A).withValues(alpha: 0.8),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: project.color.withValues(alpha: 0.3), 
-            width: 2
+            color: project.color.withValues(alpha: 0.3),
+            width: 2,
           ),
           boxShadow: [
             BoxShadow(
@@ -628,7 +660,10 @@ class _TasksPageState extends State<TasksPage> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
                       color: const Color(0xFF27272A).withValues(alpha: 0.8),
                       borderRadius: BorderRadius.circular(8),
@@ -647,7 +682,9 @@ class _TasksPageState extends State<TasksPage> {
                             style: GoogleFonts.inter(color: Colors.white),
                             decoration: InputDecoration(
                               hintText: 'Search tasks and projects...',
-                              hintStyle: GoogleFonts.inter(color: const Color(0xFF71717A)),
+                              hintStyle: GoogleFonts.inter(
+                                color: const Color(0xFF71717A),
+                              ),
                               border: InputBorder.none,
                             ),
                             onChanged: _onSearchChanged,
@@ -655,7 +692,10 @@ class _TasksPageState extends State<TasksPage> {
                         ),
                         if (_searchQuery.isNotEmpty)
                           IconButton(
-                            icon: Icon(Icons.clear, color: const Color(0xFF71717A)),
+                            icon: Icon(
+                              Icons.clear,
+                              color: const Color(0xFF71717A),
+                            ),
                             onPressed: () {
                               _searchController.clear();
                               _onSearchChanged('');
@@ -664,9 +704,9 @@ class _TasksPageState extends State<TasksPage> {
                       ],
                     ),
                   ),
-                  
+
                   const SizedBox(height: 24),
-                  
+
                   GridView.count(
                     crossAxisCount: 2,
                     shrinkWrap: true,
@@ -729,9 +769,9 @@ class _TasksPageState extends State<TasksPage> {
                       ),
                     ],
                   ),
-                  
+
                   const SizedBox(height: 32),
-                  
+
                   Text(
                     'Projects',
                     style: GoogleFonts.inter(
@@ -740,18 +780,19 @@ class _TasksPageState extends State<TasksPage> {
                       fontWeight: FontWeight.w500,
                     ),
                   ),
-                  
+
                   const SizedBox(height: 16),
-                  
+
                   filteredProjects.isEmpty
                       ? _buildEmptyProjectsState()
                       : GridView.builder(
-                          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: 2,
-                            childAspectRatio: 1.8,
-                            crossAxisSpacing: 12,
-                            mainAxisSpacing: 12,
-                          ),
+                          gridDelegate:
+                              const SliverGridDelegateWithFixedCrossAxisCount(
+                                crossAxisCount: 2,
+                                childAspectRatio: 1.8,
+                                crossAxisSpacing: 12,
+                                mainAxisSpacing: 12,
+                              ),
                           shrinkWrap: true,
                           physics: const NeverScrollableScrollPhysics(),
                           itemCount: filteredProjects.length,
@@ -765,12 +806,12 @@ class _TasksPageState extends State<TasksPage> {
                             );
                           },
                         ),
-                  
+
                   const SizedBox(height: 100),
                 ],
               ),
             ),
-            
+
             if (_showAddMenu)
               GestureDetector(
                 onTap: _toggleAddMenu,
@@ -824,15 +865,20 @@ class _TasksPageState extends State<TasksPage> {
     );
   }
 
-  Widget _buildCategoryCard(String title, String subtitle, [IconData? icon, Color? color]) {
+  Widget _buildCategoryCard(
+    String title,
+    String subtitle, [
+    IconData? icon,
+    Color? color,
+  ]) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: const Color(0xFF27272A).withValues(alpha: 0.8),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: (color ?? Colors.transparent).withValues(alpha: 0.3), 
-          width: 2
+          color: (color ?? Colors.transparent).withValues(alpha: 0.3),
+          width: 2,
         ),
         boxShadow: [
           BoxShadow(
@@ -847,7 +893,8 @@ class _TasksPageState extends State<TasksPage> {
         children: [
           Row(
             children: [
-              if (icon != null) Icon(icon, color: color ?? Colors.white, size: 20),
+              if (icon != null)
+                Icon(icon, color: color ?? Colors.white, size: 20),
               if (icon != null) const SizedBox(width: 8),
               Text(
                 title,
@@ -874,12 +921,15 @@ class _TasksPageState extends State<TasksPage> {
   }
 }
 
-
 class AddTaskSheet extends StatefulWidget {
   final List<Project> projects;
   final Function(Task) onAddTask;
 
-  const AddTaskSheet({super.key, required this.projects, required this.onAddTask});
+  const AddTaskSheet({
+    super.key,
+    required this.projects,
+    required this.onAddTask,
+  });
 
   @override
   _AddTaskSheetState createState() => _AddTaskSheetState();
@@ -922,7 +972,7 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
               borderRadius: BorderRadius.circular(2),
             ),
           ),
-          
+
           TextField(
             controller: _titleController,
             style: GoogleFonts.inter(color: Colors.white, fontSize: 18),
@@ -932,9 +982,9 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
               border: InputBorder.none,
             ),
           ),
-          
+
           const SizedBox(height: 24),
-          
+
           Text(
             'Estimated Time: ${_formatTime(_selectedTime)}',
             style: GoogleFonts.inter(
@@ -943,9 +993,9 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
               fontWeight: FontWeight.w500,
             ),
           ),
-          
+
           const SizedBox(height: 16),
-          
+
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Column(
@@ -955,7 +1005,9 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
                     activeTrackColor: const Color(0xFF9333EA),
                     inactiveTrackColor: const Color(0xFF71717A),
                     thumbColor: const Color(0xFF9333EA),
-                    overlayColor: const Color(0xFF9333EA).withValues(alpha: 0.2),
+                    overlayColor: const Color(
+                      0xFF9333EA,
+                    ).withValues(alpha: 0.2),
                   ),
                   child: Slider(
                     value: _selectedTime,
@@ -974,23 +1026,53 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text('30m', style: GoogleFonts.inter(color: const Color(0xFF71717A), fontSize: 12)),
+                      Text(
+                        '30m',
+                        style: GoogleFonts.inter(
+                          color: const Color(0xFF71717A),
+                          fontSize: 12,
+                        ),
+                      ),
                       Padding(
                         padding: const EdgeInsets.only(right: 8),
-                        child: Text('2h', style: GoogleFonts.inter(color: const Color(0xFF71717A), fontSize: 12)),
+                        child: Text(
+                          '2h',
+                          style: GoogleFonts.inter(
+                            color: const Color(0xFF71717A),
+                            fontSize: 12,
+                          ),
+                        ),
                       ),
-                      Text('4h', style: GoogleFonts.inter(color: const Color(0xFF71717A), fontSize: 12)),
-                      Text('6h', style: GoogleFonts.inter(color: const Color(0xFF71717A), fontSize: 12)),
-                      Text('8h', style: GoogleFonts.inter(color: const Color(0xFF71717A), fontSize: 12)),
+                      Text(
+                        '4h',
+                        style: GoogleFonts.inter(
+                          color: const Color(0xFF71717A),
+                          fontSize: 12,
+                        ),
+                      ),
+                      Text(
+                        '6h',
+                        style: GoogleFonts.inter(
+                          color: const Color(0xFF71717A),
+                          fontSize: 12,
+                        ),
+                      ),
+                      Text(
+                        '8h',
+                        style: GoogleFonts.inter(
+                          color: const Color(0xFF71717A),
+                          fontSize: 12,
+                        ),
+                      ),
                     ],
                   ),
                 ),
               ],
             ),
           ),
-          
+
           const SizedBox(height: 24),
-          
+
           Text(
             'Priority',
             style: GoogleFonts.inter(
@@ -1010,21 +1092,29 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
                 },
                 child: Container(
                   margin: const EdgeInsets.only(right: 12),
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
                   decoration: BoxDecoration(
-                    color: _selectedPriority == priority 
+                    color: _selectedPriority == priority
                         ? priority.color.withValues(alpha: 0.2)
                         : const Color(0xFF27272A),
                     borderRadius: BorderRadius.circular(16),
                     border: _selectedPriority == priority
                         ? Border.all(color: priority.color, width: 2)
-                        : Border.all(color: const Color(0xFF71717A).withValues(alpha: 0.3), width: 1),
+                        : Border.all(
+                            color: const Color(
+                              0xFF71717A,
+                            ).withValues(alpha: 0.3),
+                            width: 1,
+                          ),
                   ),
                   child: Text(
                     priority.displayName,
                     style: GoogleFonts.inter(
-                      color: _selectedPriority == priority 
-                          ? priority.color 
+                      color: _selectedPriority == priority
+                          ? priority.color
                           : const Color(0xFF71717A),
                       fontSize: 12,
                       fontWeight: FontWeight.w500,
@@ -1034,9 +1124,9 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
               );
             }).toList(),
           ),
-          
+
           const SizedBox(height: 24),
-          
+
           if (widget.projects.isNotEmpty) ...[
             Text(
               'Project',
@@ -1059,32 +1149,43 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
               ),
               child: DropdownButton<String>(
                 value: _selectedProjectId,
-                hint: Text('Select Project', style: GoogleFonts.inter(color: const Color(0xFF71717A))),
+                hint: Text(
+                  'Select Project',
+                  style: GoogleFonts.inter(color: const Color(0xFF71717A)),
+                ),
                 dropdownColor: const Color(0xFF27272A),
                 underline: Container(),
                 isExpanded: true,
                 items: [
                   const DropdownMenuItem<String>(
                     value: '',
-                    child: Text('No Project', style: TextStyle(color: Colors.white)),
-                  ),
-                  ...widget.projects.map((project) => DropdownMenuItem<String>(
-                    value: project.id,
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 12,
-                          height: 12,
-                          decoration: BoxDecoration(
-                            color: project.color,
-                            borderRadius: BorderRadius.circular(2),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Text(project.name, style: const TextStyle(color: Colors.white)),
-                      ],
+                    child: Text(
+                      'No Project',
+                      style: TextStyle(color: Colors.white),
                     ),
-                  )),
+                  ),
+                  ...widget.projects.map(
+                    (project) => DropdownMenuItem<String>(
+                      value: project.id,
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 12,
+                            height: 12,
+                            decoration: BoxDecoration(
+                              color: project.color,
+                              borderRadius: BorderRadius.circular(2),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            project.name,
+                            style: const TextStyle(color: Colors.white),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
                 ],
                 onChanged: (String? value) {
                   setState(() {
@@ -1095,7 +1196,7 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
             ),
             const SizedBox(height: 24),
           ],
-          
+
           Row(
             children: [
               DateTimePickerButton(
@@ -1110,55 +1211,61 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
                   });
                 },
               ),
-      
+
               const Spacer(),
               ElevatedButton(
-                onPressed: _titleController.text.trim().isEmpty ? null : () {
-                  // Determine if the task should be due today or scheduled for a specific time
-                  DateTime? dueDate;
-                  DateTime? scheduledFor;
-                  
-                  if (selectedDate != null) {
-                    final now = DateTime.now();
-                    final today = DateTime(now.year, now.month, now.day);
-                    final selected = DateTime(selectedDate!.year, selectedDate!.month, selectedDate!.day);
-                    
-                    if (selected.isAtSameMomentAs(today)) {
-                      // If today is selected, set as due date
-                      dueDate = selectedDate;
-                    } else {
-                      // If future date selected, set as due date
-                      dueDate = selectedDate;
-                    }
-                    
-                    // If specific time is selected, set scheduledFor
-                    if (selectedTime != null) {
-                      scheduledFor = DateTime(
-                        selectedDate!.year,
-                        selectedDate!.month,
-                        selectedDate!.day,
-                        selectedTime!.hour,
-                        selectedTime!.minute,
-                      );
-                    }
-                  }
-                  
-                  final newTask = Task(
-                    id: DateTime.now().millisecondsSinceEpoch.toString(),
-                    title: _titleController.text.trim(),
-                    estimatedTime: _selectedTime,
-                    timeSpent: 0.0,
-                    status: TaskStatus.notStarted,
-                    priority: _selectedPriority,
-                    dueDate: dueDate,
-                    scheduledFor: scheduledFor,
-                    projectId: _selectedProjectId,
-                    createdAt: DateTime.now(),
-                    updatedAt: DateTime.now(),
-                  );
-                  widget.onAddTask(newTask);
-                  Navigator.pop(context);
-                },
+                onPressed: _titleController.text.trim().isEmpty
+                    ? null
+                    : () {
+                        // Determine if the task should be due today or scheduled for a specific time
+                        DateTime? dueDate;
+                        DateTime? scheduledFor;
+
+                        if (selectedDate != null) {
+                          final now = DateTime.now();
+                          final today = DateTime(now.year, now.month, now.day);
+                          final selected = DateTime(
+                            selectedDate!.year,
+                            selectedDate!.month,
+                            selectedDate!.day,
+                          );
+
+                          if (selected.isAtSameMomentAs(today)) {
+                            // If today is selected, set as due date
+                            dueDate = selectedDate;
+                          } else {
+                            // If future date selected, set as due date
+                            dueDate = selectedDate;
+                          }
+
+                          // If specific time is selected, set scheduledFor
+                          if (selectedTime != null) {
+                            scheduledFor = DateTime(
+                              selectedDate!.year,
+                              selectedDate!.month,
+                              selectedDate!.day,
+                              selectedTime!.hour,
+                              selectedTime!.minute,
+                            );
+                          }
+                        }
+
+                        final newTask = Task(
+                          id: DateTime.now().millisecondsSinceEpoch.toString(),
+                          title: _titleController.text.trim(),
+                          estimatedTime: _selectedTime,
+                          timeSpent: 0.0,
+                          status: TaskStatus.notStarted,
+                          priority: _selectedPriority,
+                          dueDate: dueDate,
+                          scheduledFor: scheduledFor,
+                          projectId: _selectedProjectId,
+                          createdAt: DateTime.now(),
+                          updatedAt: DateTime.now(),
+                        );
+                        widget.onAddTask(newTask);
+                        Navigator.pop(context);
+                      },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF9333EA),
                   foregroundColor: Colors.white,
@@ -1167,7 +1274,7 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
                   ),
                 ),
                 child: Text(
-                  'Add', 
+                  'Add',
                   style: GoogleFonts.inter(
                     color: Colors.white,
                     fontWeight: FontWeight.w600,
@@ -1261,11 +1368,14 @@ class _AddProjectPageState extends State<AddProjectPage> {
                   fontWeight: FontWeight.w500,
                 ),
               ),
-              
+
               const SizedBox(height: 12),
-              
+
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
                 decoration: BoxDecoration(
                   color: const Color(0xFF27272A).withValues(alpha: 0.8),
                   borderRadius: BorderRadius.circular(8),
@@ -1284,7 +1394,9 @@ class _AddProjectPageState extends State<AddProjectPage> {
                         style: GoogleFonts.inter(color: Colors.white),
                         decoration: InputDecoration(
                           hintText: 'Project Name',
-                          hintStyle: GoogleFonts.inter(color: const Color(0xFF71717A)),
+                          hintStyle: GoogleFonts.inter(
+                            color: const Color(0xFF71717A),
+                          ),
                           border: InputBorder.none,
                         ),
                       ),
@@ -1292,9 +1404,9 @@ class _AddProjectPageState extends State<AddProjectPage> {
                   ],
                 ),
               ),
-              
+
               const SizedBox(height: 32),
-              
+
               Text(
                 'Project Color Mark',
                 style: GoogleFonts.inter(
@@ -1303,9 +1415,9 @@ class _AddProjectPageState extends State<AddProjectPage> {
                   fontWeight: FontWeight.w500,
                 ),
               ),
-              
+
               const SizedBox(height: 16),
-              
+
               Expanded(
                 child: GridView.builder(
                   gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
@@ -1339,18 +1451,23 @@ class _AddProjectPageState extends State<AddProjectPage> {
                               end: Alignment.bottomRight,
                             ),
                           ),
-                          child: _selectedColor == const Color(0xFF9333EA) && index == _colorOptions.length
+                          child:
+                              _selectedColor == const Color(0xFF9333EA) &&
+                                  index == _colorOptions.length
                               ? Container(
                                   decoration: BoxDecoration(
                                     shape: BoxShape.circle,
-                                    border: Border.all(color: Colors.white, width: 3),
+                                    border: Border.all(
+                                      color: Colors.white,
+                                      width: 3,
+                                    ),
                                   ),
                                 )
                               : null,
                         ),
                       );
                     }
-                    
+
                     final color = _colorOptions[index];
                     return GestureDetector(
                       onTap: () {
@@ -1371,16 +1488,18 @@ class _AddProjectPageState extends State<AddProjectPage> {
                   },
                 ),
               ),
-              
+
               const SizedBox(height: 32),
-              
+
               Row(
                 children: [
                   Expanded(
                     child: ElevatedButton(
                       onPressed: () => Navigator.pop(context),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF27272A).withValues(alpha: 0.8),
+                        backgroundColor: const Color(
+                          0xFF27272A,
+                        ).withValues(alpha: 0.8),
                         foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(vertical: 16),
                         shape: RoundedRectangleBorder(
@@ -1394,7 +1513,7 @@ class _AddProjectPageState extends State<AddProjectPage> {
                       child: Text(
                         'Cancel',
                         style: GoogleFonts.inter(
-                          color: Colors.white, 
+                          color: Colors.white,
                           fontSize: 16,
                           fontWeight: FontWeight.w600,
                         ),
@@ -1404,14 +1523,16 @@ class _AddProjectPageState extends State<AddProjectPage> {
                   const SizedBox(width: 16),
                   Expanded(
                     child: ElevatedButton(
-                     onPressed: _nameController.text.trim().isEmpty ? null : () {
-                        final newProject = Project.create(
-                          name: _nameController.text.trim(),
-                          color: _selectedColor,
-                        );
-                        widget.onAddProject(newProject);
-                        Navigator.pop(context);
-                      },
+                      onPressed: _nameController.text.trim().isEmpty
+                          ? null
+                          : () {
+                              final newProject = Project.create(
+                                name: _nameController.text.trim(),
+                                color: _selectedColor,
+                              );
+                              widget.onAddProject(newProject);
+                              Navigator.pop(context);
+                            },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF9333EA),
                         foregroundColor: Colors.white,
@@ -1424,7 +1545,7 @@ class _AddProjectPageState extends State<AddProjectPage> {
                       child: Text(
                         'Add',
                         style: GoogleFonts.inter(
-                          color: Colors.white, 
+                          color: Colors.white,
                           fontSize: 16,
                           fontWeight: FontWeight.w600,
                         ),
@@ -1440,4 +1561,3 @@ class _AddProjectPageState extends State<AddProjectPage> {
     );
   }
 }
-
