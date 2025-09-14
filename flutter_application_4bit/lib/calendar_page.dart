@@ -3,6 +3,7 @@ import 'package:calendar_view/calendar_view.dart';
 import '../models/calendar_models.dart';
 import '../models/task_models.dart';
 import '../models/scheduling_models.dart';
+
 import '../services/scheduling_service.dart';
 import '../widgets/chat_interface.dart';
 import '../utils/date_utils.dart';
@@ -23,6 +24,10 @@ import '../services/chat_tool_service.dart';
 import '../widgets/calendar_views.dart';
 import '../widgets/scheduling_results_sheet.dart';
 // import '../services/scheduling_service.dart';
+
+// Add these imports at the top of calendar_page.dart
+import '../dialogs/scheduling_dialogs.dart';
+import '../widgets/task_detail_modal.dart';
 
 class CalendarPage extends StatefulWidget {
   const CalendarPage({Key? key}) : super(key: key);
@@ -90,21 +95,31 @@ class CalendarPageState extends State<CalendarPage> {
   
   // Initialize the chat tool calling service
   try {
-    _chatToolService = ChatToolCallingService(
-      taskService: _taskService,
-      eventService: _eventService,
-      schedulingService: _schedulingService,
-      eventController: _eventController,
-      resolveEventColor: _resolveEventColor,
-      refreshCallback: () => setState(() {}),
-    );
-  } catch (e) {
-    print('Failed to initialize chat tool service: $e');
-    _chatToolService = null; // Fallback to regular chat
+      _chatToolService = ChatToolCallingService(
+        taskService: _taskService,
+        eventService: _eventService,
+        schedulingService: _schedulingService,
+        eventController: _eventController,
+        resolveEventColor: _resolveEventColor,
+        refreshCallback: () => setState(() {}),
+        context: context,
+        projects: tasks_source.projects,
+        projectColors: _projectColors,
+        onTaskUpdate: _onTaskUpdate,
+        onTaskDelete: _onTaskDelete,
+        onEditEvent: _onEditEvent,
+        onDeleteEvent: _onDeleteEvent,
+        onDeleteSeries: _onDeleteSeries,
+        onRescheduleAll: _onRescheduleAll,
+        onClearSchedule: _onClearSchedule,
+      );
+    } catch (e) {
+      print('Failed to initialize chat tool service: $e');
+      _chatToolService = null; // Fallback to regular chat
+    }
+
+    setState(() {});
   }
-  
-  setState(() {});
-}
 
   void _initializeProjects() {
     // Assign initial colors for predefined projects
@@ -128,6 +143,87 @@ class CalendarPageState extends State<CalendarPage> {
         _projectPalette[_paletteIndex % _projectPalette.length];
     _paletteIndex++;
   }
+
+  // Callback methods for ChatToolCallingService
+  void _onTaskUpdate(Task task) {
+    setState(() {
+      tasks_source.saveTask(task);
+      _taskService.syncTasksToCalendar(_eventController);
+    });
+  }
+
+  void _onTaskDelete(Task task) {
+    setState(() {
+      tasks_source.tasks.removeWhere((t) => t.id == task.id);
+      _taskService.syncTasksToCalendar(_eventController);
+    });
+  }
+
+  void _onEditEvent(BuildContext context, ExtendedCalendarEventData event) {
+  EventFormDialog.showEventDialog(
+    context,
+    isEdit: true,
+    event: event,
+    projects: _projects,
+    projectColors: _projectColors,
+    onAddProject: _addProject,
+    onSaveEvent: (updatedEvent, {overrideRecurring}) {
+      setState(() {
+        _eventController.remove(event);
+        _eventService.addEventWithRecurring(
+          updatedEvent,
+          _eventController,
+          _resolveEventColor,
+          overrideRecurring: overrideRecurring,
+        );
+      });
+    },
+    onDeleteEvent: (event) => _deleteEvent(context, event),
+    onDeleteSeries: _deleteAllOccurrences,
+    resolveEventColor: _resolveEventColor,
+  );
+}
+
+  void _onDeleteEvent(BuildContext context, ExtendedCalendarEventData event) {
+    setState(() {
+      _eventController.remove(event);
+    });
+  }
+
+  void _onDeleteSeries(String seriesId) {
+    setState(() {
+      _eventController.removeWhere((event) {
+        if (event is ExtendedCalendarEventData) {
+          return event.seriesId == seriesId;
+        }
+        return false;
+      });
+    });
+  }
+
+  void _onRescheduleAll() {
+    scheduleUnscheduledTasks();
+  }
+
+  void _onClearSchedule() {
+    setState(() {
+      // Remove all task-related events from calendar
+      _eventController.removeWhere((event) {
+        if (event is ExtendedCalendarEventData) {
+          return event.hasTask;
+        }
+        return false;
+      });
+      
+      // Clear scheduled times from tasks
+      for (final task in tasks_source.tasks) {
+        if (task.scheduledFor != null) {
+          tasks_source.saveTask(task.copyWith(scheduledFor: null));
+        }
+      }
+    });
+  }
+
 
   Color _resolveEventColor({String? project, required Priority priority}) {
     if (project != null && _projectColors.containsKey(project)) {
@@ -499,7 +595,7 @@ class CalendarPageState extends State<CalendarPage> {
           ),
         ],
       ),
-      floatingActionButton: Column(
+      floatingActionButton: _isChatOpen ? null : Column(
         mainAxisAlignment: MainAxisAlignment.end,
         children: [
           // Schedule Tasks FAB

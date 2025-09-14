@@ -803,7 +803,7 @@ class _TimerModePageState extends State<TimerModePage> with TickerProviderStateM
                     // Main Timer Section
                     Expanded(
                       child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
+                        mainAxisAlignment: MediaQuery.of(context).size.height < 700 ? MainAxisAlignment.spaceEvenly : MainAxisAlignment.center,
                         children: [
                           // Show session indicator only in countdown mode and when a task is selected
                           if (_globalTimer.selectedTask != 'Select Task' && _isCountdownMode)
@@ -836,7 +836,7 @@ class _TimerModePageState extends State<TimerModePage> with TickerProviderStateM
                               builder: (context) {
                                 final screenHeight = MediaQuery.of(context).size.height;
                                 final isSmallScreen = screenHeight < 700;
-                                final containerSize = isSmallScreen ? 220.0 : 300.0;
+                                final containerSize = isSmallScreen ? 160.0 : 300.0;
                                 
                                 // Use same font size calculation as TimerCircle
                                 final timerFontSize = containerSize * 0.16;
@@ -867,7 +867,7 @@ class _TimerModePageState extends State<TimerModePage> with TickerProviderStateM
                                             letterSpacing: -1,
                                           ),
                                         ),
-                                        const SizedBox(height: 8),
+                                        SizedBox(height: isSmallScreen ? 4 : 6),
                                         Text(
                                           _isBreakTime ? 'Break Time' : 'Count Up Mode',
                                           style: GoogleFonts.inter(
@@ -881,7 +881,7 @@ class _TimerModePageState extends State<TimerModePage> with TickerProviderStateM
                                 );
                               }
                             ),
-                          SizedBox(height: MediaQuery.of(context).size.height < 700 ? 16 : 40),
+                          SizedBox(height: MediaQuery.of(context).size.height < 700 ? 4 : 30),
                           // Action Buttons
                           TimerActionButtons(
                             timerState: _isBreakTime ? TimerState.breakRunning :

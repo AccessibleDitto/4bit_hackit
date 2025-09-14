@@ -185,7 +185,7 @@ class ModeSelectionBar extends StatelessWidget {
     final isSmallScreen = screenHeight < 700; 
     
     return Container(
-      margin: EdgeInsets.all(isSmallScreen ? 8 : 20),
+      margin: EdgeInsets.all(isSmallScreen ? 2 : 5),
       decoration: BoxDecoration(
         color: const Color(0xFF18181B).withOpacity(0.8),
         borderRadius: BorderRadius.circular(20),
@@ -196,7 +196,7 @@ class ModeSelectionBar extends StatelessWidget {
       ),
       child: Padding(
         padding: EdgeInsets.symmetric(
-          vertical: isSmallScreen ? 6 : 12,
+          vertical: isSmallScreen ? 3 : 1,
           horizontal: 16,
         ),
         child: Row(
@@ -356,8 +356,8 @@ class ModeOption extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Container(
-            width: isCompact ? 40 : 56,
-            height: isCompact ? 40 : 56,
+            width: isCompact ? 28 : 45,
+            height: isCompact ? 28 : 45,
             decoration: BoxDecoration(
               color: Colors.transparent,
               borderRadius: BorderRadius.circular(16),
@@ -369,15 +369,15 @@ class ModeOption extends StatelessWidget {
             child: Icon(
               icon,
               color: color,
-              size: isCompact ? 18 : 24,
+              size: isCompact ? 13 : 20,
             ),
           ),
-          SizedBox(height: isCompact ? 3 : 8),
+          SizedBox(height: isCompact ? 2 : 8),
           Text(
             label,
             style: GoogleFonts.inter(
               color: color,
-              fontSize: isCompact ? 9 : 12,
+              fontSize: isCompact ? 8 : 12,
               fontWeight: FontWeight.w500,
             ),
           ),

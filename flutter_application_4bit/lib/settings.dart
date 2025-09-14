@@ -191,7 +191,7 @@ class _SettingsScreenState extends State<SettingsScreen>
           isStrictMode: false,
         ),
       ),
-    );
+    ); 
   }
 
   Widget _buildSectionTitle(String title) {

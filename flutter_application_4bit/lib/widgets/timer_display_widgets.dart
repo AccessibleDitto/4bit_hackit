@@ -31,7 +31,7 @@ class TimerCircle extends StatelessWidget {
     final screenHeight = MediaQuery.of(context).size.height;
     
     final isSmallScreen = screenHeight < 700;
-    final circleSize = isSmallScreen ? 220.0 : 300.0;
+    final circleSize = isSmallScreen ? 125.0 : 250.0;
     
     final timerFontSize = circleSize * 0.16;
     final subtextFontSize = circleSize * 0.053;
@@ -149,7 +149,7 @@ class SessionIndicator extends StatelessWidget {
     
     // Responsive sizing
     final isSmallScreen = screenHeight < 700;
-    final circleSize = isSmallScreen ? 220.0 : (screenWidth * 0.7);
+    final circleSize = isSmallScreen ? 160.0 : (screenWidth * 0.7);
     
     // Calculate session number (represented by dot) sizes and spacing
     final dotSize = circleSize * 0.04;
@@ -158,9 +158,9 @@ class SessionIndicator extends StatelessWidget {
     final padding = ((screenWidth - totalWidth) / 2).clamp(0.0, double.infinity);
 
     return Container(
-      margin: EdgeInsets.only(bottom: isSmallScreen ? (circleSize * 0.06) : (circleSize * 0.133)),
+      margin: EdgeInsets.only(bottom: isSmallScreen ? (circleSize * 0.03) : (circleSize * 0.133)),
       width: screenWidth,
-      height: isSmallScreen ? (circleSize * 0.04) : (circleSize * 0.06),
+      height: isSmallScreen ? (circleSize * 0.03) : (circleSize * 0.06),
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
         child: Container(

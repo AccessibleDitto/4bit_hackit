@@ -27,9 +27,12 @@ class TimerActionButtons extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
+    final screenHeight = MediaQuery.of(context).size.height;
+    final isSmallScreen = screenHeight < 500;
+    
     final buttonWidth = (screenWidth * 0.6).clamp(200.0, 280.0);
     final smallButtonWidth = (screenWidth * 0.35).clamp(120.0, 180.0);
-    const buttonHeight = 56.0;
+    final buttonHeight = isSmallScreen ? 45.0 : 45.0;
     final fontSize = (screenWidth * 0.04).clamp(14.0, 18.0);
     
     switch (timerState) {

@@ -19,12 +19,44 @@ class ChatInterface extends StatefulWidget {
   _ChatInterfaceState createState() => _ChatInterfaceState();
 }
 
+// Updated ChatInterface with history integration
 class _ChatInterfaceState extends State<ChatInterface> {
   bool _isLoading = false;
   final TextEditingController _textController = TextEditingController();
   final List<ChatMessage> _messages = <ChatMessage>[];
   final ScrollController _scrollController = ScrollController();
   final ChatService _chatService = ChatService();
+
+  @override
+  void initState() {
+    super.initState();
+    // Load any existing chat history from the tool service
+    if (widget.toolService != null) {
+      _loadHistoryFromToolService();
+    }
+  }
+
+  void _loadHistoryFromToolService() {
+    if (widget.toolService == null) return;
+    
+    final history = widget.toolService!.getChatHistory();
+    for (final entry in history) {
+      _messages.add(ChatMessage(
+        text: entry.userMessage,
+        isUserMessage: true,
+      ));
+      
+      _messages.add(ChatMessage(
+        text: entry.assistantResponse,
+        isUserMessage: false,
+      ));
+    }
+    
+    if (mounted && _messages.isNotEmpty) {
+      setState(() {});
+      _scrollToBottomWithDelay(const Duration(milliseconds: 100));
+    }
+  }
 
   void _handleChatSubmitted(String text) async {
     if (text.trim().isEmpty) return;
@@ -98,39 +130,43 @@ class _ChatInterfaceState extends State<ChatInterface> {
     }
   }
 
-  Widget? _buildResponseWidget(ChatResponse toolResponse) {
-    if (toolResponse.taskWidget != null) {
-      return Container(
-        margin: const EdgeInsets.only(top: 8),
-        child: toolResponse.taskWidget,
-      );
-    } else if (toolResponse.eventWidget != null) {
-      return Container(
-        margin: const EdgeInsets.only(top: 8),
-        child: toolResponse.eventWidget,
-      );
-    } else if (toolResponse.taskListWidget != null) {
-      return Container(
-        margin: const EdgeInsets.only(top: 8),
-        child: toolResponse.taskListWidget,
-      );
-    } else if (toolResponse.eventListWidget != null) {
-      return Container(
-        margin: const EdgeInsets.only(top: 8),
-        child: toolResponse.eventListWidget,
-      );
-    } else if (toolResponse.schedulingResultWidget != null) {
-      return Container(
-        margin: const EdgeInsets.only(top: 8),
-        child: toolResponse.schedulingResultWidget,
-      );
-    } else if (toolResponse.summaryWidget != null) {
-      return Container(
-        margin: const EdgeInsets.only(top: 8),
-        child: toolResponse.summaryWidget,
-      );
-    }
-    return null;
+  Widget _buildResponseWidget(ChatResponse response) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Caption (if any)
+        if (response.caption != null) ...[
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4.0),
+            child: Text(
+              response.caption!,
+              style: TextStyle(
+                fontStyle: FontStyle.italic,
+                color: Colors.grey[600],
+                fontSize: 12,
+              ),
+            ),
+          ),
+        ],
+
+        // Main text
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 2.0),
+          child: Text(
+            response.text,
+            style: const TextStyle(fontSize: 16),
+          ),
+        ),
+
+        // Optional widgets
+        if (response.taskWidget != null) response.taskWidget!,
+        if (response.eventWidget != null) response.eventWidget!,
+        if (response.taskListWidget != null) response.taskListWidget!,
+        if (response.eventListWidget != null) response.eventListWidget!,
+        if (response.schedulingResultWidget != null) response.schedulingResultWidget!,
+        if (response.summaryWidget != null) response.summaryWidget!,
+      ],
+    );
   }
 
   _scrollToBottomWithDelay(Duration delay) async {
@@ -148,38 +184,167 @@ class _ChatInterfaceState extends State<ChatInterface> {
     setState(() {
       _messages.clear();
       _chatService.clearHistory();
+      // Also clear tool service history
+      if (widget.toolService != null) {
+        widget.toolService!.clearChatHistory();
+      }
     });
   }
 
+  // Enhanced quick actions with contextual suggestions
   Widget _buildQuickActions() {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      child: Wrap(
-        spacing: 8,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildQuickActionChip(
-            "Schedule tasks",
-            Icons.schedule,
-            () => _handleChatSubmitted("Schedule my unscheduled tasks"),
+          // Standard actions
+          Wrap(
+            spacing: 8,
+            runSpacing: 4,
+            children: [
+              _buildQuickActionChip(
+                "Schedule tasks",
+                Icons.schedule,
+                () => _handleChatSubmitted("Schedule my unscheduled tasks"),
+              ),
+              _buildQuickActionChip(
+                "Show tasks",
+                Icons.task,
+                () => _handleChatSubmitted("Show me all my tasks"),
+              ),
+              _buildQuickActionChip(
+                "Calendar summary",
+                Icons.calendar_today,
+                () => _handleChatSubmitted("Give me a calendar summary"),
+              ),
+              _buildQuickActionChip(
+                "Create task",
+                Icons.add_task,
+                () => _handleChatSubmitted("Create a new task"),
+              ),
+              _buildQuickActionChip(
+                "Create event",
+                Icons.event,
+                () => _handleChatSubmitted("Create a new calendar event"),
+              ),
+              _buildQuickActionChip(
+                "Update task",
+                Icons.edit_note,
+                () => _handleChatSubmitted("Find a task to update"),
+              ),
+              _buildQuickActionChip(
+                "Update event",
+                Icons.edit_calendar,
+                () => _handleChatSubmitted("Find an event to update"),
+              ),
+            ],
           ),
-          _buildQuickActionChip(
-            "Show tasks",
-            Icons.task,
-            () => _handleChatSubmitted("Show me all my tasks"),
-          ),
-          _buildQuickActionChip(
-            "Calendar summary",
-            Icons.calendar_today,
-            () => _handleChatSubmitted("Give me a calendar summary"),
-          ),
-          _buildQuickActionChip(
-            "Create task",
-            Icons.add_task,
-            () => _handleChatSubmitted("Create a new task"),
-          ),
+          
+          // Contextual suggestions based on recent history
+          if (widget.toolService != null) _buildContextualSuggestions(),
         ],
       ),
     );
+  }
+
+  Widget _buildContextualSuggestions() {
+    final history = widget.toolService!.getChatHistory();
+    if (history.isEmpty) return const SizedBox.shrink();
+
+    // Get the last successful action
+    final lastSuccessful = history.reversed.firstWhere(
+      (entry) => entry.success,
+      orElse: () => history.last,
+    );
+
+    if (!lastSuccessful.success) return const SizedBox.shrink();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 8),
+        Text(
+          "Quick follow-ups:",
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w500,
+            color: Colors.grey[700],
+          ),
+        ),
+        const SizedBox(height: 4),
+        Wrap(
+          spacing: 6,
+          runSpacing: 2,
+          children: _getContextualChips(lastSuccessful),
+        ),
+      ],
+    );
+  }
+
+  List<Widget> _getContextualChips(ChatHistoryEntry lastAction) {
+    final chips = <Widget>[];
+
+    switch (lastAction.toolUsed) {
+      case 'create_task':
+        chips.addAll([
+          _buildSmallActionChip(
+            "Update it",
+            Icons.edit,
+            () => _handleChatSubmitted("Update that task"),
+          ),
+          _buildSmallActionChip(
+            "Schedule it",
+            Icons.schedule,
+            () => _handleChatSubmitted("Schedule that task"),
+          ),
+        ]);
+        break;
+      case 'create_event':
+        chips.addAll([
+          _buildSmallActionChip(
+            "Update it",
+            Icons.edit,
+            () => _handleChatSubmitted("Update that event"),
+          ),
+          _buildSmallActionChip(
+            "Reschedule it",
+            Icons.access_time,
+            () => _handleChatSubmitted("Reschedule that event"),
+          ),
+        ]);
+        break;
+      case 'get_tasks':
+        chips.addAll([
+          _buildSmallActionChip(
+            "Schedule them",
+            Icons.schedule,
+            () => _handleChatSubmitted("Schedule those unscheduled tasks"),
+          ),
+          _buildSmallActionChip(
+            "Update one",
+            Icons.edit,
+            () => _handleChatSubmitted("Update a task from that list"),
+          ),
+        ]);
+        break;
+      case 'schedule_tasks':
+        chips.addAll([
+          _buildSmallActionChip(
+            "Show result",
+            Icons.visibility,
+            () => _handleChatSubmitted("Show me the scheduled tasks"),
+          ),
+          _buildSmallActionChip(
+            "Reschedule",
+            Icons.refresh,
+            () => _handleChatSubmitted("Reschedule some tasks"),
+          ),
+        ]);
+        break;
+    }
+
+    return chips;
   }
 
   Widget _buildQuickActionChip(String label, IconData icon, VoidCallback onTap) {
@@ -189,6 +354,19 @@ class _ChatInterfaceState extends State<ChatInterface> {
       onPressed: _isLoading ? null : onTap,
       backgroundColor: Colors.blue.shade50,
       side: BorderSide(color: Colors.blue.shade200),
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+    );
+  }
+
+  Widget _buildSmallActionChip(String label, IconData icon, VoidCallback onTap) {
+    return ActionChip(
+      avatar: Icon(icon, size: 14),
+      label: Text(label, style: const TextStyle(fontSize: 11)),
+      onPressed: _isLoading ? null : onTap,
+      backgroundColor: Colors.orange.shade50,
+      side: BorderSide(color: Colors.orange.shade200),
+      padding: const EdgeInsets.symmetric(horizontal: 6),
+      visualDensity: VisualDensity.compact,
     );
   }
 
@@ -197,7 +375,7 @@ class _ChatInterfaceState extends State<ChatInterface> {
     if (!widget.isVisible) return const SizedBox.shrink();
 
     return Container(
-      height: MediaQuery.of(context).size.height * 0.6, // Increased height
+      height: MediaQuery.of(context).size.height,
       decoration: const BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.only(
@@ -214,7 +392,7 @@ class _ChatInterfaceState extends State<ChatInterface> {
       ),
       child: Column(
         children: [
-          // Chat header
+          // Enhanced chat header with history info
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
@@ -238,18 +416,109 @@ class _ChatInterfaceState extends State<ChatInterface> {
                         color: Colors.blue.shade800,
                       ),
                     ),
-                    if (widget.toolService != null)
-                      Text(
-                        'Enhanced with tool calling',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.blue.shade600,
-                        ),
-                      ),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (widget.toolService != null)
+                          Text(
+                            'Enhanced with tool calling',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.blue.shade600,
+                            ),
+                          ),
+                        if (widget.toolService != null && _messages.isNotEmpty) ...[
+                          // Text(" • ", style: TextStyle(color: Colors.blue.shade600)),
+                          Text(
+                            '${(_messages.length / 2).ceil()} exchanges',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.blueGrey.shade600,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
                   ],
                 ),
                 Row(
                   children: [
+                    // Quick Actions Dropdown
+                    if (widget.toolService != null && _messages.length < 6)
+                      PopupMenuButton<String>(
+                        onSelected: (String action) {
+                          _handleQuickAction(action);
+                        },
+                        itemBuilder: (BuildContext context) => [
+                          const PopupMenuItem<String>(
+                            value: 'create_task',
+                            child: Row(
+                              children: [
+                                Icon(Icons.add_task, size: 18),
+                                SizedBox(width: 8),
+                                Text('Create a task'),
+                              ],
+                            ),
+                          ),
+                          const PopupMenuItem<String>(
+                            value: 'schedule_meeting',
+                            child: Row(
+                              children: [
+                                Icon(Icons.event, size: 18),
+                                SizedBox(width: 8),
+                                Text('Schedule meeting'),
+                              ],
+                            ),
+                          ),
+                          const PopupMenuItem<String>(
+                            value: 'view_today',
+                            child: Row(
+                              children: [
+                                Icon(Icons.today, size: 18),
+                                SizedBox(width: 8),
+                                Text('View today\'s agenda'),
+                              ],
+                            ),
+                          ),
+                          const PopupMenuItem<String>(
+                            value: 'set_reminder',
+                            child: Row(
+                              children: [
+                                Icon(Icons.alarm, size: 18),
+                                SizedBox(width: 8),
+                                Text('Set reminder'),
+                              ],
+                            ),
+                          ),
+                        ],
+                        icon: Icon(
+                          Icons.flash_on,
+                          color: Colors.blue.shade800,
+                        ),
+                        tooltip: 'Quick actions',
+                      ),
+                    if (_messages.isNotEmpty)
+                      IconButton(
+                        onPressed: () {
+                          if (widget.toolService != null) {
+                            showDialog(
+                              context: context,
+                              builder: (context) => AlertDialog(
+                                title: const Text('Recent Actions'),
+                                content: Text(widget.toolService!.getRecentActionsSummary()),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () => Navigator.pop(context),
+                                    child: const Text('Close'),
+                                  ),
+                                ],
+                              ),
+                            );
+                          }
+                        },
+                        icon: Icon(Icons.history, color: Colors.blue.shade800),
+                        tooltip: 'View recent actions',
+                      ),
                     IconButton(
                       onPressed: _clearChat,
                       icon: Icon(Icons.delete, color: Colors.blue.shade800),
@@ -266,10 +535,6 @@ class _ChatInterfaceState extends State<ChatInterface> {
             ),
           ),
           
-          // Quick actions
-          if (widget.toolService != null && _messages.isEmpty)
-            _buildQuickActions(),
-          
           // Chat messages
           Expanded(
             child: ListView.builder(
@@ -278,7 +543,6 @@ class _ChatInterfaceState extends State<ChatInterface> {
               itemCount: _messages.length + (_isLoading ? 1 : 0),
               itemBuilder: (_, int index) {
                 if (index == _messages.length && _isLoading) {
-                  // Loading indicator
                   return Container(
                     margin: const EdgeInsets.symmetric(vertical: 10.0, horizontal: 16.0),
                     child: Row(
@@ -318,7 +582,9 @@ class _ChatInterfaceState extends State<ChatInterface> {
                     maxLines: null,
                     decoration: InputDecoration(
                       hintText: widget.toolService != null 
-                        ? 'Ask me to create tasks, schedule events, or manage your calendar...'
+                        ? (_messages.isEmpty 
+                            ? 'Ask me to create tasks, schedule events, or manage your calendar...'
+                            : 'Continue our conversation...')
                         : 'Ask about your calendar or anything else...',
                       contentPadding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
                       border: OutlineInputBorder(
@@ -358,6 +624,30 @@ class _ChatInterfaceState extends State<ChatInterface> {
         ],
       ),
     );
+  }
+
+  // Add this method to handle quick action selections
+  void _handleQuickAction(String action) {
+    String message = '';
+    switch (action) {
+      case 'create_task':
+        message = 'Help me create a new task';
+        break;
+      case 'schedule_meeting':
+        message = 'Help me schedule a meeting';
+        break;
+      case 'view_today':
+        message = 'Show me today\'s agenda';
+        break;
+      case 'set_reminder':
+        message = 'Help me set a reminder';
+        break;
+    }
+    
+    if (message.isNotEmpty) {
+      _textController.text = message;
+      _handleChatSubmitted(message);
+    }
   }
 }
 
