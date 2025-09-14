@@ -6,6 +6,7 @@ enum GlobalTimerState { idle, running, paused, completed }
 class GlobalTimerService {
   // Helper to get current focus minutes from PomodoroSettings
   int get _focusMinutes => PomodoroSettings.instance.pomodoroLength;
+  int get focusMinutes => _focusMinutes;
 
   // Call this to refresh session info if pomodoro length changes
   void refreshSessionInfo({double? estimatedHours, double? timeSpentHours}) {

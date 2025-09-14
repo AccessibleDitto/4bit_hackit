@@ -457,35 +457,7 @@ class _MyHomePageState extends State<MyHomePage> with TickerProviderStateMixin {
                 // Login Button
                 _buildSecondaryButton('Login', onPressed: _handleLogin),
 
-                // remove test buttons after integration
-                const SizedBox(height: 16),
-                _buildTestButton(
-                  'tasks test button',
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => TasksPage()),
-                    );
-                  },
-                ),
-                _buildTestButton(
-                  'homepage test',
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => TimerModePage()),
-                    );
-                  },
-                ),
-                _buildTestButton(
-                  'settings test',
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => SettingsScreen()),
-                    );
-                  },
-                ),
+              
               ],
             ),
           ),
