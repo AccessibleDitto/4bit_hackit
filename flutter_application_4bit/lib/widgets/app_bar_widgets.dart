@@ -22,8 +22,14 @@ class TimerAppBar extends StatelessWidget {
     bool shouldShowTaskPill = timerState != TimerState.idle && 
                               timerState != TimerState.completed;
     
+    final screenHeight = MediaQuery.of(context).size.height;
+    final isSmallScreen = screenHeight < 700;
+    
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+      padding: EdgeInsets.symmetric(
+        horizontal: 24, 
+        vertical: isSmallScreen ? 12 : 16
+      ),
       decoration: const BoxDecoration(
         gradient: LinearGradient(
           colors: [Color(0xFF9333EA), Color(0xFF8B5CF6)],

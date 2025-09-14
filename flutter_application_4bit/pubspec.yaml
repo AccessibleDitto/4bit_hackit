@@ -48,6 +48,14 @@ dependencies:
   firebase_auth: ^6.0.1
   firebase_database: ^12.0.0
   shared_preferences: ^2.2.2
+  #App blocker package
+  app_limiter: ^0.0.4
+  #NFC Manager plugin v3.5.1 so it works with new flutter
+  nfc_manager: # Replace with the actual package name
+        git:
+          url: https://github.com/okadan/flutter-nfc-manager.git
+          ref: 78a3cb9 # Optional: Specify a branch, tag, or commit hash (e.g., 'dev', 'v1.0.0', 'abcdef123')
+
 
 dev_dependencies:
   flutter_test:

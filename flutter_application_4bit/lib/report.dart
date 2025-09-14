@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'widgets/navigation_widgets.dart';
-import 'services/user_stats_service.dart';
+import 'widgets/standard_app_bar.dart';
+import 'tasks_updated.dart' as TaskData;
+import 'models/task_models.dart' show TaskStatus, Project, Task;
 
 class ReportScreen extends StatefulWidget {
   @override
@@ -9,17 +11,288 @@ class ReportScreen extends StatefulWidget {
 }
 
 class _ReportScreenState extends State<ReportScreen> {
+  // Helper: Get completed tasks for a time range
+  int _getCompletedTasksForRange(String range) {
+    final now = DateTime.now();
+    final allTasks = TaskData.getTasksList();
+    if (range == 'today') {
+      return allTasks.where((t) => t.status == TaskStatus.completed && t.updatedAt.year == now.year && t.updatedAt.month == now.month && t.updatedAt.day == now.day).length;
+    } else if (range == 'week') {
+      final startOfWeek = now.subtract(Duration(days: now.weekday - 1));
+      return allTasks.where((t) => t.status == TaskStatus.completed && t.updatedAt.isAfter(startOfWeek)).length;
+    } else if (range == 'biweekly') {
+      final startOfBiweek = now.subtract(Duration(days: 13));
+      return allTasks.where((t) => t.status == TaskStatus.completed && t.updatedAt.isAfter(startOfBiweek)).length;
+    } else if (range == 'month') {
+      final startOfMonth = DateTime(now.year, now.month, 1);
+      return allTasks.where((t) => t.status == TaskStatus.completed && t.updatedAt.isAfter(startOfMonth)).length;
+    }
+    return 0;
+  }
+
+  // Helper: Get project time distribution data
+  List<Map<String, dynamic>> _getProjectTimeDistribution(String range) {
+    final now = DateTime.now();
+    final allTasks = TaskData.getTasksList();
+    final allProjects = TaskData.getProjectsList();
+    
+    // Filter tasks based on time range
+    List<Task> filteredTasks;
+    if (range == 'Weekly') {
+      final startOfWeek = now.subtract(Duration(days: now.weekday - 1));
+      filteredTasks = allTasks.where((t) => t.updatedAt.isAfter(startOfWeek)).toList();
+    } else {
+      // Monthly
+      final startOfMonth = DateTime(now.year, now.month, 1);
+      filteredTasks = allTasks.where((t) => t.updatedAt.isAfter(startOfMonth)).toList();
+    }
+    
+    // Calculate total time spent per project
+    Map<String, double> projectTimes = {};
+    double totalTime = 0.0;
+    
+    for (final task in filteredTasks) {
+      if (task.projectId != null && task.projectId!.isNotEmpty) {
+        projectTimes[task.projectId!] = (projectTimes[task.projectId!] ?? 0.0) + task.timeSpent;
+        totalTime += task.timeSpent;
+      }
+    }
+    
+    // Create project distribution data
+    List<Map<String, dynamic>> projectData = [];
+    for (final project in allProjects) {
+      double timeSpent = projectTimes[project.id] ?? 0.0;
+      if (timeSpent > 0) {
+        double percentage = totalTime > 0 ? (timeSpent / totalTime) * 100 : 0;
+        projectData.add({
+          'name': project.name,
+          'timeSpent': timeSpent,
+          'percentage': percentage,
+          'color': project.color,
+          'formattedTime': TaskData.formatTime(timeSpent),
+        });
+      }
+    }
+    
+    // Sort by time spent (descending)
+    projectData.sort((a, b) => b['timeSpent'].compareTo(a['timeSpent']));
+    
+    return projectData;
+  }
+
+  // Helper: Get tasks with focus time based on time range
+  List<Map<String, dynamic>> _getTasksWithFocusTime(String range) {
+    final now = DateTime.now();
+    final allTasks = TaskData.getTasksList();
+    
+    // Filter tasks based on time range
+    List<Task> filteredTasks;
+    if (range == 'Weekly') {
+      final startOfWeek = now.subtract(Duration(days: now.weekday - 1));
+      filteredTasks = allTasks.where((t) => t.updatedAt.isAfter(startOfWeek) && t.timeSpent > 0).toList();
+    } else {
+      // Monthly
+      final startOfMonth = DateTime(now.year, now.month, 1);
+      filteredTasks = allTasks.where((t) => t.updatedAt.isAfter(startOfMonth) && t.timeSpent > 0).toList();
+    }
+    
+    // Sort tasks by time spent (descending)
+    filteredTasks.sort((a, b) => b.timeSpent.compareTo(a.timeSpent));
+    
+    // Create task data with predefined color sequence
+    final colorSequence = [Colors.teal, Color(0xFFFF4757), Colors.blue, Colors.orange, Colors.pink];
+    List<Map<String, dynamic>> taskData = [];
+    
+    for (int i = 0; i < filteredTasks.length; i++) {
+      final task = filteredTasks[i];
+      Color taskColor = colorSequence[i % colorSequence.length];
+      
+      taskData.add({
+        'name': task.title,
+        'time': TaskData.formatTime(task.timeSpent),
+        'color': taskColor,
+        'timeSpent': task.timeSpent,
+      });
+    }
+    
+    return taskData;
+  }
+
+  String _formatTimeAsHoursMinutes(double totalMinutes) {
+    if (totalMinutes <= 0) return '0m';
+    
+    int hours = (totalMinutes / 60).floor();
+    int minutes = (totalMinutes % 60).round();
+    
+    if (minutes >= 60) {
+      hours += 1;
+      minutes = 0;
+    }
+    
+    if (hours > 0 && minutes > 0) {
+      return '${hours}h ${minutes}m';
+    } else if (hours > 0) {
+      return '${hours}h';
+    } else {
+      return '${minutes}m';
+    }
+  }
+
+  // Helper: Get focus time for a time range
+  String _getFocusTimeForRange(String range) {
+    final now = DateTime.now();
+    final allTasks = TaskData.getTasksList();
+    double total = 0.0;
+    if (range == 'today') {
+      total = allTasks.where((t) => t.updatedAt.year == now.year && t.updatedAt.month == now.month && t.updatedAt.day == now.day).fold(0.0, (a, b) => a + b.timeSpent);
+    } else if (range == 'week') {
+      final startOfWeek = now.subtract(Duration(days: now.weekday - 1));
+      total = allTasks.where((t) => t.updatedAt.isAfter(startOfWeek)).fold(0.0, (a, b) => a + b.timeSpent);
+    } else if (range == 'biweekly') {
+      final startOfBiweek = now.subtract(Duration(days: 13));
+      total = allTasks.where((t) => t.updatedAt.isAfter(startOfBiweek)).fold(0.0, (a, b) => a + b.timeSpent);
+    } else if (range == 'month') {
+      final startOfMonth = DateTime(now.year, now.month, 1);
+      total = allTasks.where((t) => t.updatedAt.isAfter(startOfMonth)).fold(0.0, (a, b) => a + b.timeSpent);
+    }
+    return _formatTimeAsHoursMinutes(total);
+  }
+
+  // Helper: Get pomodoro counts based on time range
+  List<BarChartGroupData> _generatePomodoroBarGroups(String range) {
+    final now = DateTime.now();
+    final allTasks = TaskData.getTasksList();
+    final colorList = [Color(0xFF9333EA), Color(0xFF10B981), Color(0xFF3B82F6), Color(0xFFEF4444), Color(0xFFF59E0B)];
+    
+    if (range == 'Monthly') {
+      // Show monthly data
+      return List.generate(7, (i) {
+        final monthsAgo = 6 - i;
+        final targetDate = DateTime(now.year, now.month - monthsAgo, 1);
+        
+        // Count completed tasks for this month
+        int pomodoroCount = allTasks.where((task) => 
+          task.status == TaskStatus.completed &&
+          task.updatedAt.year == targetDate.year &&
+          task.updatedAt.month == targetDate.month
+        ).length;
+        
+        return BarChartGroupData(
+          x: i,
+          barRods: [
+            BarChartRodData(
+              toY: pomodoroCount.toDouble(),
+              color: colorList[i % colorList.length],
+              width: 12,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ],
+        );
+      });
+    } else {
+      // Show daily data (Weekly)
+      return List.generate(7, (i) {
+        final daysAgo = 6 - i;
+        final targetDate = DateTime(now.year, now.month, now.day - daysAgo);
+        
+        // Count completed tasks for this day
+        int pomodoroCount = allTasks.where((task) => 
+          task.status == TaskStatus.completed &&
+          task.updatedAt.year == targetDate.year &&
+          task.updatedAt.month == targetDate.month &&
+          task.updatedAt.day == targetDate.day
+        ).length;
+        
+        return BarChartGroupData(
+          x: i,
+          barRods: [
+            BarChartRodData(
+              toY: pomodoroCount.toDouble(),
+              color: colorList[i % colorList.length],
+              width: 12,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ],
+        );
+      });
+    }
+  }
+
+  // Helper: Get task completion counts based on time range
+  List<BarChartGroupData> _generateTaskBarGroups(String range) {
+    final now = DateTime.now();
+    final allTasks = TaskData.getTasksList();
+    final colors = [Color(0xFF9333EA), Color(0xFF10B981), Color(0xFF3B82F6), Color(0xFFEF4444), Color(0xFFF59E0B)];
+    
+    if (range == 'Monthly') {
+      // Show monthly data
+      return List.generate(7, (i) {
+        final monthsAgo = 6 - i;
+        final targetDate = DateTime(now.year, now.month - monthsAgo, 1);
+        
+        // Get completed tasks for this month
+        final monthTasks = allTasks.where((task) => 
+          task.status == TaskStatus.completed &&
+          task.updatedAt.year == targetDate.year &&
+          task.updatedAt.month == targetDate.month
+        ).toList();
+        
+        final taskCount = monthTasks.length.toDouble();
+        
+        return BarChartGroupData(
+          x: i,
+          barRods: [
+            BarChartRodData(
+              toY: taskCount,
+              color: colors[i % colors.length],
+              width: 12,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ],
+        );
+      });
+    } else {
+      // Show daily data (Weekly)
+      return List.generate(7, (i) {
+        final daysAgo = 6 - i;
+        final targetDate = DateTime(now.year, now.month, now.day - daysAgo);
+        
+        // Get completed tasks for this day
+        final dayTasks = allTasks.where((task) => 
+          task.status == TaskStatus.completed &&
+          task.updatedAt.year == targetDate.year &&
+          task.updatedAt.month == targetDate.month &&
+          task.updatedAt.day == targetDate.day
+        ).toList();
+        
+        final taskCount = dayTasks.length.toDouble();
+        
+        return BarChartGroupData(
+          x: i,
+          barRods: [
+            BarChartRodData(
+              toY: taskCount,
+              color: colors[i % colors.length],
+              width: 12,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ],
+        );
+      });
+    }
+  }
   bool isPomodoroTab = true;
   int selectedTabIndex = 0;
 
   // Dropdown selections for each section
   String pomodoroRecordsRange = 'Weekly';
   String focusTimeGoalRange = 'Monthly';
-  String focusTimeChartRange = 'Biweekly';
+  String focusTimeChartRange = 'Weekly';
   String focusTimeTasksRange = 'Weekly';
   String projectTimeDistributionRange = 'Weekly';
   String taskChartRange = 'Weekly';
-  final List<String> rangeOptions = ['Weekly', 'Monthly', 'Biweekly'];
+  final List<String> rangeOptions = ['Weekly', 'Monthly'];
+  final List<String> monthlyOnlyOptions = ['Monthly'];
 
   // Calendar state
   int displayedMonth = DateTime.now().month;
@@ -28,16 +301,11 @@ class _ReportScreenState extends State<ReportScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Color(0xFF1A1A1A),
-      appBar: AppBar(
+      backgroundColor: const Color(0xFF1A1A1A),
+      appBar: const StandardAppBar(
+        title: 'Report',
+        type: AppBarType.standard,
         backgroundColor: Color(0xFF1A1A1A),
-        elevation: 0,
-        leading: Icon(Icons.timer, color: Color(0xFFFF4757)),
-        title: Text('Report', style: TextStyle(color: Colors.white, fontSize: MediaQuery.of(context).size.width * 0.045)),
-        actions: [
-          Icon(Icons.more_vert, color: Colors.white),
-          SizedBox(width: MediaQuery.of(context).size.width * 0.04),
-        ],
       ),
       body: SafeArea(
         child: Column(
@@ -118,11 +386,11 @@ class _ReportScreenState extends State<ReportScreen> {
           Row(
             children: [
               Expanded(
-                child: _buildStatCard(UserStats().todayFocusTime, 'Focus Time Today'),
+                child: _buildStatCard(_getFocusTimeForRange('today'), 'Focus Time Today'),
               ),
               SizedBox(width: MediaQuery.of(context).size.width * 0.03),
               Expanded(
-                child: _buildStatCard(UserStats().weekFocusTime, 'Focus Time This Week'),
+                child: _buildStatCard(_getFocusTimeForRange('week'), 'Focus Time This Week'),
               ),
             ],
           ),
@@ -130,11 +398,11 @@ class _ReportScreenState extends State<ReportScreen> {
           Row(
             children: [
               Expanded(
-                child: _buildStatCard(UserStats().twoWeeksFocusTime, 'Focus Time This Two Weeks'),
+                child: _buildStatCard(_getFocusTimeForRange('biweekly'), 'Focus Time This Two Weeks'),
               ),
               SizedBox(width: MediaQuery.of(context).size.width * 0.03),
               Expanded(
-                child: _buildStatCard(UserStats().monthFocusTime, 'Focus Time This Month'),
+                child: _buildStatCard(_getFocusTimeForRange('month'), 'Focus Time This Month'),
               ),
             ],
           ),
@@ -153,7 +421,7 @@ class _ReportScreenState extends State<ReportScreen> {
           SizedBox(height: MediaQuery.of(context).size.height * 0.03),
 
           // Focus Time Goal
-          _buildSectionHeaderWithDropdown('Focus Time Goal', focusTimeGoalRange, (String? newValue) {
+          _buildSectionHeaderWithMonthlyDropdown('Focus Time Goal', focusTimeGoalRange, (String? newValue) {
             setState(() {
               focusTimeGoalRange = newValue!;
             });
@@ -190,11 +458,11 @@ class _ReportScreenState extends State<ReportScreen> {
           Row(
             children: [
               Expanded(
-                child: _buildStatCard('2', 'Task Completed Today'),
+                child: _buildStatCard(_getCompletedTasksForRange('today').toString(), 'Task Completed Today'),
               ),
               SizedBox(width: MediaQuery.of(context).size.width * 0.03),
               Expanded(
-                child: _buildStatCard('25', 'Task Completed This Week'),
+                child: _buildStatCard(_getCompletedTasksForRange('week').toString(), 'Task Completed This Week'),
               ),
             ],
           ),
@@ -202,11 +470,11 @@ class _ReportScreenState extends State<ReportScreen> {
           Row(
             children: [
               Expanded(
-                child: _buildStatCard('58', 'Task Completed This Two Weeks'),
+                child: _buildStatCard(_getCompletedTasksForRange('biweekly').toString(), 'Task Completed This Two Weeks'),
               ),
               SizedBox(width: MediaQuery.of(context).size.width * 0.03),
               Expanded(
-                child: _buildStatCard('124', 'Task Completed This Month'),
+                child: _buildStatCard(_getCompletedTasksForRange('month').toString(), 'Task Completed This Month'),
               ),
             ],
           ),
@@ -254,6 +522,7 @@ class _ReportScreenState extends State<ReportScreen> {
 
   Widget _buildStatCard(String value, String label) {
     return Container(
+      height: MediaQuery.of(context).size.height * 0.15,
       padding: EdgeInsets.all(MediaQuery.of(context).size.width * 0.04),
       decoration: BoxDecoration(
         color: Color(0xFF2D2D2D),
@@ -261,6 +530,7 @@ class _ReportScreenState extends State<ReportScreen> {
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Text(
             value,
@@ -270,12 +540,17 @@ class _ReportScreenState extends State<ReportScreen> {
               fontWeight: FontWeight.bold,
             ),
           ),
-          SizedBox(height: MediaQuery.of(context).size.height * 0.005),
-          Text(
-            label,
-            style: TextStyle(
-              color: Colors.grey[400],
-              fontSize: MediaQuery.of(context).size.width * 0.03,
+          SizedBox(height: 14),
+          Container(
+            height: 30, // Fixed height for description area
+            child: Text(
+              label,
+              style: TextStyle(
+                color: Colors.grey[400],
+                fontSize: MediaQuery.of(context).size.width * 0.03,
+              ),
+              maxLines: 2, // Up to 2 lines for longer labels
+              overflow: TextOverflow.ellipsis,
             ),
           ),
         ],
@@ -283,16 +558,16 @@ class _ReportScreenState extends State<ReportScreen> {
     );
   }
 
-  Widget _buildSectionHeaderWithDropdown(String title, String selectedValue, ValueChanged<String?> onChanged, {List<String>? options}) {
+  Widget _buildSectionHeaderWithDropdown(String title, String selectedValue, ValueChanged<String?> onChanged) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Text(
           title,
           style: TextStyle(
-            color: Colors.white,
-            fontSize: MediaQuery.of(context).size.width * 0.045,
-            fontWeight: FontWeight.w600,
+            color: Colors.grey[400],
+            fontSize: MediaQuery.of(context).size.width * 0.04,
+            fontWeight: FontWeight.bold,
           ),
         ),
         Container(
@@ -325,7 +600,65 @@ class _ReportScreenState extends State<ReportScreen> {
     );
   }
 
+  Widget _buildSectionHeaderWithMonthlyDropdown(String title, String selectedValue, ValueChanged<String?> onChanged) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          title,
+          style: TextStyle(
+            color: Colors.grey[400],
+            fontSize: MediaQuery.of(context).size.width * 0.04,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        Container(
+          padding: EdgeInsets.symmetric(
+            horizontal: MediaQuery.of(context).size.width * 0.03,
+            vertical: MediaQuery.of(context).size.height * 0.005,
+          ),
+          decoration: BoxDecoration(
+            color: Color(0xFF2D2D2D),
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<String>(
+              value: selectedValue,
+              icon: Icon(Icons.keyboard_arrow_down, color: Colors.grey[400], size: 16),
+              dropdownColor: Color(0xFF2D2D2D),
+              style: TextStyle(color: Colors.grey[400], fontSize: MediaQuery.of(context).size.width * 0.03),
+              itemHeight: 48,
+              items: monthlyOnlyOptions.map((String value) {
+                return DropdownMenuItem<String>(
+                  value: value,
+                  child: Text(value),
+                );
+              }).toList(),
+              onChanged: onChanged,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildPomodoroChart() {
+    final pomodoroBarGroups = _generatePomodoroBarGroups(pomodoroRecordsRange);
+    final maxY = pomodoroBarGroups.isEmpty ? 10.0 : pomodoroBarGroups.map((g) => g.barRods.first.toY).reduce((a, b) => a > b ? a : b);
+    
+    double finalMaxY;
+    if (maxY <= 1) {
+      finalMaxY = 1.0;
+    } else if (maxY <= 6) {
+      finalMaxY = 6.0;
+    } else if (maxY <= 12) {
+      finalMaxY = 12.0;
+    } else if (maxY <= 24) {
+      finalMaxY = 24.0;
+    } else {
+      finalMaxY = (maxY * 1.2).ceilToDouble();
+    }
+    
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -339,7 +672,8 @@ class _ReportScreenState extends State<ReportScreen> {
           child: BarChart(
             BarChartData(
               alignment: BarChartAlignment.spaceAround,
-              maxY: 10,
+              minY: 0,
+              maxY: finalMaxY,
               barTouchData: BarTouchData(enabled: false),
               titlesData: FlTitlesData(
                 show: true,
@@ -348,22 +682,53 @@ class _ReportScreenState extends State<ReportScreen> {
                     showTitles: true,
                     getTitlesWidget: (value, meta) {
                       final i = value.toInt();
-                      final date = DateTime.now().subtract(Duration(days: 6 - i));
-                      final label = i == 6
-                        ? 'Today'
-                        : i == 5
-                          ? 'Yesterday'
-                          : '${date.month}/${date.day}';
-                      return Text(label, style: TextStyle(color: Colors.grey[600], fontSize: MediaQuery.of(context).size.width * 0.025));
+                      final now = DateTime.now();
+                      
+                      if (pomodoroRecordsRange == 'Monthly') {
+                        final monthsAgo = 6 - i;
+                        final targetDate = DateTime(now.year, now.month - monthsAgo, 1);
+                        final monthName = _monthName(targetDate.month);
+                        return Text(
+                          monthName.substring(0, 3), // short month name
+                          style: TextStyle(color: Colors.grey[600], fontSize: MediaQuery.of(context).size.width * 0.025)
+                        );
+                      } else {
+                        // Daily labels for Weekly
+                        final date = DateTime.now().subtract(Duration(days: 6 - i));
+                        final label = i == 6
+                          ? 'Today'
+                          : i == 5
+                            ? 'Yesterday'
+                            : '${date.month}/${date.day}';
+                        return Text(label, style: TextStyle(color: Colors.grey[600], fontSize: MediaQuery.of(context).size.width * 0.025));
+                      }
                     },
                   ),
                 ),
                 leftTitles: AxisTitles(
                   sideTitles: SideTitles(
                     showTitles: true,
+                    interval: finalMaxY <= 1 ? 0.2 : finalMaxY <= 6 ? 1 : finalMaxY <= 12 ? 2 : finalMaxY <= 24 ? 4 : finalMaxY / 6,
+                    reservedSize: 40,
                     getTitlesWidget: (value, meta) {
+                      // Only show values within the range
+                      if (value < 0 || value > finalMaxY) return Container();
+                      
+                      // Format based on the scale
+                      String label;
+                      if (finalMaxY <= 1) {
+                        // For small values, show one decimal place
+                        label = value.toStringAsFixed(1);
+                      } else if (value == value.toInt()) {
+                        // For whole numbers, show as integer
+                        label = value.toInt().toString();
+                      } else {
+                        // For decimal values, show one decimal place
+                        label = value.toStringAsFixed(1);
+                      }
+                      
                       return Text(
-                        value.toInt().toString(),
+                        label,
                         style: TextStyle(color: Colors.grey[600], fontSize: 10),
                       );
                     },
@@ -374,59 +739,13 @@ class _ReportScreenState extends State<ReportScreen> {
               ),
               gridData: FlGridData(show: false),
               borderData: FlBorderData(show: false),
-              barGroups: List.generate(7, (i) {
-                // TODO: Replace with actual pomodoro count for each day
-                final pomodorosCompleted = 2 + i; // Example data
-                final colorList = [Color(0xFF9333EA), Color(0xFF10B981), Color(0xFF3B82F6), Color(0xFFEF4444), Color(0xFFF59E0B)];
-                return BarChartGroupData(
-                  x: i,
-                  barRods: [
-                    BarChartRodData(
-                      toY: pomodorosCompleted.toDouble(),
-                      color: colorList[i % colorList.length],
-                      width: 12,
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ],
-                );
-              }),
+              barGroups: pomodoroBarGroups,
             ),
           ),
         ),
         Padding(
           padding: EdgeInsets.only(top: 4, left: 8),
           child: Text('no. of pomodoros completed', style: TextStyle(color: Colors.grey[400], fontSize: 12)),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildPomodoroBar(Color color, double height, String label) {
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.end,
-      children: [
-        Expanded(
-          child: Container(
-            width: MediaQuery.of(context).size.width * 0.05,
-            margin: EdgeInsets.only(bottom: 8),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                Container(
-                  width: MediaQuery.of(context).size.width * 0.05,
-                  height: height * 120,
-                  decoration: BoxDecoration(
-                    color: color,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-        Text(
-          label,
-          style: TextStyle(color: Colors.grey[600], fontSize: MediaQuery.of(context).size.width * 0.025),
         ),
       ],
     );
@@ -506,7 +825,6 @@ class _ReportScreenState extends State<ReportScreen> {
     for (int week = 0; week < 6; week++) {
       List<Widget> days = [];
       for (int weekday = 1; weekday <= 7; weekday++) {
-    // cellIndex not used, removed
         if (week == 0 && weekday < firstWeekday) {
           days.add(_buildCalendarDayDynamic(null, false, false, false));
         } else if (dayCounter > daysInMonth) {
@@ -562,9 +880,24 @@ class _ReportScreenState extends State<ReportScreen> {
   }
 
   Widget _buildFocusTimeChart() {
-    // Use stacked bar chart data
-    final stackedBarGroups = _generateStackedBarGroups();
-    final tallestStackedBar = stackedBarGroups.map((g) => g.barRods.map((r) => r.toY).reduce((a, b) => a > b ? a : b)).reduce((a, b) => a > b ? a : b);
+    // Use focus time bar chart data based on selected range
+    final focusTimeBarGroups = _generateFocusTimeBarGroups(focusTimeChartRange);
+    final maxY = focusTimeBarGroups.isEmpty ? 10.0 : focusTimeBarGroups.map((g) => g.barRods.map((r) => r.toY).reduce((a, b) => a > b ? a : b)).reduce((a, b) => a > b ? a : b);
+    
+    // Dynamic y-axis scaling with appropriate intervals
+    double finalMaxY;
+    if (maxY <= 1) {
+      finalMaxY = 1.0;
+    } else if (maxY <= 6) {
+      finalMaxY = 6.0;
+    } else if (maxY <= 12) {
+      finalMaxY = 12.0;
+    } else if (maxY <= 24) {
+      finalMaxY = 24.0;
+    } else {
+      finalMaxY = (maxY * 1.2).ceilToDouble();
+    }
+    
     return Container(
       height: MediaQuery.of(context).size.height * 0.25,
       padding: EdgeInsets.all(MediaQuery.of(context).size.width * 0.04),
@@ -575,7 +908,8 @@ class _ReportScreenState extends State<ReportScreen> {
       child: BarChart(
         BarChartData(
           alignment: BarChartAlignment.spaceAround,
-          maxY: tallestStackedBar.ceilToDouble(),
+          minY: 0,
+          maxY: finalMaxY,
           barTouchData: BarTouchData(enabled: false),
           titlesData: FlTitlesData(
             show: true,
@@ -584,29 +918,60 @@ class _ReportScreenState extends State<ReportScreen> {
                 showTitles: true,
                 getTitlesWidget: (value, meta) {
                   final i = value.toInt();
-                  final daysAgo = 6 - i;
-                  String label;
-                  if (daysAgo == 0) {
-                    label = 'Today';
-                  } else if (daysAgo == 1) {
-                    label = 'Yesterday';
+                  final now = DateTime.now();
+                  
+                  if (focusTimeChartRange == 'Monthly') {
+                    final monthsAgo = 6 - i;
+                    final targetDate = DateTime(now.year, now.month - monthsAgo, 1);
+                    final monthName = _monthName(targetDate.month);
+                    return Text(
+                      monthName.substring(0, 3), // short month name
+                      style: TextStyle(color: Colors.grey[600], fontSize: 10),
+                    );
                   } else {
-                    final date = DateTime.now().subtract(Duration(days: daysAgo));
-                    label = '${date.month}/${date.day}';
+                    // Daily labels for Weekly
+                    final daysAgo = 6 - i;
+                    String label;
+                    if (daysAgo == 0) {
+                      label = 'Today';
+                    } else if (daysAgo == 1) {
+                      label = 'Yesterday';
+                    } else {
+                      final date = DateTime.now().subtract(Duration(days: daysAgo));
+                      label = '${date.month}/${date.day}';
+                    }
+                    return Text(
+                      label,
+                      style: TextStyle(color: Colors.grey[600], fontSize: 10),
+                    );
                   }
-                  return Text(
-                    label,
-                    style: TextStyle(color: Colors.grey[600], fontSize: 10),
-                  );
                 },
               ),
             ),
             leftTitles: AxisTitles(
               sideTitles: SideTitles(
                 showTitles: true,
+                interval: finalMaxY <= 1 ? 0.2 : finalMaxY <= 6 ? 1 : finalMaxY <= 12 ? 2 : finalMaxY <= 24 ? 4 : finalMaxY / 6,
+                reservedSize: 40,
                 getTitlesWidget: (value, meta) {
+                  // Only show values within the range
+                  if (value < 0 || value > finalMaxY) return Container();
+                  
+                  // Format based on the scale
+                  String label;
+                  if (finalMaxY <= 1) {
+                    // For small values, show one decimal place
+                    label = value.toStringAsFixed(1);
+                  } else if (value == value.toInt()) {
+                    // For whole numbers, show as integer
+                    label = value.toInt().toString();
+                  } else {
+                    // For decimal values, show one decimal place
+                    label = value.toStringAsFixed(1);
+                  }
+                  
                   return Text(
-                    value.toInt().toString(),
+                    label,
                     style: TextStyle(color: Colors.grey[600], fontSize: 10),
                   );
                 },
@@ -617,80 +982,95 @@ class _ReportScreenState extends State<ReportScreen> {
           ),
           gridData: FlGridData(show: false),
           borderData: FlBorderData(show: false),
-          barGroups: stackedBarGroups,
+          barGroups: focusTimeBarGroups,
         ),
       ),
     );
   }
 
-  List<BarChartGroupData> _generateStackedBarGroups() {
-    final colors = [
-      Colors.teal,
-      Colors.green,
-      Colors.yellow,
-      Colors.orange,
-      Colors.red,
-      Colors.purple,
-      Colors.blue,
-      Colors.cyan,
-      Colors.pink,
-      Colors.brown,
-      Colors.grey,
-      Colors.indigo,
-    ];
+  List<BarChartGroupData> _generateFocusTimeBarGroups(String range) {
+    final now = DateTime.now();
+    final allTasks = TaskData.getTasksList();
     
-    // Data representing stacked segments for each bar
-    final stackedData = [
-      [0.5, 0.8, 1.2, 1.5],
-      [0.4, 0.9, 1.4, 1.6, 1.9],
-      [0.3, 0.7, 1.1, 1.8, 2.2],
-      [0.2, 0.6, 1.0, 1.3, 1.7, 2.8],
-      [0.4, 0.8, 1.5, 1.8, 2.4, 2.7],
-      [0.3, 0.9, 1.2, 1.7, 2.2, 2.8, 4.3],
-      [0.5, 1.0, 1.8, 2.5, 3.0, 4.0, 4.8],
-      [0.2, 0.8, 1.5, 2.2, 2.8, 3.5, 4.0, 4.7],
-    ];
-    
-    return List.generate(7, (index) {
-      final segments = stackedData[index];
-      List<BarChartRodStackItem> stackItems = [];
-      
-      for (int i = 0; i < segments.length; i++) {
-        double fromY = i == 0 ? 0 : segments[i - 1];
-        double toY = segments[i];
-        stackItems.add(
-          BarChartRodStackItem(
-            fromY,
-            toY,
-            colors[i % colors.length],
-          ),
+    if (range == 'Monthly') {
+      // Show monthly data
+      return List.generate(7, (index) {
+        final monthsAgo = 6 - index;
+        final targetDate = DateTime(now.year, now.month - monthsAgo, 1);
+        
+        // Get total time spent for tasks in this month
+        double totalTimeInHours = 0.0;
+        for (final task in allTasks) {
+          if (task.updatedAt.year == targetDate.year && 
+              task.updatedAt.month == targetDate.month) {
+            totalTimeInHours += task.timeSpent / 60.0;
+          }
+        }
+        
+        return BarChartGroupData(
+          x: index,
+          barRods: [
+            BarChartRodData(
+              toY: totalTimeInHours,
+              color: Color(0xFFFF4757),
+              width: 16,
+              borderRadius: BorderRadius.circular(4),
+            ),
+          ],
         );
-      }
-      
-      return BarChartGroupData(
-        x: index,
-        barRods: [
-          BarChartRodData(
-            toY: segments.last,
-            rodStackItems: stackItems,
-            width: 12,
-            borderRadius: BorderRadius.circular(2),
-          ),
-        ],
-      );
-    });
+      });
+    } else {
+      // Show daily data (Weekly)
+      return List.generate(7, (index) {
+        final daysAgo = 6 - index;
+        final targetDate = DateTime(now.year, now.month, now.day - daysAgo);
+        
+        // Get total time spent for tasks in this day
+        double totalTimeInHours = 0.0;
+        for (final task in allTasks) {
+          if (task.updatedAt.year == targetDate.year && 
+              task.updatedAt.month == targetDate.month &&
+              task.updatedAt.day == targetDate.day) {
+            totalTimeInHours += task.timeSpent / 60.0;
+          }
+        }
+        
+        return BarChartGroupData(
+          x: index,
+          barRods: [
+            BarChartRodData(
+              toY: totalTimeInHours,
+              color: Color(0xFFFF4757),
+              width: 16,
+              borderRadius: BorderRadius.circular(4),
+            ),
+          ],
+        );
+      });
+    }
   }
 
+
+
   Widget _buildTaskList() {
-    final tasks = [
-      {'name': 'UI/UX Design Research', 'time': '7h 25m', 'color': Colors.green},
-      {'name': 'Design User Interface (UI)', 'time': '6h 30m', 'color': Color(0xFFFF4757)},
-      {'name': 'Create a Design Wireframe', 'time': '5h 40m', 'color': Colors.yellow},
-      {'name': 'Market Research and Analysis', 'time': '4h 45m', 'color': Colors.blue},
-      {'name': 'Write a Report & Proposal', 'time': '4h 30m', 'color': Colors.purple},
-      {'name': 'Write a Research Paper', 'time': '4h 5m', 'color': Colors.orange},
-      {'name': 'Read Articles', 'time': '3h 40m', 'color': Colors.red},
-    ];
+    final tasks = _getTasksWithFocusTime(focusTimeTasksRange);
+    
+    // If no tasks, show empty state
+    if (tasks.isEmpty) {
+      return Container(
+        padding: EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Color(0xFF2D2D2D),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Center(
+          child: Text(
+            'No focus time data available',
+            style: TextStyle(color: Colors.grey[400], fontSize: 16),
+          ),
+        ),
+      );
+    }
 
     return Container(
       decoration: BoxDecoration(
@@ -735,6 +1115,26 @@ class _ReportScreenState extends State<ReportScreen> {
   }
 
   Widget _buildProjectDistributionChart() {
+    final projectData = _getProjectTimeDistribution(projectTimeDistributionRange);
+    
+    // If no data, show empty state
+    if (projectData.isEmpty) {
+      return Container(
+        height: MediaQuery.of(context).size.height * 0.30,
+        padding: EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Color(0xFF2D2D2D),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Center(
+          child: Text(
+            'No project data available',
+            style: TextStyle(color: Colors.grey[400], fontSize: 16),
+          ),
+        ),
+      );
+    }
+    
     return Container(
       height: MediaQuery.of(context).size.height * 0.30,
       padding: EdgeInsets.all(16),
@@ -748,44 +1148,12 @@ class _ReportScreenState extends State<ReportScreen> {
             flex: 2,
             child: PieChart(
               PieChartData(
-                sections: [
-                  PieChartSectionData(
-                    value: 35,
-                    color: Colors.green,
-                    radius: 80,
-                    showTitle: false,
-                  ),
-                  PieChartSectionData(
-                    value: 20,
-                    color: Color(0xFFFF4757),
-                    radius: 80,
-                    showTitle: false,
-                  ),
-                  PieChartSectionData(
-                    value: 15,
-                    color: Colors.blue,
-                    radius: 80,
-                    showTitle: false,
-                  ),
-                  PieChartSectionData(
-                    value: 12,
-                    color: Colors.orange,
-                    radius: 80,
-                    showTitle: false,
-                  ),
-                  PieChartSectionData(
-                    value: 10,
-                    color: Colors.pink,
-                    radius: 80,
-                    showTitle: false,
-                  ),
-                  PieChartSectionData(
-                    value: 8,
-                    color: Colors.teal,
-                    radius: 80,
-                    showTitle: false,
-                  ),
-                ],
+                sections: projectData.map((project) => PieChartSectionData(
+                  value: project['percentage'],
+                  color: project['color'],
+                  radius: 80,
+                  showTitle: false,
+                )).toList(),
                 centerSpaceRadius: 30,
               ),
             ),
@@ -795,14 +1163,11 @@ class _ReportScreenState extends State<ReportScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                _buildLegendItem(Colors.green, 'General', '18h 15m - 35%'),
-                _buildLegendItem(Color(0xFFFF4757), 'Pomodoro App', '8h 5m - 20%'),
-                _buildLegendItem(Colors.blue, 'Flight App', '6h 10m - 15%'),
-                _buildLegendItem(Colors.orange, 'Work Project', '4h 48m - 12%'),
-                _buildLegendItem(Colors.pink, 'Dating App', '4h 10m - 10%'),
-                _buildLegendItem(Colors.teal, 'AI Chatbot App', '3h 12m - 8%'),
-              ],
+              children: projectData.map((project) => _buildLegendItem(
+                project['color'],
+                project['name'],
+                '${project['formattedTime']} - ${project['percentage'].toInt()}%',
+              )).toList(),
             ),
           ),
         ],
@@ -845,6 +1210,22 @@ class _ReportScreenState extends State<ReportScreen> {
   }
 
   Widget _buildTaskChart() {
+    final taskBarGroups = _generateTaskBarGroups(taskChartRange);
+    final maxY = taskBarGroups.isEmpty ? 10.0 : taskBarGroups.map((g) => g.barRods.first.toY).reduce((a, b) => a > b ? a : b);
+    
+    double finalMaxY;
+    if (maxY <= 1) {
+      finalMaxY = 1.0;
+    } else if (maxY <= 6) {
+      finalMaxY = 6.0;
+    } else if (maxY <= 12) {
+      finalMaxY = 12.0;
+    } else if (maxY <= 24) {
+      finalMaxY = 24.0;
+    } else {
+      finalMaxY = (maxY * 1.2).ceilToDouble();
+    }
+    
     return Container(
       height: MediaQuery.of(context).size.height * 0.25,
       padding: EdgeInsets.all(16),
@@ -862,7 +1243,7 @@ class _ReportScreenState extends State<ReportScreen> {
       child: BarChart(
         BarChartData(
           alignment: BarChartAlignment.spaceAround,
-          maxY: 7,
+          maxY: finalMaxY,
           barTouchData: BarTouchData(enabled: false),
           titlesData: FlTitlesData(
             show: true,
@@ -871,30 +1252,44 @@ class _ReportScreenState extends State<ReportScreen> {
                 showTitles: true,
                 getTitlesWidget: (value, meta) {
                   final i = value.toInt();
-                  final daysAgo = 6 - i;
-                  String label;
-                  if (daysAgo == 0) {
-                    label = 'Today';
-                  } else if (daysAgo == 1) {
-                    label = 'Yesterday';
+                  final now = DateTime.now();
+                  
+                  if (taskChartRange == 'Monthly') {
+                    final monthsAgo = 6 - i;
+                    final targetDate = DateTime(now.year, now.month - monthsAgo, 1);
+                    final monthName = _monthName(targetDate.month);
+                    return Text(
+                      monthName.substring(0, 3), // short month name
+                      style: TextStyle(color: Colors.grey[600], fontSize: 10, fontWeight: FontWeight.w600),
+                    );
                   } else {
-                    final date = DateTime.now().subtract(Duration(days: daysAgo));
-                    label = '${date.month}/${date.day}';
+                    // Daily labels for Weekly
+                    final daysAgo = 6 - i;
+                    String label;
+                    if (daysAgo == 0) {
+                      label = 'Today';
+                    } else if (daysAgo == 1) {
+                      label = 'Yesterday';
+                    } else {
+                      final date = DateTime.now().subtract(Duration(days: daysAgo));
+                      label = '${date.month}/${date.day}';
+                    }
+                    return Text(
+                      label,
+                      style: TextStyle(color: Colors.grey[600], fontSize: 10, fontWeight: FontWeight.w600),
+                    );
                   }
-                  return Text(
-                    label,
-                    style: TextStyle(color: Colors.grey[600], fontSize: 10, fontWeight: FontWeight.w600),
-                  );
                 },
               ),
             ),
             leftTitles: AxisTitles(
               sideTitles: SideTitles(
                 showTitles: true,
+                interval: finalMaxY <= 6 ? 1 : finalMaxY <= 12 ? 2 : finalMaxY <= 24 ? 4 : finalMaxY / 6,
                 getTitlesWidget: (value, meta) {
                   return Text(
                     value.toInt().toString(),
-                    style: TextStyle(color: Colors.blueGrey, fontSize: 10, fontWeight: FontWeight.w500),
+                    style: TextStyle(color: Colors.grey[600], fontSize: 10, fontWeight: FontWeight.w500),
                   );
                 },
               ),
@@ -904,59 +1299,9 @@ class _ReportScreenState extends State<ReportScreen> {
           ),
           gridData: FlGridData(show: false),
           borderData: FlBorderData(show: false),
-          barGroups: _generateTaskStackedBarGroups(),
+          barGroups: taskBarGroups,
         ),
       ),
     );
-  }
-
-  List<BarChartGroupData> _generateTaskStackedBarGroups() {
-    final colors = [
-      Color(0xFF9333EA),
-      Color(0xFF10B981),
-      Color(0xFF3B82F6),
-      Color(0xFFEF4444),
-      Color(0xFFF59E0B),
-    ];
-    
-    // Task chart stacked data
-    final taskStackedData = [
-      [0.3, 1.0, 2.0, 3.0, 4.0, 5.0],
-      [0.5, 1.2, 2.2, 3.0, 4.0],
-      [0.2, 0.8, 1.5, 2.0, 3.0],
-      [0.4, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0],
-      [0.3, 0.8, 1.8, 2.5, 3.0, 4.0],
-      [0.5, 1.2, 2.0, 3.2, 4.0, 5.0, 6.0],
-      [0.2, 1.0, 2.2, 3.0, 4.0, 5.0, 7.0],
-    ];
-    
-    return List.generate(7, (index) {
-      final segments = taskStackedData[index];
-      List<BarChartRodStackItem> stackItems = [];
-      
-      for (int i = 0; i < segments.length; i++) {
-        double fromY = i == 0 ? 0 : segments[i - 1];
-        double toY = segments[i];
-        stackItems.add(
-          BarChartRodStackItem(
-            fromY,
-            toY,
-            colors[i % colors.length],
-          ),
-        );
-      }
-      
-      return BarChartGroupData(
-        x: index,
-        barRods: [
-          BarChartRodData(
-            toY: segments.last,
-            rodStackItems: stackItems,
-            width: 12,
-            borderRadius: BorderRadius.circular(2),
-          ),
-        ],
-      );
-    });
   }
 }

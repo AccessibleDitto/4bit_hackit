@@ -9,6 +9,7 @@ class AmbientMusicController extends StatefulWidget {
   final String selectedAmbientMusic;
   final ValueChanged<bool> onAmbientMusicChanged;
   final ValueChanged<String> onAmbientMusicOptionChanged;
+  final bool isCompact;
 
   const AmbientMusicController({
     super.key,
@@ -16,6 +17,7 @@ class AmbientMusicController extends StatefulWidget {
     required this.selectedAmbientMusic,
     required this.onAmbientMusicChanged,
     required this.onAmbientMusicOptionChanged,
+    this.isCompact = false,
   });
 
   @override
@@ -116,6 +118,7 @@ class _AmbientMusicControllerState extends State<AmbientMusicController> {
       isSelected: widget.isAmbientMusic,
       color: const Color(0xFF3B82F6),
       onTap: _showAmbientMusicModal,
+      isCompact: widget.isCompact,
     );
   }
 }
@@ -178,8 +181,11 @@ class ModeSelectionBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final screenHeight = MediaQuery.of(context).size.height;
+    final isSmallScreen = screenHeight < 700; 
+    
     return Container(
-      margin: const EdgeInsets.all(20),
+      margin: EdgeInsets.all(isSmallScreen ? 2 : 5),
       decoration: BoxDecoration(
         color: const Color(0xFF18181B).withOpacity(0.8),
         borderRadius: BorderRadius.circular(20),
@@ -188,30 +194,39 @@ class ModeSelectionBar extends StatelessWidget {
           width: 1,
         ),
       ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: [
-          ModeOption(
-            icon: Icons.block,
-            label: 'Strict Mode',
-            isSelected: isStrictMode,
-            color: const Color(0xFFEF4444),
-            onTap: onStrictModePressed,
-          ),
-          ModeOption(
-            icon: Icons.timer,
-            label: 'Timer Mode',
-            isSelected: isTimerMode,
-            color: const Color(0xFF10B981),
-            onTap: () => _showTimerModeModal(context),
-          ),
-            AmbientMusicController(
-              isAmbientMusic: isAmbientMusic,
-              selectedAmbientMusic: selectedAmbientMusic,
-              onAmbientMusicChanged: onAmbientMusicChanged,
-              onAmbientMusicOptionChanged: onAmbientMusicOptionChanged,
+      child: Padding(
+        padding: EdgeInsets.symmetric(
+          vertical: isSmallScreen ? 3 : 1,
+          horizontal: 16,
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceAround,
+          children: [
+            ModeOption(
+              icon: Icons.block,
+              label: 'Strict Mode',
+              isSelected: isStrictMode,
+              color: const Color(0xFFEF4444),
+              onTap: onStrictModePressed,
+              isCompact: isSmallScreen,
             ),
-        ],
+            ModeOption(
+              icon: Icons.timer,
+              label: 'Timer Mode',
+              isSelected: isTimerMode,
+              color: const Color(0xFF10B981),
+              onTap: () => _showTimerModeModal(context),
+              isCompact: isSmallScreen,
+            ),
+              AmbientMusicController(
+                isAmbientMusic: isAmbientMusic,
+                selectedAmbientMusic: selectedAmbientMusic,
+                onAmbientMusicChanged: onAmbientMusicChanged,
+                onAmbientMusicOptionChanged: onAmbientMusicOptionChanged,
+                isCompact: isSmallScreen,
+              ),
+          ],
+        ),
       ),
     );
   }
@@ -318,6 +333,7 @@ class ModeOption extends StatelessWidget {
   final bool isSelected;
   final Color color;
   final VoidCallback onTap;
+  final bool isCompact;
 
   const ModeOption({
     super.key,
@@ -326,6 +342,7 @@ class ModeOption extends StatelessWidget {
     required this.isSelected,
     required this.color,
     required this.onTap,
+    this.isCompact = false,
   });
 
   @override
@@ -336,10 +353,11 @@ class ModeOption extends StatelessWidget {
         HapticFeedback.selectionClick();
       },
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
           Container(
-            width: 56,
-            height: 56,
+            width: isCompact ? 28 : 45,
+            height: isCompact ? 28 : 45,
             decoration: BoxDecoration(
               color: Colors.transparent,
               borderRadius: BorderRadius.circular(16),
@@ -351,15 +369,15 @@ class ModeOption extends StatelessWidget {
             child: Icon(
               icon,
               color: color,
-              size: 24,
+              size: isCompact ? 13 : 20,
             ),
           ),
-          const SizedBox(height: 8),
+          SizedBox(height: isCompact ? 2 : 8),
           Text(
             label,
             style: GoogleFonts.inter(
               color: color,
-              fontSize: 12,
+              fontSize: isCompact ? 8 : 12,
               fontWeight: FontWeight.w500,
             ),
           ),

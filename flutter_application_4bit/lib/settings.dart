@@ -8,6 +8,7 @@ import 'pomodoro_preferences.dart';
 import 'login.dart';
 import 'homepage.dart';
 import 'widgets/navigation_widgets.dart';
+import 'package:flutter_application_4bit/widgets/standard_app_bar.dart';
 
 // theme mode
 enum AppThemeMode { light, dark, system }
@@ -138,10 +139,14 @@ class _SettingsScreenState extends State<SettingsScreen>
       duration: const Duration(milliseconds: 300),
       child: Scaffold(
         backgroundColor: _colors.background,
+        appBar: const StandardAppBar(
+          title: 'Settings',
+          type: AppBarType.standard,
+        ),
+
         body: SafeArea(
           child: Column(
             children: [
-              _buildAppBar(),
               Expanded(
                 child: FadeTransition(
                   opacity: _fadeAnimation,
@@ -186,53 +191,7 @@ class _SettingsScreenState extends State<SettingsScreen>
           isStrictMode: false,
         ),
       ),
-    );
-  }
-
-  Widget _buildAppBar() {
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 300),
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-      child: Row(
-        children: [
-          Hero(
-            tag: 'settings_back_button',
-            child: Material(
-              color: Colors.transparent,
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 300),
-                child: IconButton(
-                  onPressed: null, // No action for settings icon
-                  icon: Icon(
-                    Icons.settings,
-                    color: _colors.onSurface,
-                    size: 24,
-                  ),
-                  style: IconButton.styleFrom(
-                    backgroundColor: _colors.surface,
-                    padding: const EdgeInsets.all(12),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
-          const Spacer(),
-          AnimatedDefaultTextStyle(
-            duration: const Duration(milliseconds: 300),
-            style: GoogleFonts.inter(
-              fontSize: 20,
-              fontWeight: FontWeight.w600,
-              color: _colors.onBackground,
-            ),
-            child: const Text('Settings'),
-          ),
-          const Spacer(),
-        ],
-      ),
-    );
+    ); 
   }
 
   Widget _buildSectionTitle(String title) {

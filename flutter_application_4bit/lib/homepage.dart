@@ -8,6 +8,16 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'dart:async';
 
+//imports for NFC and App Limiter
+import 'dart:async';
+import 'dart:developer';
+import 'package:app_limiter/app_limiter.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:nfc_manager/nfc_manager.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+
 // Import the modular files
 import 'models/timer_models.dart';
 import 'tasks_updated.dart' as TaskData show getTasksList, updateTaskTimeSpent, startTask, completeTask;
@@ -35,6 +45,13 @@ class _TimerModePageState extends State<TimerModePage> with TickerProviderStateM
   late AudioPlayer _audioPlayer;
   late VoidCallback _settingsListener;
   late VoidCallback _timerModeListener;
+  String _platformVersion = 'Unknown';
+  final _appLimiterPlugin = AppLimiter();
+  String _nfcStatus = 'NFC Status: Unknown';
+  String _readData = 'No data read yet';
+  bool _isReading = false;
+  bool _isNFCAvailable = false;
+  bool _isLocked = false;
 
   final GlobalTimerService _globalTimer = GlobalTimerService();
 
@@ -54,6 +71,184 @@ class _TimerModePageState extends State<TimerModePage> with TickerProviderStateM
   final int _selectedIndex = 0;
 
   dynamic _currentFullTask; // Track the currently selected full task with timeSpent
+
+  final TextEditingController _writeController = TextEditingController();
+  Future<void> _checkCurrentState() async {
+    final SharedPreferences prefs = await SharedPreferences.getInstance();
+    bool? isLocked = prefs.getBool('locked');
+    setState(() {
+      _isLocked = isLocked ?? false;
+    });
+  }
+  // App blocker
+  Future<void> initPlatformState() async {
+    String platformVersion;
+    try {
+      platformVersion =
+          await _appLimiterPlugin.getPlatformVersion() ??
+          'Unknown platform version';
+    } on PlatformException {
+      platformVersion = 'Failed to get platform version.';
+    }
+
+    if (!mounted) return;
+
+    setState(() {
+      _platformVersion = platformVersion;
+    });
+  }
+  Future<bool> checkAndroidPermission() async {
+    try {
+      final result = await _appLimiterPlugin.isAndroidPermissionAllowed();
+      log(result.toString(), name: 'Permission Status');
+      return result;
+    } catch (e) {
+      debugPrint(e.toString());
+      rethrow;
+    }
+  }
+  Future<void> requestAndroidPermission() async {
+    try {
+      await _appLimiterPlugin.requestAndroidPermission();
+    } catch (e) {
+      debugPrint(e.toString());
+      rethrow;
+    }
+  }
+
+  Future<void> blockAndroidApps() async {
+    try {
+      if (_isLocked) {
+        debugPrint("Apps are already blocked");
+        return;
+      }
+      await _appLimiterPlugin.blocAndroidApp();
+      setState(() {
+        _isLocked = true;
+      });
+    
+    } catch (e) {
+      debugPrint(e.toString());
+      rethrow;
+    }
+  }
+
+  Future<void> unBlockAndroidApps() async {
+    try {
+      if (!_isLocked) {
+        debugPrint("Apps are already unblocked");
+        return;
+      }
+      await _appLimiterPlugin.unblocAndroidApp();
+      setState(() {
+        _isLocked = false;
+      });
+    
+    } catch (e) {
+      debugPrint(e.toString());
+      rethrow;
+    }
+  }
+
+  //nfc
+  Future<void> _checkNFCAvailability() async {
+    bool isAvailable = await NfcManager.instance.isAvailable();
+    
+    setState(() {
+      _isNFCAvailable = isAvailable;
+      _nfcStatus = isAvailable ? 'NFC Status: Available' : 'NFC Status: Not Available';
+    });
+  }
+  Future<void> _startReading(context) async {
+
+    if (!_isNFCAvailable) {
+      debugPrint("NFC is not available on this device");
+      return;
+    }
+
+    setState(() {
+      _isReading = true;
+      _readData = 'Waiting for NFC tag...';
+    });
+
+    try {
+      NfcManager.instance.startSession(onDiscovered: (NfcTag tag) async {
+        try {
+          // Try to read NDEF data
+          var ndef = Ndef.from(tag);
+          if (ndef == null) {
+            if (mounted) {
+              setState(() {
+                _readData = 'Tag is not NDEF formatted or not readable';
+                _isReading = false;
+              });
+            }
+            return;
+          }
+
+          NdefMessage? ndefMessage = await ndef.read();
+
+          String data = '';
+          for (NdefRecord record in ndefMessage.records) {
+            if (record.typeNameFormat == NdefTypeNameFormat.nfcWellknown) {
+              if (record.type.length == 1 && record.type[0] == 0x54) {
+                // Text Record
+                List<int> payload = record.payload;
+                if (payload.isNotEmpty) {
+                  int languageLength = payload[0] & 0x3F;
+                  String text = String.fromCharCodes(payload.sublist(1 + languageLength));
+                  data += text;
+                }
+              } else if (record.type.length == 1 && record.type[0] == 0x55) {
+                // URI Record
+                List<int> payload = record.payload;
+                if (payload.isNotEmpty) {
+                  String uri = String.fromCharCodes(payload.sublist(1));
+                  data += uri;
+                }
+              }
+            }
+          }
+
+          if (mounted) {
+            setState(() {
+              _readData = data.isNotEmpty ? data : 'No readable text data found';
+              _isReading = false;
+            });
+          }
+
+          NfcManager.instance.stopSession();
+
+          // Check if the NFC tag contains "lock" command
+          debugPrint("Read data: $_readData");
+          if (data == "lock") {
+            debugPrint("Locking/Unlocking apps");
+            if (!_isLocked) {
+              await blockAndroidApps();
+              Navigator.pop(context); // Close the modal
+            } else {
+              await unBlockAndroidApps();
+              Navigator.pop(context); // Close the modal
+            }
+          }
+        } catch (e) {
+          if (mounted) {
+            setState(() {
+              _readData = 'Error reading tag: $e';
+              _isReading = false;
+            });
+          }
+          NfcManager.instance.stopSession(errorMessage: 'Error reading tag');
+        }
+      });
+    } catch (e) {
+      setState(() {
+        _readData = 'Error starting NFC session: $e';
+        _isReading = false;
+      });
+    }
+  }
+
 
   void _showTaskSelectionModal() {
     // Filter out completed tasks
@@ -262,6 +457,43 @@ class _TimerModePageState extends State<TimerModePage> with TickerProviderStateM
   }
 
   void _showModeModal(String title, String description, bool currentValue, Function(bool) onChanged) {
+    if (title  == 'Strict Mode Settings') {
+      if(checkAndroidPermission() == false){
+        showModalBottomSheet(context: context, builder: (context) => Container(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+            Text("Permissions not Granted", style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 16),
+            Text("Enable Usage Stats and Overlay Access to use Strict Mode."),
+            const SizedBox(height: 24),
+            ],
+          ),
+        ));
+      }
+      else{
+        _startReading(context);
+        var mode = _isLocked ? "Disable" : "Enable";
+        showModalBottomSheet(context: context, builder: (context) => Container(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+            Text("$mode Strict Mode", style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 16),
+            Text("Scan your NFC tag to $mode strict mode."),
+            const SizedBox(height: 24),
+            ],
+          ),
+        ));
+      }
+
+
+    }
+    else{
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(
@@ -288,6 +520,7 @@ class _TimerModePageState extends State<TimerModePage> with TickerProviderStateM
         ),
       ),
     );
+    }
   }
 
   Future<void> _loadTimerModeFromPrefs() async {
@@ -375,11 +608,14 @@ class _TimerModePageState extends State<TimerModePage> with TickerProviderStateM
   @override
   void initState() {
     super.initState();
+    _checkNFCAvailability();
+    initPlatformState();
     _confettiController = ConfettiController(duration: const Duration(seconds: 2));
     _progressAnimationController = AnimationController(
       duration: const Duration(milliseconds: 950),
       vsync: this,
     );
+    _checkCurrentState();
 
   _audioPlayer = AudioPlayer();
 
@@ -448,16 +684,19 @@ class _TimerModePageState extends State<TimerModePage> with TickerProviderStateM
   }
 
   @override
-  void dispose() {
+  void dispose() async {
+  final SharedPreferences prefs = await SharedPreferences.getInstance();
+  prefs.setBool('locked', _isLocked);
   PomodoroSettings.instance.removeListener(_settingsListener);
   PomodoroSettings.instance.removeListener(_timerModeListener);
-    _confettiController.dispose();
-    _progressAnimationController.dispose();
-    _progressNotifier.dispose();
-    _audioPlayer.dispose();
-    _globalTimer.onTick = null;
-    _globalTimer.onComplete = null;
-    super.dispose();
+  _confettiController.dispose();
+  _writeController.dispose();
+  _progressAnimationController.dispose();
+  _progressNotifier.dispose();
+  _audioPlayer.dispose();
+  _globalTimer.onTick = null;
+  _globalTimer.onComplete = null;
+  super.dispose();
   }
 
   @override
@@ -522,7 +761,7 @@ class _TimerModePageState extends State<TimerModePage> with TickerProviderStateM
                     // Main Timer Section
                     Expanded(
                       child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
+                        mainAxisAlignment: MediaQuery.of(context).size.height < 700 ? MainAxisAlignment.spaceEvenly : MainAxisAlignment.center,
                         children: [
                           // Show session indicator only in countdown mode and when a task is selected
                           if (_globalTimer.selectedTask != 'Select Task' && _isCountdownMode)
@@ -551,43 +790,56 @@ class _TimerModePageState extends State<TimerModePage> with TickerProviderStateM
                             )
                           else
                             // In count-up mode, show timer display without progress circle
-                            Container(
-                              width: 300,
-                              height: 300,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: const Color(0xFF0F0F0F),
-                                border: Border.all(
-                                  color: const Color(0xFF27272A),
-                                  width: 8,
-                                ),
-                              ),
-                              child: Center(
-                                child: Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Text(
-                                      TimerUtils.formatTime(_globalTimer.currentSeconds),
-                                      style: const TextStyle(
-                                        fontSize: 48,
-                                        fontWeight: FontWeight.w600,
-                                        color: Colors.white,
-                                      ),
+                            Builder(
+                              builder: (context) {
+                                final screenHeight = MediaQuery.of(context).size.height;
+                                final isSmallScreen = screenHeight < 700;
+                                final containerSize = isSmallScreen ? 160.0 : 300.0;
+                                
+                                // Use same font size calculation as TimerCircle
+                                final timerFontSize = containerSize * 0.16;
+                                final subtextFontSize = containerSize * 0.053;
+                                
+                                return Container(
+                                  width: containerSize,
+                                  height: containerSize,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    color: const Color(0xFF0F0F0F),
+                                    border: Border.all(
+                                      color: const Color(0xFF27272A),
+                                      width: isSmallScreen ? 6 : 8,
                                     ),
-                                    const SizedBox(height: 8),
-                                    Text(
-                                      _isBreakTime ? 'Break Time' : 'Count Up Mode',
-                                      style: TextStyle(
-                                        fontSize: 16,
-                                        color: Colors.white.withOpacity(0.7),
-                                      ),
+                                  ),
+                                  child: Center(
+                                    child: Column(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Text(
+                                          TimerUtils.formatTime(_globalTimer.currentSeconds),
+                                          style: GoogleFonts.inter(
+                                            fontSize: timerFontSize,
+                                            fontWeight: FontWeight.w300,
+                                            color: Colors.white,
+                                            letterSpacing: -1,
+                                          ),
+                                        ),
+                                        SizedBox(height: isSmallScreen ? 4 : 6),
+                                        Text(
+                                          _isBreakTime ? 'Break Time' : 'Count Up Mode',
+                                          style: GoogleFonts.inter(
+                                            fontSize: subtextFontSize,
+                                            color: Colors.white.withOpacity(0.7),
+                                          ),
+                                        ),
+                                      ],
                                     ),
-                                  ],
-                                ),
-                              ),
+                                  ),
+                                );
+                              }
                             ),
-                          const SizedBox(height: 40),
+                          SizedBox(height: MediaQuery.of(context).size.height < 700 ? 4 : 30),
                           // Action Buttons
                           TimerActionButtons(
                             timerState: _isBreakTime ? TimerState.breakRunning :

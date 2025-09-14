@@ -983,8 +983,8 @@ class _ProfileScreenState extends State<ProfileScreen>
                     physics: const NeverScrollableScrollPhysics(),
                     gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                       crossAxisCount: 4,
-                      crossAxisSpacing: 12,
-                      mainAxisSpacing: 12,
+                      crossAxisSpacing: 15,
+                      mainAxisSpacing: 15,
                     ),
                     itemCount: _avatarOptions.length,
                     itemBuilder: (context, index) {
@@ -1033,6 +1033,9 @@ class _ProfileScreenState extends State<ProfileScreen>
   }
 
   Widget _buildTabBar() {
+    final screenHeight = MediaQuery.of(context).size.height;
+    final isSmallScreen = screenHeight < 700;
+    
     return Container(
       height: 50,
       margin: const EdgeInsets.symmetric(horizontal: 20),
@@ -1066,23 +1069,28 @@ class _ProfileScreenState extends State<ProfileScreen>
         labelColor: Colors.white,
         unselectedLabelColor: const Color(0xFF999999),
         labelStyle: GoogleFonts.inter(
-          fontSize: 13,
+          fontSize: isSmallScreen ? 10 : 13,
           fontWeight: FontWeight.w700,
           letterSpacing: 0.5,
         ),
         unselectedLabelStyle: GoogleFonts.inter(
-          fontSize: 13,
+          fontSize: isSmallScreen ? 10 : 13,
           fontWeight: FontWeight.w500,
         ),
-        tabs: const [
+        tabs: [
           Tab(
             height: 42,
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.person_outline, size: 18),
-                SizedBox(width: 6),
-                Text('Personal'),
+                Icon(Icons.person_outline, size: isSmallScreen ? 14 : 18),
+                SizedBox(width: isSmallScreen ? 3 : 6),
+                Flexible(
+                  child: Text(
+                    'Personal',
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
               ],
             ),
           ),
@@ -1091,9 +1099,14 @@ class _ProfileScreenState extends State<ProfileScreen>
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.emoji_events_outlined, size: 18),
-                SizedBox(width: 6),
-                Text('Achievements'),
+                Icon(Icons.emoji_events_outlined, size: isSmallScreen ? 14 : 18),
+                SizedBox(width: isSmallScreen ? 3 : 6),
+                Flexible(
+                  child: Text(
+                    'Achievements',
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
               ],
             ),
           ),
@@ -1135,18 +1148,21 @@ class _ProfileScreenState extends State<ProfileScreen>
   }
 
   Widget _buildAchievementsTab() {
+    final screenHeight = MediaQuery.of(context).size.height;
+    final isSmallScreen = screenHeight < 700;
+    
     return SingleChildScrollView(
       physics: const BouncingScrollPhysics(),
       child: Padding(
-        padding: const EdgeInsets.all(20),
+        padding: EdgeInsets.all(isSmallScreen ? 1 : 20),
         child: Column(
           children: [
             _buildStatsGrid(),
-            const SizedBox(height: 30),
+            SizedBox(height: isSmallScreen ? 2 : 30),
             _buildBadgesSection(),
-            const SizedBox(height: 30),
+            SizedBox(height: isSmallScreen ? 2 : 30),
             _buildRecentAchievements(),
-            const SizedBox(height: 20),
+            SizedBox(height: isSmallScreen ? 1 : 20),
           ],
         ),
       ),
@@ -1230,13 +1246,16 @@ class _ProfileScreenState extends State<ProfileScreen>
   }
 
   Widget _buildStatsGrid() {
+    final screenHeight = MediaQuery.of(context).size.height;
+    final isSmallScreen = screenHeight < 700;
+    
     return GridView.count(
       crossAxisCount: 2,
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
-      mainAxisSpacing: 20,
-      crossAxisSpacing: 20,
-      childAspectRatio: 1.0,
+      mainAxisSpacing: isSmallScreen ? 8 : 20,
+      crossAxisSpacing: isSmallScreen ? 8 : 20,
+      childAspectRatio: isSmallScreen ? 1.1 : 1.0,
       children: [
         _buildStatCard('Pomodoros\nCompleted', '${_userStats.pomodorosCompleted}', Icons.timer, const Color(0xFFFF8C42)),
         _buildStatCard('Total Focus\nTime', _userStats.totalFocusTime, Icons.access_time, const Color(0xFF10B981)),
@@ -1247,16 +1266,19 @@ class _ProfileScreenState extends State<ProfileScreen>
   }
 
   Widget _buildStatCard(String title, String value, IconData icon, Color color) {
+    final screenHeight = MediaQuery.of(context).size.height;
+    final isSmallScreen = screenHeight < 700;
+    
     return Container(
-      padding: const EdgeInsets.all(24),
+      padding: EdgeInsets.all(isSmallScreen ? 8 : 24),
       decoration: BoxDecoration(
         color: const Color(0xFF1E1E1E),
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(isSmallScreen ? 12 : 20),
         border: Border.all(color: const Color(0xFF333333)),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.1),
-            blurRadius: 8,
+            blurRadius: isSmallScreen ? 4 : 8,
             offset: const Offset(0, 2),
           ),
         ],
@@ -1265,10 +1287,10 @@ class _ProfileScreenState extends State<ProfileScreen>
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Container(
-            padding: const EdgeInsets.all(16),
+            padding: EdgeInsets.all(isSmallScreen ? 3 : 10),
             decoration: BoxDecoration(
               color: color.withValues(alpha: 0.15),
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(isSmallScreen ? 5 : 16),
               border: Border.all(
                 color: color.withValues(alpha: 0.3),
                 width: 1,
@@ -1277,24 +1299,24 @@ class _ProfileScreenState extends State<ProfileScreen>
             child: Icon(
               icon,
               color: color,
-              size: 28,
+              size: isSmallScreen ? 10 : 25,
             ),
           ),
-          const SizedBox(height: 16),
+          SizedBox(height: isSmallScreen ? 2 : 7),
           Text(
             value,
             style: GoogleFonts.inter(
-              fontSize: 24,
+              fontSize: isSmallScreen ? 8 : 10,
               fontWeight: FontWeight.w800,
               color: Colors.white,
             ),
           ),
-          const SizedBox(height: 8),
+          SizedBox(height: isSmallScreen ? 1 : 7),
           Text(
             title,
             textAlign: TextAlign.center,
             style: GoogleFonts.inter(
-              fontSize: 14,
+              fontSize: isSmallScreen ? 6 : 9,
               color: const Color(0xFF888888),
               fontWeight: FontWeight.w600,
               height: 1.2,
@@ -1307,9 +1329,11 @@ class _ProfileScreenState extends State<ProfileScreen>
 
   Widget _buildBadgesSection() {
     final allBadges = _userStats.allAvailableBadges;
+    final screenHeight = MediaQuery.of(context).size.height;
+    final isSmallScreen = screenHeight < 700;
 
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: EdgeInsets.all(isSmallScreen ? 8 : 20),
       decoration: BoxDecoration(
         color: const Color(0xFF1E1E1E),
         borderRadius: BorderRadius.circular(16),
@@ -1328,29 +1352,32 @@ class _ProfileScreenState extends State<ProfileScreen>
           Row(
             children: [
               Container(
-                padding: const EdgeInsets.all(8),
+                padding: EdgeInsets.all(isSmallScreen ? 4 : 8),
                 decoration: BoxDecoration(
                   color: const Color(0xFFFF8C42).withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: const Icon(
+                child: Icon(
                   Icons.emoji_events,
                   color: Color(0xFFFF8C42),
-                  size: 18,
+                  size: isSmallScreen ? 14 : 18,
                 ),
               ),
-              const SizedBox(width: 12),
+              SizedBox(width: isSmallScreen ? 6 : 12),
               Text(
                 'Badges Earned',
                 style: GoogleFonts.inter(
-                  fontSize: 18,
+                  fontSize: isSmallScreen ? 14 : 18,
                   fontWeight: FontWeight.w600,
                   color: Colors.white,
                 ),
               ),
               const Spacer(),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                padding: EdgeInsets.symmetric(
+                  horizontal: isSmallScreen ? 6 : 8, 
+                  vertical: isSmallScreen ? 2 : 4,
+                ),
                 decoration: BoxDecoration(
                   color: const Color(0xFFFF8C42).withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(12),
@@ -1358,7 +1385,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                 child: Text(
                   '${_userStats.earnedBadges.length}/${allBadges.length}',
                   style: GoogleFonts.inter(
-                    fontSize: 12,
+                    fontSize: isSmallScreen ? 10 : 12,
                     fontWeight: FontWeight.w600,
                     color: const Color(0xFFFF8C42),
                   ),
@@ -1366,7 +1393,7 @@ class _ProfileScreenState extends State<ProfileScreen>
               ),
             ],
           ),
-          const SizedBox(height: 20),
+          SizedBox(height: isSmallScreen ? 8 : 20),
           LayoutBuilder(
             builder: (context, constraints) {
               return GridView.builder(
@@ -1374,9 +1401,9 @@ class _ProfileScreenState extends State<ProfileScreen>
                 physics: const NeverScrollableScrollPhysics(),
                 gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                   crossAxisCount: 2,
-                  childAspectRatio: constraints.maxWidth > 400 ? 1.6 : 1.3,
-                  crossAxisSpacing: 8,
-                  mainAxisSpacing: 8,
+                  childAspectRatio: isSmallScreen ? 1.8 : (constraints.maxWidth > 400 ? 1.6 : 1.3),
+                  crossAxisSpacing: isSmallScreen ? 4 : 8,
+                  mainAxisSpacing: isSmallScreen ? 4 : 8,
                 ),
                 itemCount: allBadges.length,
                 itemBuilder: (context, index) {
@@ -1394,9 +1421,12 @@ class _ProfileScreenState extends State<ProfileScreen>
   }
 
   Widget _buildEnhancedBadge(String emoji, String title, String description, bool isEarned) {
+    final screenHeight = MediaQuery.of(context).size.height;
+    final isSmallScreen = screenHeight < 700;
+    
     return AnimatedContainer(
       duration: const Duration(milliseconds: 300),
-      padding: const EdgeInsets.all(12),
+      padding: EdgeInsets.all(isSmallScreen ? 6 : 12),
       decoration: BoxDecoration(
         color: isEarned 
           ? const Color(0xFF2A2A2A)
@@ -1423,8 +1453,8 @@ class _ProfileScreenState extends State<ProfileScreen>
           Stack(
             children: [
               Container(
-                width: 38,
-                height: 38,
+                width: isSmallScreen ? 28 : 38,
+                height: isSmallScreen ? 28 : 38,
                 decoration: BoxDecoration(
                   color: isEarned 
                     ? const Color(0xFFFF8C42).withValues(alpha: 0.1)
@@ -1435,7 +1465,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                   child: Text(
                     emoji,
                     style: TextStyle(
-                      fontSize: 12,
+                      fontSize: isSmallScreen ? 10 : 12,
                       color: isEarned ? Colors.white : Colors.grey.withValues(alpha: 0.5),
                     ),
                   ),
@@ -1446,22 +1476,22 @@ class _ProfileScreenState extends State<ProfileScreen>
                   right: -2,
                   top: -2,
                   child: Container(
-                    width: 17,
-                    height: 17,
+                    width: isSmallScreen ? 14 : 17,
+                    height: isSmallScreen ? 14 : 17,
                     decoration: const BoxDecoration(
                       color: Color(0xFF10B981),
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(
+                    child: Icon(
                       Icons.check,
-                      size: 9,
+                      size: isSmallScreen ? 7 : 9,
                       color: Colors.white,
                     ),
                   ),
                 ),
             ],
           ),
-          const SizedBox(height: 8),
+          SizedBox(height: isSmallScreen ? 4 : 8),
           Flexible(
             child: Text(
               title,
@@ -1469,13 +1499,13 @@ class _ProfileScreenState extends State<ProfileScreen>
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: GoogleFonts.inter(
-                fontSize: 12,
+                fontSize: isSmallScreen ? 9 : 12,
                 fontWeight: FontWeight.w600,
                 color: isEarned ? Colors.white : const Color(0xFF666666),
               ),
             ),
           ),
-          const SizedBox(height: 2),
+          SizedBox(height: isSmallScreen ? 1 : 2),
           Flexible(
             child: Text(
               description,
@@ -1483,7 +1513,7 @@ class _ProfileScreenState extends State<ProfileScreen>
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
               style: GoogleFonts.inter(
-                fontSize: 8.5,
+                fontSize: isSmallScreen ? 6.5 : 8.5,
                 color: isEarned ? const Color(0xFF999999) : const Color(0xFF555555),
               ),
             ),
@@ -1495,18 +1525,20 @@ class _ProfileScreenState extends State<ProfileScreen>
 
   Widget _buildRecentAchievements() {
     final achievements = _userStats.recentAchievements;
+    final screenHeight = MediaQuery.of(context).size.height;
+    final isSmallScreen = screenHeight < 700;
     
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: EdgeInsets.all(isSmallScreen ? 6 : 20),
       decoration: BoxDecoration(
         color: const Color(0xFF1E1E1E),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(color: const Color(0xFF333333)),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.2),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
+            blurRadius: 6,
+            offset: const Offset(0, 1),
           ),
         ],
       ),
@@ -1516,44 +1548,44 @@ class _ProfileScreenState extends State<ProfileScreen>
           Row(
             children: [
               Container(
-                padding: const EdgeInsets.all(8),
+                padding: EdgeInsets.all(isSmallScreen ? 2 : 8),
                 decoration: BoxDecoration(
                   color: const Color(0xFF10B981).withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(4),
                 ),
-                child: const Icon(
+                child: Icon(
                   Icons.history,
-                  color: Color(0xFF10B981),
-                  size: 20,
+                  color: const Color(0xFF10B981),
+                  size: isSmallScreen ? 12 : 20,
                 ),
               ),
-              const SizedBox(width: 12),
+              SizedBox(width: isSmallScreen ? 4 : 12),
               Text(
                 'Recent Achievements',
                 style: GoogleFonts.inter(
-                  fontSize: 18,
+                  fontSize: isSmallScreen ? 10 : 18,
                   fontWeight: FontWeight.w600,
                   color: Colors.white,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 10),
+          SizedBox(height: isSmallScreen ? 3 : 10),
           if (achievements.isEmpty)
             Container(
-              padding: const EdgeInsets.all(20),
+              padding: EdgeInsets.all(isSmallScreen ? 6 : 20),
               child: Column(
                 children: [
                   Icon(
                     Icons.star_outline,
-                    size: 48,
+                    size: isSmallScreen ? 20 : 48,
                     color: Colors.grey.withValues(alpha: 0.5),
                   ),
-                  const SizedBox(height: 12),
+                  SizedBox(height: isSmallScreen ? 3 : 12),
                   Text(
                     'No achievements yet',
                     style: GoogleFonts.inter(
-                      fontSize: 14,
+                      fontSize: isSmallScreen ? 10 : 16,
                       color: const Color(0xFF888888),
                     ),
                   ),
@@ -1561,7 +1593,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                     'Complete tasks and pomodoros to unlock achievements!',
                     textAlign: TextAlign.center,
                     style: GoogleFonts.inter(
-                      fontSize: 12,
+                      fontSize: isSmallScreen ? 10 : 16,
                       color: const Color(0xFF666666),
                     ),
                   ),
@@ -1572,7 +1604,7 @@ class _ProfileScreenState extends State<ProfileScreen>
             ...achievements.take(3).map((achievement) {
               final timeAgo = _getTimeAgo(achievement.timestamp);
               return Padding(
-                padding: const EdgeInsets.only(bottom: 12),
+                padding: EdgeInsets.only(bottom: isSmallScreen ? 1 : 12),
                 child: _buildAchievementItem(
                   achievement.emoji,
                   achievement.title,
@@ -1602,23 +1634,26 @@ class _ProfileScreenState extends State<ProfileScreen>
   }
 
   Widget _buildAchievementItem(String emoji, String title, String description, String time) {
+    final screenHeight = MediaQuery.of(context).size.height;
+    final isSmallScreen = screenHeight < 700;
+    
     return Row(
       children: [
         Container(
-          width: 40,
-          height: 40,
+          width: isSmallScreen ? 20 : 40,
+          height: isSmallScreen ? 20 : 40,
           decoration: BoxDecoration(
             color: const Color(0xFFFF8C42).withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: BorderRadius.circular(3),
           ),
           child: Center(
             child: Text(
               emoji,
-              style: const TextStyle(fontSize: 20),
+              style: TextStyle(fontSize: isSmallScreen ? 10 : 20),
             ),
           ),
         ),
-        const SizedBox(width: 12),
+        SizedBox(width: isSmallScreen ? 3 : 12),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -1626,18 +1661,21 @@ class _ProfileScreenState extends State<ProfileScreen>
               Text(
                 title,
                 style: GoogleFonts.inter(
-                  fontSize: 14,
+                  fontSize: isSmallScreen ? 9 : 14,
                   fontWeight: FontWeight.w600,
                   color: Colors.white,
                 ),
+                overflow: TextOverflow.ellipsis,
+                maxLines: 1,
               ),
-              const SizedBox(height: 2),
               Text(
                 description,
                 style: GoogleFonts.inter(
-                  fontSize: 12,
+                  fontSize: isSmallScreen ? 7 : 12,
                   color: const Color(0xFF888888),
                 ),
+                overflow: TextOverflow.ellipsis,
+                maxLines: 1,
               ),
             ],
           ),
@@ -1645,7 +1683,7 @@ class _ProfileScreenState extends State<ProfileScreen>
         Text(
           time,
           style: GoogleFonts.inter(
-            fontSize: 11,
+            fontSize: isSmallScreen ? 6 : 11,
             color: const Color(0xFF666666),
           ),
         ),
