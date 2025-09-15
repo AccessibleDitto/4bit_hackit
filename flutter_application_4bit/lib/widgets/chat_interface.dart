@@ -531,6 +531,7 @@ class _ChatInterfaceState extends State<ChatInterface> {
                       onPressed: widget.onClose,
                       icon: Icon(Icons.close, color: Colors.blue.shade800),
                       tooltip: 'Close chat',
+                      iconSize: 20,
                     ),
                   ],
                 ),
