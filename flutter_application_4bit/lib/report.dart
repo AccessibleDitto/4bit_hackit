@@ -18,7 +18,7 @@ class _ReportScreenState extends State<ReportScreen> {
     if (range == 'today') {
       return allTasks.where((t) => t.status == TaskStatus.completed && t.updatedAt.year == now.year && t.updatedAt.month == now.month && t.updatedAt.day == now.day).length;
     } else if (range == 'week') {
-      final startOfWeek = now.subtract(Duration(days: now.weekday - 1));
+      final startOfWeek = now.subtract(Duration(days: 7));
       return allTasks.where((t) => t.status == TaskStatus.completed && t.updatedAt.isAfter(startOfWeek)).length;
     } else if (range == 'biweekly') {
       final startOfBiweek = now.subtract(Duration(days: 13));
@@ -39,7 +39,7 @@ class _ReportScreenState extends State<ReportScreen> {
     // Filter tasks based on time range
     List<Task> filteredTasks;
     if (range == 'Weekly') {
-      final startOfWeek = now.subtract(Duration(days: now.weekday - 1));
+      final startOfWeek = now.subtract(Duration(days: 7));
       filteredTasks = allTasks.where((t) => t.updatedAt.isAfter(startOfWeek)).toList();
     } else {
       // Monthly
@@ -146,7 +146,7 @@ class _ReportScreenState extends State<ReportScreen> {
     if (range == 'today') {
       total = allTasks.where((t) => t.updatedAt.year == now.year && t.updatedAt.month == now.month && t.updatedAt.day == now.day).fold(0.0, (a, b) => a + b.timeSpent);
     } else if (range == 'week') {
-      final startOfWeek = now.subtract(Duration(days: now.weekday - 1));
+      final startOfWeek = now.subtract(Duration(days: 7));
       total = allTasks.where((t) => t.updatedAt.isAfter(startOfWeek)).fold(0.0, (a, b) => a + b.timeSpent);
     } else if (range == 'biweekly') {
       final startOfBiweek = now.subtract(Duration(days: 13));
@@ -988,10 +988,13 @@ class _ReportScreenState extends State<ReportScreen> {
     );
   }
 
-  List<BarChartGroupData> _generateFocusTimeBarGroups(String range) {
+  List<BarChartGroupData> _generateFocusTimeBarGroups(String range){
     final now = DateTime.now();
-    final allTasks = TaskData.getTasksList();
-    
+    final allTasks = <Task>[];
+    TaskData.fetchTasks().then((tasks) {
+      allTasks.addAll(tasks);
+    });
+
     if (range == 'Monthly') {
       // Show monthly data
       return List.generate(7, (index) {
@@ -1020,14 +1023,16 @@ class _ReportScreenState extends State<ReportScreen> {
         );
       });
     } else {
+      debugPrint(allTasks.length.toString());
       // Show daily data (Weekly)
       return List.generate(7, (index) {
         final daysAgo = 6 - index;
-        final targetDate = DateTime(now.year, now.month, now.day - daysAgo);
-        
+        DateTime targetDate = now.subtract( Duration(days: daysAgo));
+        debugPrint('Calculating for date: $targetDate');
         // Get total time spent for tasks in this day
         double totalTimeInHours = 0.0;
         for (final task in allTasks) {
+          debugPrint( 'Checking task updated at: ${task.updatedAt.day} at $targetDate');
           if (task.updatedAt.year == targetDate.year && 
               task.updatedAt.month == targetDate.month &&
               task.updatedAt.day == targetDate.day) {
