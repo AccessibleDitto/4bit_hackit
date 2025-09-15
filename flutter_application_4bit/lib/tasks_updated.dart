@@ -590,7 +590,7 @@ class _TasksPageState extends State<TasksPage> {
             ),
             const Spacer(),
             Text(
-              '$timeSpent ($taskCount tasks)',
+              '$timeSpent ($taskCount)',
               style: GoogleFonts.inter(
                 color: Colors.white,
                 fontSize: 16,
