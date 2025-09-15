@@ -158,7 +158,7 @@ class _PomodoroPreferencesScreenState extends State<PomodoroPreferencesScreen> w
   Future<void> _loadPomodoroSettings() async {
     final prefs = await SharedPreferences.getInstance();
     // int loadedLength = prefs.getInt('pomodoroLength') ?? 25; // this was original time
-    int loadedLength = prefs.getInt('pomodoroLength') ?? 1;
+    int loadedLength = prefs.getInt('pomodoroLength') ?? 10;
     String defaultMode = '${loadedLength.toString().padLeft(2, '0')}:00 → 00:00';
     List<String> options = [defaultMode, '00:00 → ∞'];
     String loadedTimerMode = prefs.getString('timerMode') ?? defaultMode;
@@ -335,9 +335,9 @@ class _PomodoroPreferencesScreenState extends State<PomodoroPreferencesScreen> w
           subtitle: '$_pomodoroLength minutes',
           icon: Icons.schedule,
           value: _pomodoroLength.toDouble(),
-          min: 1, // this was 25
+          min: 10, // this was 25
           max: 60, 
-          divisions: 7, 
+          divisions: 10, 
           onChanged: (value) async {
             int newValue = value.round();
             setState(() {
